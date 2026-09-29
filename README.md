@@ -6,11 +6,11 @@ Sistema para cadastro de dados acadêmicos e geração automática de grade hor�
 
 - cadastra cursos, turmas e disciplinas;
 - cadastra, edita e remove professores;
-- registra disponibilidade de professores em 15 períodos semanais por dia;
+- registra disponibilidade de professores em 16 períodos de aula possíveis ao longo do dia;
 - atribui disciplinas aos professores habilitados;
 - configura regras obrigatórias (Hard) e preferências (Soft);
 - gera uma grade evitando conflitos de turma e professor;
-- considera carga horária, turno, disponibilidade, complexidade e janelas;
+- considera carga horária, jornada da turma, disponibilidade, complexidade, intervalos e janelas;
 - salva a última grade no SQLite;
 - permite visualizar a grade por turma ou professor.
 
@@ -107,13 +107,23 @@ O CP-SAT trata, entre outras, as seguintes condições:
 - uma turma não pode ter duas aulas no mesmo período;
 - um professor não pode dar duas aulas simultâneas;
 - a carga horária semanal de cada disciplina deve ser cumprida;
-- aulas só podem ocorrer no turno da turma;
+- aulas só podem ocorrer nos períodos válidos da jornada da turma (Manhã, Integral ou Noite);
 - indisponibilidades de professores são respeitadas;
-- existe limite diário e consecutivo para professores;
+- existe limite diário e consecutivo para professores, com intervalos oficiais quebrando a sequência;
 - disciplinas de alta complexidade têm limite diário;
-- três aulas consecutivas da mesma disciplina são evitadas por regra obrigatória;
+- três aulas consecutivas da mesma disciplina são evitadas por regra obrigatória, respeitando intervalos;
 - janelas podem ser Hard ou Soft;
-- preferências Soft podem evitar bordas do turno e sexta-feira;
+- preferências Soft podem evitar primeira aula, última aula e sexta-feira;
 - a pontuação do professor participa da função objetivo.
 
 A regra de interjornada usada aqui é uma simplificação por turnos: professor que trabalha no período noturno não é alocado na manhã do dia seguinte.
+
+## Jornadas e horários
+
+O modelo atual representa três jornadas de turma:
+
+- **Manhã:** 6 aulas, de 07:10 a 12:30;
+- **Integral:** 5 aulas pela manhã e 5 à tarde, com almoço de 11:40 a 13:00;
+- **Noite:** 5 aulas, de 19:00 a 23:00.
+
+Intervalos e almoço aparecem visualmente na grade, mas não são períodos onde o solver possa colocar uma disciplina.

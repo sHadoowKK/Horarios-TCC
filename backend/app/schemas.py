@@ -2,7 +2,7 @@ from typing import Dict, List, Literal
 from pydantic import BaseModel, Field
 
 
-Shift = Literal["Manhã", "Tarde", "Noite"]
+Shift = Literal["Manhã", "Integral", "Noite"]
 Complexity = Literal["Alta", "Media", "Baixa"]
 RuleMode = Literal["ignore", "soft", "hard"]
 
@@ -118,7 +118,7 @@ class TimetableItemBase(BaseModel):
     subject_id: int
     teacher_id: int
     day: int = Field(ge=0, le=4)
-    period: int = Field(ge=0, le=14)
+    period: int = Field(ge=0, le=15)
 
 
 class TimetableItemCreate(TimetableItemBase):

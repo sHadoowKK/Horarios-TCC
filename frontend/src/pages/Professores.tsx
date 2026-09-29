@@ -17,20 +17,37 @@ interface Teacher {
 
 const DAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
 const PERIOD_NAMES = [
-  "07:10 - 08:00", "08:00 - 08:50", "08:50 - 09:40", "10:00 - 10:50", "10:50 - 11:40",
+  "07:10 - 08:00", "08:00 - 08:50", "08:50 - 09:40", "10:00 - 10:50", "10:50 - 11:40", "11:40 - 12:30",
   "13:00 - 13:50", "13:50 - 14:40", "14:50 - 15:40", "15:40 - 16:30", "16:30 - 17:20",
   "19:00 - 19:50", "19:50 - 20:30", "20:30 - 21:15", "21:30 - 22:15", "22:15 - 23:00"
 ];
 const SHIFTS = [
-  { name: "Manhã", prefix: "M", count: 5, startIndex: 0 },
-  { name: "Tarde", prefix: "T", count: 5, startIndex: 5 },
-  { name: "Noite", prefix: "N", count: 5, startIndex: 10 }
+  { name: "Manhã", prefix: "M", count: 6, startIndex: 0 },
+  { name: "Tarde", prefix: "T", count: 5, startIndex: 6 },
+  { name: "Noite", prefix: "N", count: 5, startIndex: 11 }
 ];
+
+const normalizeAvailabilityDay = (values?: boolean[]) => {
+  if (!values) return Array(16).fill(true);
+  if (values.length === 16) return [...values];
+
+  // Banco antigo: 5 manhã + 5 tarde + 5 noite.
+  // A nova 6ª aula da manhã herda a disponibilidade da última aula matutina antiga.
+  if (values.length === 15) {
+    return [...values.slice(0, 5), values[4], ...values.slice(5)];
+  }
+
+  const normalized = Array(16).fill(true);
+  for (let i = 0; i < Math.min(values.length, 16); i++) {
+    normalized[i] = values[i];
+  }
+  return normalized;
+};
 
 const initialAvailability = () => {
   const avail: Record<string, boolean[]> = {};
   for (let i = 0; i < 5; i++) {
-    avail[i.toString()] = Array(15).fill(true); // 15 periods (M1-M5, T1-T5, N1-N5)
+    avail[i.toString()] = Array(16).fill(true);
   }
   return avail;
 };
@@ -92,18 +109,10 @@ export default function Professores() {
     e.preventDefault();
     if (!newName.trim() || newAllowedSubjects.length === 0) return;
     
-    // Ensure all days have 15 elements (migration fallback)
-    const normalizedAvailability = { ...newAvailability };
+    const normalizedAvailability: Record<string, boolean[]> = {};
     for (let i = 0; i < 5; i++) {
-      if (!normalizedAvailability[i.toString()] || normalizedAvailability[i.toString()].length < 15) {
-        const arr = Array(15).fill(true);
-        if (normalizedAvailability[i.toString()]) {
-          for (let j = 0; j < normalizedAvailability[i.toString()].length; j++) {
-            arr[j] = normalizedAvailability[i.toString()][j];
-          }
-        }
-        normalizedAvailability[i.toString()] = arr;
-      }
+      const dayKey = i.toString();
+      normalizedAvailability[dayKey] = normalizeAvailabilityDay(newAvailability[dayKey]);
     }
 
     const payload = {
@@ -133,14 +142,9 @@ export default function Professores() {
     setNewAllowedSubjects([...teacher.allowed_subjects]);
     
     const availCopy: Record<string, boolean[]> = {};
-    for (const key in teacher.availability) {
-      availCopy[key] = [...teacher.availability[key]];
-      // Backwards compatibility with 5-period DB
-      if (availCopy[key].length < 15) {
-        const newArr = Array(15).fill(true);
-        for (let i = 0; i < availCopy[key].length; i++) newArr[i] = availCopy[key][i];
-        availCopy[key] = newArr;
-      }
+    for (let day = 0; day < 5; day++) {
+      const key = day.toString();
+      availCopy[key] = normalizeAvailabilityDay(teacher.availability[key]);
     }
     setNewAvailability(availCopy);
     

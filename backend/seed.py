@@ -4,13 +4,13 @@ BASE = "http://localhost:8000"
 
 
 def make_availability(shifts):
-    day = [False] * 15
+    day = [False] * 16
     if "M" in shifts:
-        day[0:5] = [True] * 5
+        day[0:6] = [True] * 6
     if "T" in shifts:
-        day[5:10] = [True] * 5
+        day[6:11] = [True] * 5
     if "N" in shifts:
-        day[10:15] = [True] * 5
+        day[11:16] = [True] * 5
     return {str(day_index): day[:] for day_index in range(5)}
 
 
@@ -20,7 +20,7 @@ tecnico = requests.post(f"{BASE}/courses/", json={"name": "Técnico em Informát
 
 print("Criando turmas...")
 requests.post(f"{BASE}/classrooms/", json={"name": "1º Ano A", "course_id": medio["id"], "shift": "Manhã"})
-requests.post(f"{BASE}/classrooms/", json={"name": "1º Ano B", "course_id": medio["id"], "shift": "Tarde"})
+requests.post(f"{BASE}/classrooms/", json={"name": "1º Ano B", "course_id": medio["id"], "shift": "Integral"})
 requests.post(f"{BASE}/classrooms/", json={"name": "Módulo 1", "course_id": tecnico["id"], "shift": "Noite"})
 
 print("Criando disciplinas...")

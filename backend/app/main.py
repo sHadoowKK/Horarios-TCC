@@ -3,11 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from . import models, schemas
-from .database import engine, ensure_config_columns, get_db
+from .database import engine, ensure_database_compatibility, get_db
 from .optimizer import generate_schedule
 
 models.Base.metadata.create_all(bind=engine)
-ensure_config_columns()
+ensure_database_compatibility()
 
 app = FastAPI(title="Gerador de Horários API")
 

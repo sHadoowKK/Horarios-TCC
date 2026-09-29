@@ -151,7 +151,7 @@ export default function Turmas() {
                 onChange={e => setNewClassShift(e.target.value)}
               >
                 <option value="Manhã">Manhã</option>
-                <option value="Tarde">Tarde</option>
+                <option value="Integral">Integral</option>
                 <option value="Noite">Noite</option>
               </select>
               <select 
