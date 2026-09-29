@@ -1,0 +1,130 @@
+from typing import Dict, List, Literal
+from pydantic import BaseModel, Field
+
+
+Shift = Literal["Manhã", "Tarde", "Noite"]
+Complexity = Literal["Alta", "Media", "Baixa"]
+RuleMode = Literal["ignore", "soft", "hard"]
+
+
+class CourseBase(BaseModel):
+    name: str = Field(min_length=1)
+
+
+class CourseCreate(CourseBase):
+    pass
+
+
+class Course(CourseBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+
+class ClassroomBase(BaseModel):
+    name: str = Field(min_length=1)
+    shift: Shift
+    course_id: int = Field(gt=0)
+
+
+class ClassroomCreate(ClassroomBase):
+    pass
+
+
+class Classroom(ClassroomBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+
+class SubjectBase(BaseModel):
+    name: str = Field(min_length=1)
+    workload: int = Field(ge=1, le=25)
+    complexity: Complexity
+    course_ids: List[int]
+
+
+class SubjectCreate(SubjectBase):
+    pass
+
+
+class Subject(SubjectBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+
+class TeacherBase(BaseModel):
+    name: str = Field(min_length=1)
+    allowed_subjects: List[int]
+    availability: Dict[str, List[bool]]
+    score: int = Field(default=0, ge=0, le=100)
+
+
+class TeacherCreate(TeacherBase):
+    pass
+
+
+class Teacher(TeacherBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+
+class PeriodBase(BaseModel):
+    name: str
+    start_time: str
+    end_time: str
+    is_break: bool = False
+
+
+class PeriodCreate(PeriodBase):
+    pass
+
+
+class Period(PeriodBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+
+class SystemConfigBase(BaseModel):
+    max_classes_per_day: int = Field(default=9, ge=1, le=15)
+    max_consecutive_classes: int = Field(default=5, ge=1, le=15)
+    max_high_complexity_per_day: int = Field(default=2, ge=0, le=15)
+    student_gaps_hard: bool = True
+    teacher_gaps_hard: bool = False
+    min_classes_students: int = Field(default=2, ge=0, le=15)
+    min_classes_teachers: int = Field(default=2, ge=0, le=15)
+    avoid_edges: bool = False
+    avoid_friday: bool = False
+    max_consec_per_teacher: int = Field(default=2, ge=1, le=15)
+    max_consec_teacher_mode: RuleMode = "hard"
+
+
+class SystemConfigUpdate(SystemConfigBase):
+    pass
+
+
+class SystemConfig(SystemConfigBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+
+class TimetableItemBase(BaseModel):
+    classroom_id: int
+    subject_id: int
+    teacher_id: int
+    day: int = Field(ge=0, le=4)
+    period: int = Field(ge=0, le=14)
+
+
+class TimetableItemCreate(TimetableItemBase):
+    pass
+
+
+class TimetableItem(TimetableItemBase):
+    id: int
+    class Config:
+        from_attributes = True
