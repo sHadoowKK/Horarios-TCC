@@ -96,7 +96,8 @@ class SystemConfigBase(BaseModel):
     teacher_gaps_hard: bool = False
     min_classes_students: int = Field(default=2, ge=0, le=15)
     min_classes_teachers: int = Field(default=2, ge=0, le=15)
-    avoid_edges: bool = False
+    avoid_first_period: bool = False
+    avoid_last_period: bool = False
     avoid_friday: bool = False
     max_consec_per_teacher: int = Field(default=2, ge=1, le=15)
     max_consec_teacher_mode: RuleMode = "hard"

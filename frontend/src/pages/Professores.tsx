@@ -19,7 +19,7 @@ const DAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
 const PERIOD_NAMES = [
   "07:10 - 08:00", "08:00 - 08:50", "08:50 - 09:40", "10:00 - 10:50", "10:50 - 11:40",
   "13:00 - 13:50", "13:50 - 14:40", "14:50 - 15:40", "15:40 - 16:30", "16:30 - 17:20",
-  "19:00 - 19:45", "19:45 - 20:30", "20:30 - 21:15", "21:30 - 22:15", "22:15 - 23:00"
+  "19:00 - 19:50", "19:50 - 20:30", "20:30 - 21:15", "21:30 - 22:15", "22:15 - 23:00"
 ];
 const SHIFTS = [
   { name: "Manhã", prefix: "M", count: 5, startIndex: 0 },
@@ -115,7 +115,7 @@ export default function Professores() {
 
     try {
       if (editingTeacherId) {
-        await axios.put(`http://localhost:8000/teachers/${editingTeacherId}`, payload);
+        await api.put(`/teachers/${editingTeacherId}`, payload);
       } else {
         await api.post("/teachers/", payload);
       }

@@ -3,10 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from . import models, schemas
-from .database import engine, get_db
+from .database import engine, ensure_config_columns, get_db
 from .optimizer import generate_schedule
 
 models.Base.metadata.create_all(bind=engine)
+ensure_config_columns()
 
 app = FastAPI(title="Gerador de Horários API")
 
@@ -170,7 +171,8 @@ def generate_timetable(db: Session = Depends(get_db)):
         "teacher_gaps_hard": config.teacher_gaps_hard,
         "min_classes_students": config.min_classes_students,
         "min_classes_teachers": config.min_classes_teachers,
-        "avoid_edges": config.avoid_edges,
+        "avoid_first_period": config.avoid_first_period,
+        "avoid_last_period": config.avoid_last_period,
         "avoid_friday": config.avoid_friday,
         "max_consec_per_teacher": config.max_consec_per_teacher,
         "max_consec_teacher_mode": config.max_consec_teacher_mode,

@@ -129,8 +129,16 @@ export default function Config() {
             </div>
 
             <div className="flex flex-col gap-3 p-4 border rounded-lg bg-gray-50">
-              <label className="font-bold text-gray-700">Alunos: Evitar 1ª e Última Aula (Soft)</label>
-              <select className="border border-gray-300 rounded p-2" value={config.avoid_edges ? "true" : "false"} onChange={e => handleChange("avoid_edges", e.target.value === "true")}>
+              <label className="font-bold text-gray-700">Alunos: Evitar 1ª Aula (Soft)</label>
+              <select className="border border-gray-300 rounded p-2" value={config.avoid_first_period ? "true" : "false"} onChange={e => handleChange("avoid_first_period", e.target.value === "true")}>
+                <option value="false">NÃO</option>
+                <option value="true">SIM</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-3 p-4 border rounded-lg bg-gray-50">
+              <label className="font-bold text-gray-700">Alunos: Evitar Última Aula (Soft)</label>
+              <select className="border border-gray-300 rounded p-2" value={config.avoid_last_period ? "true" : "false"} onChange={e => handleChange("avoid_last_period", e.target.value === "true")}>
                 <option value="false">NÃO</option>
                 <option value="true">SIM</option>
               </select>

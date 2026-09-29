@@ -263,7 +263,8 @@ def generate_schedule(
     # 2. Novas Preferências Soft (Penalidades)
     min_classes_students = sys_config.get("min_classes_students", 2)
     min_classes_teachers = sys_config.get("min_classes_teachers", 2)
-    avoid_edges = sys_config.get("avoid_edges", False)
+    avoid_first_period = sys_config.get("avoid_first_period", False)
+    avoid_last_period = sys_config.get("avoid_last_period", False)
     avoid_friday = sys_config.get("avoid_friday", False)
     
     # A) Mínimo de aulas para professores
@@ -301,9 +302,12 @@ def generate_schedule(
                     for t in teachers:
                         p_classes.append(Y[(c["id"], s["id"], t["id"], d, p)])
                         
-                        # Borda do dia (Primeira e Última Aula)
-                        if avoid_edges and (p == min_p or p == max_p):
-                            penalties.append(Y[(c["id"], s["id"], t["id"], d, p)] * 20) # penalidade leve
+                        # Preferências de borda do turno
+                        if avoid_first_period and p == min_p:
+                            penalties.append(Y[(c["id"], s["id"], t["id"], d, p)] * 20)
+
+                        if avoid_last_period and p == max_p:
+                            penalties.append(Y[(c["id"], s["id"], t["id"], d, p)] * 20)
                         
                         # Evitar Sexta-feira
                         if avoid_friday and d == 4:
