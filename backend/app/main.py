@@ -9,7 +9,7 @@ from .optimizer import generate_schedule
 models.Base.metadata.create_all(bind=engine)
 ensure_database_compatibility()
 
-app = FastAPI(title="Gerador de Horários API")
+app = FastAPI(title="Anatinus API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,7 +32,7 @@ def get_or_create_config(db: Session) -> models.SystemConfig:
 
 @app.get("/")
 def root():
-    return {"message": "API do Gerador de Horários"}
+    return {"message": "API do Anatinus"}
 
 
 @app.post("/courses/", response_model=schemas.Course)

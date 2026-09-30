@@ -344,8 +344,12 @@ function App() {
         <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
           <div className="p-6 border-b border-gray-200">
             <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
-              <Calendar className="w-6 h-6" />
-              GeradorHorários
+              <img
+                src="/anatinus.svg"
+                alt=""
+                className="w-8 h-8"
+              />
+              Anatinus
             </h1>
           </div>
 
