@@ -76,6 +76,11 @@ const PROFESSOR_ROWS: DisplayRow[] = [
 
 type Theme = "light" | "dark";
 
+interface GenerationInfo {
+  solveTimeSeconds?: number;
+  solutionStatus?: string;
+}
+
 function getInitialTheme(): Theme {
   const savedTheme = localStorage.getItem("anatinus-theme");
 
@@ -93,6 +98,8 @@ function App() {
   const [schedule, setSchedule] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [generationInfo, setGenerationInfo] =
+    useState<GenerationInfo | null>(null);
 
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -161,10 +168,17 @@ function App() {
       const response = await api.post("/generate/");
       const newSchedule = response.data.schedule;
       setSchedule(newSchedule);
+      setGenerationInfo({
+        solveTimeSeconds:
+          response.data.solve_time_seconds,
+        solutionStatus:
+          response.data.solution_status,
+      });
 
       // Salva a grade mais recente para ela reaparecer ao abrir o sistema.
       await api.post("/timetable/", newSchedule);
     } catch (err: any) {
+      setGenerationInfo(null);
       const detail = err.response?.data?.detail;
       const responseText =
         typeof err.response?.data === "string"
@@ -202,6 +216,39 @@ function App() {
 
   const unstaffedLessons =
     schedule?.filter(item => item.teacher_id == null).length || 0;
+
+  const unstaffedSummary = Object.values(
+    (schedule || [])
+      .filter(item => item.teacher_id == null)
+      .reduce(
+        (groups: Record<string, any>, item: any) => {
+          const key = [
+            item.classroom_id,
+            item.subject_id,
+            item.student_group || "Todos",
+          ].join(":");
+
+          if (!groups[key]) {
+            groups[key] = {
+              classroomId: item.classroom_id,
+              subjectId: item.subject_id,
+              studentGroup:
+                item.student_group || "Todos",
+              lessons: 0,
+            };
+          }
+
+          groups[key].lessons += 1;
+          return groups;
+        },
+        {},
+      ),
+  ) as Array<{
+    classroomId: number;
+    subjectId: number;
+    studentGroup: string;
+    lessons: number;
+  }>;
 
   const renderScheduleGrid = () => {
     if (!schedule) {
@@ -512,14 +559,50 @@ function App() {
                     </div>
                   )}
 
+                  {!error && generationInfo && (
+                    <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm">
+                      <strong>Grade gerada.</strong>
+                      {typeof generationInfo.solveTimeSeconds === "number" && (
+                        <span className="ml-1">
+                          Cálculo em {generationInfo.solveTimeSeconds.toFixed(2)}s.
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {!error && unstaffedLessons > 0 && (
                     <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg">
-                      <strong>
-                        {unstaffedLessons} {unstaffedLessons === 1 ? "aula está" : "aulas estão"} sem professor.
-                      </strong>
-                      <span className="ml-1">
-                        A grade continua válida; essas aulas ficam reservadas até a escola atribuir um docente.
-                      </span>
+                      <div>
+                        <strong>
+                          {unstaffedLessons} {unstaffedLessons === 1 ? "aula está" : "aulas estão"} sem professor.
+                        </strong>
+                        <span className="ml-1">
+                          A grade continua válida; esses horários ficam reservados até a escola atribuir um docente.
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {unstaffedSummary.map(item => {
+                          const groupLabel =
+                            item.studentGroup !== "Todos"
+                              ? ` · Grupo ${item.studentGroup}`
+                              : "";
+
+                          return (
+                            <span
+                              key={`${item.classroomId}-${item.subjectId}-${item.studentGroup}`}
+                              className="text-xs px-2 py-1 rounded bg-white border border-amber-200"
+                            >
+                              {getClassroomName(item.classroomId)}
+                              {" · "}
+                              {getSubName(item.subjectId)}
+                              {groupLabel}
+                              {" — "}
+                              {item.lessons} {item.lessons === 1 ? "aula" : "aulas"}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 

@@ -317,3 +317,29 @@ html.dark-theme {
   background: #334155;
   border-color: #475569;
 }
+
+
+/* Ajustes para controles rápidos adicionados aos cadastros */
+.dark-theme .border-green-200 {
+  border-color: #2f6b4f !important;
+}
+
+.dark-theme .border-blue-200 {
+  border-color: #305985 !important;
+}
+
+.dark-theme .hover\:bg-indigo-100:hover {
+  background-color: #242653 !important;
+}
+
+.dark-theme .hover\:bg-green-100:hover {
+  background-color: #17392e !important;
+}
+
+.dark-theme .hover\:bg-red-100:hover {
+  background-color: #3d1b22 !important;
+}
+
+.dark-theme .hover\:bg-blue-100:hover {
+  background-color: #193558 !important;
+}

@@ -171,3 +171,28 @@ Para reduzir trabalho manual, o fluxo pensado para quem monta a grade é:
 7. gerar a grade.
 
 Regras obrigatórias ficam embutidas no otimizador para não depender de o usuário lembrar de configurá-las.
+
+
+## Cadastro rápido de professores
+
+A tela de professores foi preparada para reduzir trabalho repetitivo:
+
+- busca por disciplina;
+- seleção e limpeza em massa das disciplinas visíveis;
+- disponibilidade recolhível;
+- botão para liberar ou bloquear todos os horários;
+- clique no nome do dia para liberar/bloquear o dia inteiro;
+- clique no nome do turno para liberar/bloquear esse turno na semana inteira;
+- disponibilidade pode ser cadastrada mesmo antes de definir as disciplinas do professor;
+- horários ocupados em outra escola são representados simplesmente como indisponíveis.
+
+
+## Manutenção dos cadastros
+
+Cursos, turmas e disciplinas podem ser removidos pela própria interface.
+
+- uma turma removida também remove apenas os horários salvos daquela turma;
+- uma disciplina removida é retirada das matrizes das turmas, das permissões dos professores e da grade salva;
+- um curso só pode ser removido quando não houver turmas ligadas a ele; a associação do curso nas disciplinas é limpa automaticamente.
+
+Essas exclusões evitam deixar referências quebradas no banco.

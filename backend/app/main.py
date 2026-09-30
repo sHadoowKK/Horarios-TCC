@@ -76,6 +76,49 @@ def read_courses(db: Session = Depends(get_db)):
     return db.query(models.Course).all()
 
 
+@app.delete("/courses/{course_id}")
+def delete_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+):
+    item = (
+        db.query(models.Course)
+        .filter(models.Course.id == course_id)
+        .first()
+    )
+
+    if not item:
+        raise HTTPException(404, "Curso não encontrado")
+
+    classroom_count = (
+        db.query(models.Classroom)
+        .filter(models.Classroom.course_id == course_id)
+        .count()
+    )
+
+    if classroom_count:
+        raise HTTPException(
+            400,
+            "Este curso ainda possui turmas. "
+            "Remova ou altere essas turmas antes de excluir o curso.",
+        )
+
+    # Retira a associação do curso nas disciplinas sem apagá-las.
+    for subject in db.query(models.Subject).all():
+        course_ids = list(subject.course_ids or [])
+        if course_id in course_ids:
+            subject.course_ids = [
+                current_id
+                for current_id in course_ids
+                if current_id != course_id
+            ]
+
+    db.delete(item)
+    db.commit()
+
+    return {"detail": "Curso removido com sucesso"}
+
+
 # ----------------------------------------------------------------------
 # TURMAS
 # ----------------------------------------------------------------------
@@ -119,6 +162,30 @@ def update_classroom(
     return item
 
 
+@app.delete("/classrooms/{classroom_id}")
+def delete_classroom(
+    classroom_id: int,
+    db: Session = Depends(get_db),
+):
+    item = (
+        db.query(models.Classroom)
+        .filter(models.Classroom.id == classroom_id)
+        .first()
+    )
+
+    if not item:
+        raise HTTPException(404, "Turma não encontrada")
+
+    db.query(models.TimetableItem).filter(
+        models.TimetableItem.classroom_id == classroom_id
+    ).delete(synchronize_session=False)
+
+    db.delete(item)
+    db.commit()
+
+    return {"detail": "Turma removida com sucesso"}
+
+
 # ----------------------------------------------------------------------
 # DISCIPLINAS
 # ----------------------------------------------------------------------
@@ -160,6 +227,49 @@ def update_subject(
     db.commit()
     db.refresh(item)
     return item
+
+
+@app.delete("/subjects/{subject_id}")
+def delete_subject(
+    subject_id: int,
+    db: Session = Depends(get_db),
+):
+    item = (
+        db.query(models.Subject)
+        .filter(models.Subject.id == subject_id)
+        .first()
+    )
+
+    if not item:
+        raise HTTPException(404, "Disciplina não encontrada")
+
+    for classroom in db.query(models.Classroom).all():
+        classroom.subject_settings = [
+            setting
+            for setting in (classroom.subject_settings or [])
+            if setting.get("subject_id") != subject_id
+        ]
+        classroom.split_subject_ids = [
+            current_id
+            for current_id in (classroom.split_subject_ids or [])
+            if current_id != subject_id
+        ]
+
+    for teacher in db.query(models.Teacher).all():
+        teacher.allowed_subjects = [
+            current_id
+            for current_id in (teacher.allowed_subjects or [])
+            if current_id != subject_id
+        ]
+
+    db.query(models.TimetableItem).filter(
+        models.TimetableItem.subject_id == subject_id
+    ).delete(synchronize_session=False)
+
+    db.delete(item)
+    db.commit()
+
+    return {"detail": "Disciplina removida com sucesso"}
 
 
 # ----------------------------------------------------------------------

@@ -7,6 +7,7 @@ import {
   Layers,
   Plus,
   School,
+  Trash2,
 } from "lucide-react";
 
 interface Course {
@@ -99,6 +100,85 @@ export default function Turmas() {
 
     setNewCourseName("");
     fetchData();
+  };
+
+  const handleDeleteCourse = async (
+    course: Course,
+  ) => {
+    if (
+      !confirm(
+        `Remover o curso "${course.name}"?`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.delete(
+        `/courses/${course.id}`,
+      );
+      fetchData();
+    } catch (error: any) {
+      alert(
+        error.response?.data?.detail
+        || "Não foi possível remover o curso.",
+      );
+    }
+  };
+
+  const handleDeleteClassroom = async (
+    classroom: Classroom,
+  ) => {
+    if (
+      !confirm(
+        `Remover a turma "${classroom.name}" e os horários salvos dela?`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.delete(
+        `/classrooms/${classroom.id}`,
+      );
+
+      setExpandedClassrooms(current => {
+        const next = new Set(current);
+        next.delete(classroom.id);
+        return next;
+      });
+
+      fetchData();
+    } catch (error: any) {
+      alert(
+        error.response?.data?.detail
+        || "Não foi possível remover a turma.",
+      );
+    }
+  };
+
+  const handleDeleteSubject = async (
+    subject: Subject,
+  ) => {
+    if (
+      !confirm(
+        `Remover a disciplina "${subject.name}"? Ela será retirada das turmas e dos professores que a utilizam.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.delete(
+        `/subjects/${subject.id}`,
+      );
+      fetchData();
+    } catch (error: any) {
+      alert(
+        error.response?.data?.detail
+        || "Não foi possível remover a disciplina.",
+      );
+    }
   };
 
   const handleAddClassroom = async (
@@ -443,15 +523,26 @@ export default function Turmas() {
             {courses.map(course => (
               <li
                 key={course.id}
-                className="p-3 bg-gray-50 border border-gray-100 rounded-lg flex justify-between items-center"
+                className="p-3 bg-gray-50 border border-gray-100 rounded-lg flex justify-between items-center gap-2"
               >
-                <span className="font-medium text-gray-800">
+                <span className="font-medium text-gray-800 flex-1 min-w-0 truncate">
                   {course.name}
                 </span>
 
                 <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
                   ID: {course.id}
                 </span>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDeleteCourse(course)
+                  }
+                  className="p-1.5 text-red-600 hover:bg-red-100 rounded"
+                  title="Remover curso"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </li>
             ))}
 
@@ -570,14 +661,27 @@ export default function Turmas() {
                   key={classroom.id}
                   className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-sm flex flex-col gap-2"
                 >
-                  <div className="flex justify-between gap-2">
-                    <strong className="text-gray-800 text-base">
+                  <div className="flex justify-between gap-2 items-start">
+                    <strong className="text-gray-800 text-base flex-1 min-w-0 truncate">
                       {classroom.name}
                     </strong>
 
                     <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
                       {classroom.shift}
                     </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDeleteClassroom(
+                          classroom,
+                        )
+                      }
+                      className="p-1 text-red-600 hover:bg-red-100 rounded"
+                      title="Remover turma"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
 
                   <div className="text-xs text-emerald-600 font-medium">
@@ -991,9 +1095,9 @@ export default function Turmas() {
                 key={subject.id}
                 className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-sm flex flex-col gap-2"
               >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <strong className="text-gray-800 text-base block">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <strong className="text-gray-800 text-base block truncate">
                       {subject.name}
                     </strong>
 
@@ -1003,17 +1107,32 @@ export default function Turmas() {
                     </span>
                   </div>
 
-                  <span
-                    className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
-                      subject.complexity === "Alta"
-                        ? "bg-red-100 text-red-700"
-                        : subject.complexity === "Media"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-green-100 text-green-700"
-                    }`}
-                  >
-                    {subject.complexity}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
+                        subject.complexity === "Alta"
+                          ? "bg-red-100 text-red-700"
+                          : subject.complexity === "Media"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-700"
+                      }`}
+                    >
+                      {subject.complexity}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDeleteSubject(
+                          subject,
+                        )
+                      }
+                      className="p-1.5 text-red-600 hover:bg-red-100 rounded"
+                      title="Remover disciplina"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <select
