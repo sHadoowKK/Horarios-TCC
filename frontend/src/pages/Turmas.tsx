@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { api } from '../api';
-import { BookOpen, School, Layers, Plus } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { api } from "../api";
+import { BookOpen, School, Layers, Plus } from "lucide-react";
 
 interface Course {
   id: number;
@@ -13,6 +13,7 @@ interface Classroom {
   shift: string;
   course_id: number;
   has_groups: boolean;
+  split_subject_ids: number[];
 }
 
 interface Subject {
@@ -81,6 +82,7 @@ export default function Turmas() {
       shift: newClassShift,
       course_id: Number(newClassCourseId),
       has_groups: newClassHasGroups,
+      split_subject_ids: [],
     });
 
     setNewClassName("");
@@ -88,15 +90,43 @@ export default function Turmas() {
     fetchData();
   };
 
-  const handleToggleClassGroups = async (classroom: Classroom) => {
+  const saveClassroom = async (
+    classroom: Classroom,
+    changes: Partial<Classroom>,
+  ) => {
     await api.put(`/classrooms/${classroom.id}`, {
-      name: classroom.name,
-      shift: classroom.shift,
-      course_id: classroom.course_id,
-      has_groups: !classroom.has_groups,
+      name: changes.name ?? classroom.name,
+      shift: changes.shift ?? classroom.shift,
+      course_id: changes.course_id ?? classroom.course_id,
+      has_groups: changes.has_groups ?? classroom.has_groups,
+      split_subject_ids:
+        changes.split_subject_ids ?? classroom.split_subject_ids ?? [],
     });
 
     fetchData();
+  };
+
+  const handleToggleClassGroups = async (classroom: Classroom) => {
+    await saveClassroom(classroom, {
+      has_groups: !classroom.has_groups,
+    });
+  };
+
+  const handleSubjectMode = async (
+    classroom: Classroom,
+    subjectId: number,
+    mode: "Todos" | "Grupos",
+  ) => {
+    const current = classroom.split_subject_ids || [];
+
+    const next =
+      mode === "Grupos"
+        ? Array.from(new Set([...current, subjectId]))
+        : current.filter(id => id !== subjectId);
+
+    await saveClassroom(classroom, {
+      split_subject_ids: next,
+    });
   };
 
   const handleAddSubject = async (event: React.FormEvent) => {
@@ -133,6 +163,11 @@ export default function Turmas() {
     fetchData();
   };
 
+  const subjectsForClassroom = (classroom: Classroom) =>
+    subjects.filter(subject =>
+      subject.course_ids?.includes(classroom.course_id),
+    );
+
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2 mb-8">
@@ -165,13 +200,15 @@ export default function Turmas() {
             </button>
           </form>
 
-          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[400px] pr-2">
+          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[520px] pr-2">
             {courses.map(course => (
               <li
                 key={course.id}
                 className="p-3 bg-gray-50 border border-gray-100 rounded-lg flex justify-between items-center"
               >
-                <span className="font-medium text-gray-800">{course.name}</span>
+                <span className="font-medium text-gray-800">
+                  {course.name}
+                </span>
                 <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
                   ID: {course.id}
                 </span>
@@ -241,8 +278,15 @@ export default function Turmas() {
                 onChange={event => setNewClassHasGroups(event.target.checked)}
                 className="accent-emerald-600"
               />
-              Dividir esta turma em Grupo A e Grupo B
+              Esta turma utiliza Grupos A/B
             </label>
+
+            {newClassHasGroups && (
+              <p className="text-xs text-gray-500 -mt-1">
+                Depois de criar a turma, você escolhe quais disciplinas
+                ficam juntas e quais separam A/B.
+              </p>
+            )}
 
             <button
               type="submit"
@@ -253,38 +297,97 @@ export default function Turmas() {
             </button>
           </form>
 
-          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[400px] pr-2">
-            {classrooms.map(classroom => (
-              <li
-                key={classroom.id}
-                className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-sm flex flex-col gap-2"
-              >
-                <div className="flex justify-between">
-                  <strong className="text-gray-800 text-base">
-                    {classroom.name}
-                  </strong>
-                  <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
-                    {classroom.shift}
-                  </span>
-                </div>
+          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[520px] pr-2">
+            {classrooms.map(classroom => {
+              const classSubjects = subjectsForClassroom(classroom);
 
-                <div className="text-xs text-emerald-600 font-medium">
-                  Curso:{" "}
-                  {courses.find(course => course.id === classroom.course_id)?.name ||
-                    classroom.course_id}
-                </div>
+              return (
+                <li
+                  key={classroom.id}
+                  className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-sm flex flex-col gap-2"
+                >
+                  <div className="flex justify-between">
+                    <strong className="text-gray-800 text-base">
+                      {classroom.name}
+                    </strong>
+                    <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+                      {classroom.shift}
+                    </span>
+                  </div>
 
-                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={classroom.has_groups}
-                    onChange={() => handleToggleClassGroups(classroom)}
-                    className="accent-emerald-600"
-                  />
-                  Grupos A/B
-                </label>
-              </li>
-            ))}
+                  <div className="text-xs text-emerald-600 font-medium">
+                    Curso:{" "}
+                    {courses.find(
+                      course => course.id === classroom.course_id,
+                    )?.name || classroom.course_id}
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={classroom.has_groups}
+                      onChange={() => handleToggleClassGroups(classroom)}
+                      className="accent-emerald-600"
+                    />
+                    Turma possui Grupos A/B
+                  </label>
+
+                  {classroom.has_groups && (
+                    <div className="mt-1 border-t border-gray-200 pt-2">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2">
+                        Organização das disciplinas
+                      </div>
+
+                      <div className="space-y-2">
+                        {classSubjects.map(subject => {
+                          const isSplit =
+                            classroom.split_subject_ids?.includes(subject.id);
+
+                          return (
+                            <div
+                              key={subject.id}
+                              className="flex items-center gap-2"
+                            >
+                              <span
+                                className="text-xs text-gray-700 flex-1 truncate"
+                                title={subject.name}
+                              >
+                                {subject.name}
+                              </span>
+
+                              <select
+                                value={isSplit ? "Grupos" : "Todos"}
+                                onChange={event =>
+                                  handleSubjectMode(
+                                    classroom,
+                                    subject.id,
+                                    event.target.value as "Todos" | "Grupos",
+                                  )
+                                }
+                                className="text-[11px] border border-gray-300 rounded p-1 bg-white"
+                              >
+                                <option value="Todos">
+                                  Turma inteira
+                                </option>
+                                <option value="Grupos">
+                                  Separada A/B
+                                </option>
+                              </select>
+                            </div>
+                          );
+                        })}
+
+                        {classSubjects.length === 0 && (
+                          <span className="text-xs text-gray-400">
+                            Nenhuma disciplina associada ao curso.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
 
             {classrooms.length === 0 && (
               <p className="text-sm text-gray-500 text-center py-4">
@@ -338,7 +441,9 @@ export default function Turmas() {
                 <select
                   className="border border-gray-300 p-2 rounded-lg w-full bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   value={newSubComplexity}
-                  onChange={event => setNewSubComplexity(event.target.value)}
+                  onChange={event =>
+                    setNewSubComplexity(event.target.value)
+                  }
                 >
                   <option value="Alta">Alta</option>
                   <option value="Media">Média</option>
@@ -349,7 +454,7 @@ export default function Turmas() {
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-500 uppercase">
-                Tipo da disciplina
+                Categoria
               </label>
               <select
                 className="border border-gray-300 p-2 rounded-lg w-full bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -360,9 +465,12 @@ export default function Turmas() {
                   )
                 }
               >
-                <option value="Ensino Médio">Ensino Médio — aula conjunta</option>
-                <option value="Técnica">Técnica — separa A/B quando houver grupos</option>
+                <option value="Ensino Médio">Ensino Médio</option>
+                <option value="Técnica">Técnica</option>
               </select>
+              <span className="text-[11px] text-gray-400">
+                A categoria não decide se a aula é conjunta ou separada.
+              </span>
             </div>
 
             <div className="border border-gray-300 p-2 rounded-lg bg-white max-h-32 overflow-y-auto flex flex-col gap-1">
@@ -386,7 +494,9 @@ export default function Turmas() {
                         ]);
                       } else {
                         setNewSubCourseIds(
-                          newSubCourseIds.filter(id => id !== course.id),
+                          newSubCourseIds.filter(
+                            id => id !== course.id,
+                          ),
                         );
                       }
                     }}
@@ -411,7 +521,7 @@ export default function Turmas() {
             </button>
           </form>
 
-          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[400px] pr-2">
+          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[520px] pr-2">
             {subjects.map(subject => (
               <li
                 key={subject.id}
@@ -450,12 +560,8 @@ export default function Turmas() {
                   }
                   className="text-xs border border-gray-200 bg-white rounded p-1.5"
                 >
-                  <option value="Ensino Médio">
-                    Ensino Médio — conjunta
-                  </option>
-                  <option value="Técnica">
-                    Técnica — grupos A/B
-                  </option>
+                  <option value="Ensino Médio">Ensino Médio</option>
+                  <option value="Técnica">Técnica</option>
                 </select>
 
                 <div className="text-xs text-purple-600 font-medium">
@@ -463,7 +569,8 @@ export default function Turmas() {
                   {subject.course_ids
                     ?.map(
                       id =>
-                        courses.find(course => course.id === id)?.name || id,
+                        courses.find(course => course.id === id)?.name ||
+                        id,
                     )
                     .join(", ") || "Nenhum"}
                 </div>

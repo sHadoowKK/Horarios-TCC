@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import relationship
+
 from .database import Base
 
 
@@ -17,6 +18,7 @@ class Classroom(Base):
     shift = Column(String, nullable=False)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     has_groups = Column(Boolean, default=False)
+    split_subject_ids = Column(JSON, default=list)
     course = relationship("Course", back_populates="classes")
 
 

@@ -47,11 +47,20 @@ def ensure_database_compatibility():
             row[1]
             for row in conn.execute(text("PRAGMA table_info(classrooms)"))
         }
+
         if "has_groups" not in classroom_columns:
             conn.execute(text(
                 "ALTER TABLE classrooms "
                 "ADD COLUMN has_groups BOOLEAN DEFAULT 0"
             ))
+
+        split_config_changed = False
+        if "split_subject_ids" not in classroom_columns:
+            conn.execute(text(
+                "ALTER TABLE classrooms "
+                "ADD COLUMN split_subject_ids JSON DEFAULT '[]'"
+            ))
+            split_config_changed = True
 
         subject_columns = {
             row[1]
@@ -124,19 +133,21 @@ def ensure_database_compatibility():
                     ),
                     {
                         "availability": json.dumps(
-                            availability, ensure_ascii=False
+                            availability,
+                            ensure_ascii=False,
                         ),
                         "teacher_id": teacher_id,
                     },
                 )
                 availability_changed = True
 
-        # Grades antigas não conhecem grupos e/ou usam índices de período antigos.
-        # É mais seguro gerar uma grade nova do que reinterpretá-las incorretamente.
+        # Quando a forma de representar horários ou grupos muda, uma grade
+        # antiga pode ficar ambígua. Os cadastros continuam preservados.
         if (
             old_afternoon_count
             or availability_changed
             or timetable_structure_changed
+            or split_config_changed
         ):
             conn.execute(text("DELETE FROM timetable"))
 

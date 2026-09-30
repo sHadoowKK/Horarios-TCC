@@ -28,7 +28,6 @@ JOURNEY_SEGMENTS = {
     "Tarde": [[6, 7], [8, 9, 10]],
 }
 
-TECHNICAL_CATEGORY = "Técnica"
 
 
 def _subjects_for_classroom(classroom, subjects):
@@ -41,15 +40,17 @@ def _subjects_for_classroom(classroom, subjects):
 
 def _targets_for(classroom, subject):
     """
-    Turma sem divisão: toda disciplina ocupa a turma inteira.
+    A divisão é configurada por turma e por disciplina.
 
-    Turma com grupos:
-    - Ensino Médio ocupa A + B juntos ("Todos");
-    - Técnica cria uma carga independente para A e outra para B.
+    - sem grupos: a disciplina ocupa a turma inteira;
+    - com grupos e disciplina marcada para separar: cria carga para A e B;
+    - com grupos e disciplina conjunta: ocupa A + B ao mesmo tempo.
     """
+    split_subject_ids = classroom.get("split_subject_ids", []) or []
+
     if (
         classroom.get("has_groups", False)
-        and subject.get("category", "Ensino Médio") == TECHNICAL_CATEGORY
+        and subject["id"] in split_subject_ids
     ):
         return ["A", "B"]
 
@@ -76,14 +77,9 @@ def generate_schedule(
         for classroom in classrooms
     }
 
-    classroom_by_id = {
-        classroom["id"]: classroom
-        for classroom in classrooms
-    }
-
     # Cada unidade é uma carga semanal independente.
-    # Ex.: Matemática conjunta -> target "Todos".
-    #      UDA técnica em turma dividida -> target "A" e target "B".
+    # Uma disciplina conjunta usa target "Todos".
+    # Uma disciplina configurada como separada usa targets "A" e "B".
     units = []
     for classroom in classrooms:
         for subject in classroom_subjects[classroom["id"]]:

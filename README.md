@@ -130,11 +130,21 @@ Intervalos e almoço aparecem visualmente na grade, mas não são períodos onde
 
 ## Turmas divididas em grupos
 
-Uma turma pode ser cadastrada como simples ou dividida em **Grupo A** e **Grupo B**.
+Uma turma pode ser cadastrada como simples ou como uma turma que utiliza **Grupo A** e **Grupo B**.
 
-- disciplinas de **Ensino Médio** são aulas conjuntas e ocupam os dois grupos;
-- disciplinas **Técnicas** são geradas separadamente para A e B;
-- os dois grupos precisam cumprir a mesma carga semanal das disciplinas técnicas;
-- A e B podem ter a mesma matéria, matérias diferentes ou apenas um dos grupos ter aula em determinado horário;
-- os professores dos dois grupos podem ser diferentes;
-- uma aula conjunta impede qualquer aula técnica de A ou B no mesmo horário.
+A divisão é configurada **por turma e por disciplina**. Para cada disciplina de uma turma com grupos, quem monta o horário escolhe:
+
+- **Turma inteira:** A e B têm a aula juntos no mesmo horário;
+- **Separada A/B:** cada grupo recebe a carga semanal da disciplina de forma independente.
+
+A categoria da disciplina (**Ensino Médio** ou **Técnica**) é apenas informativa e não determina automaticamente a divisão.
+
+Quando uma disciplina é separada:
+
+- A e B precisam cumprir a carga semanal configurada;
+- os grupos podem ter a mesma matéria no mesmo horário;
+- podem ter matérias diferentes simultaneamente;
+- apenas um dos grupos pode estar em aula em determinado horário;
+- os professores dos grupos podem ser diferentes.
+
+Uma aula marcada como **Turma inteira** ocupa os dois grupos e impede outra aula de A ou B no mesmo horário.

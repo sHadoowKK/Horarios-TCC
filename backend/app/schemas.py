@@ -1,4 +1,5 @@
 from typing import Dict, List, Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -29,6 +30,7 @@ class ClassroomBase(BaseModel):
     shift: Shift
     course_id: int = Field(gt=0)
     has_groups: bool = False
+    split_subject_ids: List[int] = Field(default_factory=list)
 
 
 class ClassroomCreate(ClassroomBase):

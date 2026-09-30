@@ -251,6 +251,7 @@ def generate_timetable(db: Session = Depends(get_db)):
             "course_id": classroom.course_id,
             "shift": classroom.shift,
             "has_groups": classroom.has_groups,
+            "split_subject_ids": classroom.split_subject_ids or [],
         }
         for classroom in db.query(models.Classroom).all()
     ]

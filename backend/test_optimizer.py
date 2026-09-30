@@ -33,6 +33,7 @@ class OptimizerTests(unittest.TestCase):
                 "course_id": 1,
                 "shift": "Manhã",
                 "has_groups": False,
+                "split_subject_ids": [],
             }
         ]
         subjects = [
@@ -85,6 +86,7 @@ class OptimizerTests(unittest.TestCase):
                 "course_id": 1,
                 "shift": "Manhã",
                 "has_groups": False,
+                "split_subject_ids": [],
             }
         ]
         subjects = [
@@ -126,6 +128,7 @@ class OptimizerTests(unittest.TestCase):
                 "course_id": 1,
                 "shift": "Integral",
                 "has_groups": False,
+                "split_subject_ids": [],
             }
         ]
         subjects = [
@@ -166,7 +169,7 @@ class OptimizerTests(unittest.TestCase):
             [item["period"] for item in result["schedule"]],
         )
 
-    def test_split_classroom_duplicates_technical_workload_by_group(self):
+    def test_split_is_defined_by_classroom_subject_configuration(self):
         classrooms = [
             {
                 "id": 1,
@@ -174,14 +177,15 @@ class OptimizerTests(unittest.TestCase):
                 "course_id": 1,
                 "shift": "Integral",
                 "has_groups": True,
+                "split_subject_ids": [1],
             }
         ]
         subjects = [
             {
                 "id": 1,
-                "name": "Matemática",
+                "name": "Espanhol",
                 "course_ids": [1],
-                "workload": 1,
+                "workload": 2,
                 "complexity": "Baixa",
                 "category": "Ensino Médio",
             },
@@ -197,21 +201,21 @@ class OptimizerTests(unittest.TestCase):
         teachers = [
             {
                 "id": 1,
-                "name": "Professor Geral",
+                "name": "Professor Espanhol A",
                 "allowed_subjects": [1],
                 "availability": full_availability(),
                 "score": 50,
             },
             {
                 "id": 2,
-                "name": "Professor Técnico 1",
-                "allowed_subjects": [2],
+                "name": "Professor Espanhol B",
+                "allowed_subjects": [1],
                 "availability": full_availability(),
                 "score": 50,
             },
             {
                 "id": 3,
-                "name": "Professor Técnico 2",
+                "name": "Professor UDA",
                 "allowed_subjects": [2],
                 "availability": full_availability(),
                 "score": 50,
@@ -227,35 +231,29 @@ class OptimizerTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "success")
 
-        general = [
+        spanish = [
             item
             for item in result["schedule"]
             if item["subject_id"] == 1
         ]
-        technical = [
+        uda = [
             item
             for item in result["schedule"]
             if item["subject_id"] == 2
         ]
 
-        self.assertEqual(len(general), 1)
-        self.assertEqual(general[0]["student_group"], "Todos")
+        self.assertEqual(
+            {item["student_group"] for item in spanish},
+            {"A", "B"},
+        )
+        self.assertEqual(len(spanish), 4)
 
-        group_a = [
-            item
-            for item in technical
-            if item["student_group"] == "A"
-        ]
-        group_b = [
-            item
-            for item in technical
-            if item["student_group"] == "B"
-        ]
+        self.assertEqual(len(uda), 2)
+        self.assertTrue(
+            all(item["student_group"] == "Todos" for item in uda)
+        )
 
-        self.assertEqual(len(group_a), 2)
-        self.assertEqual(len(group_b), 2)
-
-    def test_groups_can_have_technical_classes_at_same_time(self):
+    def test_groups_can_have_classes_at_same_time(self):
         availability = {
             str(day): [False] * 16
             for day in range(5)
@@ -269,6 +267,7 @@ class OptimizerTests(unittest.TestCase):
                 "course_id": 1,
                 "shift": "Manhã",
                 "has_groups": True,
+                "split_subject_ids": [1],
             }
         ]
         subjects = [
@@ -307,7 +306,6 @@ class OptimizerTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(len(result["schedule"]), 2)
-
         self.assertEqual(
             {item["student_group"] for item in result["schedule"]},
             {"A", "B"},
@@ -317,6 +315,51 @@ class OptimizerTests(unittest.TestCase):
                 item["day"] == 0 and item["period"] == 0
                 for item in result["schedule"]
             )
+        )
+
+    def test_classroom_without_groups_ignores_split_subject_ids(self):
+        classrooms = [
+            {
+                "id": 1,
+                "name": "Noite",
+                "course_id": 1,
+                "shift": "Noite",
+                "has_groups": False,
+                "split_subject_ids": [1],
+            }
+        ]
+        subjects = [
+            {
+                "id": 1,
+                "name": "Banco de Dados",
+                "course_ids": [1],
+                "workload": 1,
+                "complexity": "Baixa",
+                "category": "Técnica",
+            }
+        ]
+        teachers = [
+            {
+                "id": 1,
+                "name": "Professor",
+                "allowed_subjects": [1],
+                "availability": full_availability(),
+                "score": 50,
+            }
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(len(result["schedule"]), 1)
+        self.assertEqual(
+            result["schedule"][0]["student_group"],
+            "Todos",
         )
 
 
