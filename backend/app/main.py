@@ -22,11 +22,32 @@ app.add_middleware(
 
 def get_or_create_config(db: Session) -> models.SystemConfig:
     config = db.query(models.SystemConfig).first()
+
     if config is None:
         config = models.SystemConfig()
         db.add(config)
         db.commit()
         db.refresh(config)
+
+    # Regras fixas do sistema.
+    changed = False
+
+    if config.max_classes_per_day > 9:
+        config.max_classes_per_day = 9
+        changed = True
+
+    if config.max_consecutive_classes != 6:
+        config.max_consecutive_classes = 6
+        changed = True
+
+    if not config.student_gaps_hard:
+        config.student_gaps_hard = True
+        changed = True
+
+    if changed:
+        db.commit()
+        db.refresh(config)
+
     return config
 
 
@@ -35,8 +56,14 @@ def root():
     return {"message": "API do Anatinus"}
 
 
+# ----------------------------------------------------------------------
+# CURSOS
+# ----------------------------------------------------------------------
 @app.post("/courses/", response_model=schemas.Course)
-def create_course(course: schemas.CourseCreate, db: Session = Depends(get_db)):
+def create_course(
+    course: schemas.CourseCreate,
+    db: Session = Depends(get_db),
+):
     item = models.Course(**course.model_dump())
     db.add(item)
     db.commit()
@@ -49,6 +76,9 @@ def read_courses(db: Session = Depends(get_db)):
     return db.query(models.Course).all()
 
 
+# ----------------------------------------------------------------------
+# TURMAS
+# ----------------------------------------------------------------------
 @app.post("/classrooms/", response_model=schemas.Classroom)
 def create_classroom(
     data: schemas.ClassroomCreate,
@@ -77,6 +107,7 @@ def update_classroom(
         .filter(models.Classroom.id == classroom_id)
         .first()
     )
+
     if not item:
         raise HTTPException(404, "Turma não encontrada")
 
@@ -88,6 +119,9 @@ def update_classroom(
     return item
 
 
+# ----------------------------------------------------------------------
+# DISCIPLINAS
+# ----------------------------------------------------------------------
 @app.post("/subjects/", response_model=schemas.Subject)
 def create_subject(
     data: schemas.SubjectCreate,
@@ -116,6 +150,7 @@ def update_subject(
         .filter(models.Subject.id == subject_id)
         .first()
     )
+
     if not item:
         raise HTTPException(404, "Disciplina não encontrada")
 
@@ -127,6 +162,9 @@ def update_subject(
     return item
 
 
+# ----------------------------------------------------------------------
+# PROFESSORES
+# ----------------------------------------------------------------------
 @app.post("/teachers/", response_model=schemas.Teacher)
 def create_teacher(
     data: schemas.TeacherCreate,
@@ -155,6 +193,7 @@ def update_teacher(
         .filter(models.Teacher.id == teacher_id)
         .first()
     )
+
     if not item:
         raise HTTPException(404, "Professor não encontrado")
 
@@ -167,20 +206,28 @@ def update_teacher(
 
 
 @app.delete("/teachers/{teacher_id}")
-def delete_teacher(teacher_id: int, db: Session = Depends(get_db)):
+def delete_teacher(
+    teacher_id: int,
+    db: Session = Depends(get_db),
+):
     item = (
         db.query(models.Teacher)
         .filter(models.Teacher.id == teacher_id)
         .first()
     )
+
     if not item:
         raise HTTPException(404, "Professor não encontrado")
 
     db.delete(item)
     db.commit()
+
     return {"detail": "Professor removido com sucesso"}
 
 
+# ----------------------------------------------------------------------
+# PERÍODOS
+# ----------------------------------------------------------------------
 @app.get("/periods/", response_model=list[schemas.Period])
 def read_periods(db: Session = Depends(get_db)):
     return db.query(models.Period).all()
@@ -198,6 +245,9 @@ def create_period(
     return item
 
 
+# ----------------------------------------------------------------------
+# CONFIGURAÇÕES
+# ----------------------------------------------------------------------
 @app.get("/config/", response_model=schemas.SystemConfig)
 def read_config(db: Session = Depends(get_db)):
     return get_or_create_config(db)
@@ -209,8 +259,17 @@ def update_config(
     db: Session = Depends(get_db),
 ):
     config = get_or_create_config(db)
+    values = data.model_dump()
 
-    for key, value in data.model_dump().items():
+    # Regras obrigatórias: podem ser endurecidas, mas não relaxadas.
+    values["max_classes_per_day"] = min(
+        values["max_classes_per_day"],
+        9,
+    )
+    values["max_consecutive_classes"] = 6
+    values["student_gaps_hard"] = True
+
+    for key, value in values.items():
         setattr(config, key, value)
 
     db.commit()
@@ -218,6 +277,9 @@ def update_config(
     return config
 
 
+# ----------------------------------------------------------------------
+# GRADE SALVA
+# ----------------------------------------------------------------------
 @app.get("/timetable/", response_model=list[schemas.TimetableItem])
 def read_timetable(db: Session = Depends(get_db)):
     return db.query(models.TimetableItem).all()
@@ -229,10 +291,12 @@ def save_timetable(
     db: Session = Depends(get_db),
 ):
     db.query(models.TimetableItem).delete()
+
     rows = [
         models.TimetableItem(**item.model_dump())
         for item in items
     ]
+
     db.add_all(rows)
     db.commit()
 
@@ -242,8 +306,41 @@ def save_timetable(
     return rows
 
 
+# ----------------------------------------------------------------------
+# GERAÇÃO
+# ----------------------------------------------------------------------
 @app.post("/generate/")
 def generate_timetable(db: Session = Depends(get_db)):
+    classroom_rows = db.query(models.Classroom).all()
+    subject_rows = db.query(models.Subject).all()
+    teacher_rows = db.query(models.Teacher).all()
+
+    if not classroom_rows:
+        raise HTTPException(
+            400,
+            "Cadastre pelo menos uma turma antes de gerar a grade.",
+        )
+
+    if not subject_rows:
+        raise HTTPException(
+            400,
+            "Cadastre pelo menos uma disciplina antes de gerar a grade.",
+        )
+
+    missing_matrix = [
+        classroom.name
+        for classroom in classroom_rows
+        if not (classroom.subject_settings or [])
+    ]
+
+    if missing_matrix:
+        names = ", ".join(missing_matrix)
+        raise HTTPException(
+            400,
+            "Escolha as matérias presentes nas seguintes turmas "
+            f"antes de gerar: {names}.",
+        )
+
     classrooms = [
         {
             "id": classroom.id,
@@ -251,55 +348,53 @@ def generate_timetable(db: Session = Depends(get_db)):
             "course_id": classroom.course_id,
             "shift": classroom.shift,
             "has_groups": classroom.has_groups,
-            "split_subject_ids": classroom.split_subject_ids or [],
+            "subject_settings": classroom.subject_settings or [],
         }
-        for classroom in db.query(models.Classroom).all()
+        for classroom in classroom_rows
     ]
 
     subjects = [
         {
             "id": subject.id,
             "name": subject.name,
-            "course_ids": subject.course_ids,
+            "course_ids": subject.course_ids or [],
             "workload": subject.workload,
             "complexity": subject.complexity,
             "category": subject.category,
         }
-        for subject in db.query(models.Subject).all()
+        for subject in subject_rows
     ]
 
     teachers = [
         {
             "id": teacher.id,
             "name": teacher.name,
-            "allowed_subjects": teacher.allowed_subjects,
-            "availability": teacher.availability,
+            "allowed_subjects": teacher.allowed_subjects or [],
+            "availability": teacher.availability or {},
             "score": teacher.score,
         }
-        for teacher in db.query(models.Teacher).all()
+        for teacher in teacher_rows
     ]
 
-    if not classrooms or not subjects or not teachers:
-        raise HTTPException(
-            400,
-            "Cadastre cursos, turmas, disciplinas e professores "
-            "antes de gerar a grade.",
-        )
-
     config = get_or_create_config(db)
+
     sys_config = {
-        "max_classes_per_day": config.max_classes_per_day,
-        "max_consecutive_classes": config.max_consecutive_classes,
-        "max_high_complexity_per_day": config.max_high_complexity_per_day,
-        "student_gaps_hard": config.student_gaps_hard,
+        "max_classes_per_day": min(
+            config.max_classes_per_day,
+            9,
+        ),
+        "max_high_complexity_per_day":
+            config.max_high_complexity_per_day,
         "teacher_gaps_hard": config.teacher_gaps_hard,
         "min_classes_students": config.min_classes_students,
         "min_classes_teachers": config.min_classes_teachers,
         "avoid_first_period": config.avoid_first_period,
         "avoid_last_period": config.avoid_last_period,
         "avoid_friday": config.avoid_friday,
-        "max_consec_per_teacher": config.max_consec_per_teacher,
-        "max_consec_teacher_mode": config.max_consec_teacher_mode,
+        "max_consec_per_teacher":
+            config.max_consec_per_teacher,
+        "max_consec_teacher_mode":
+            config.max_consec_teacher_mode,
     }
 
     result = generate_schedule(

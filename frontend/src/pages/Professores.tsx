@@ -195,7 +195,7 @@ export default function Professores() {
               </div>
               <div className="w-32">
                 <label className="text-sm font-semibold text-gray-600 mb-1 flex items-center gap-1">
-                  <Star className="w-4 h-4 text-yellow-500" /> Pontuação
+                  <Star className="w-4 h-4 text-yellow-500" /> Pontuação docente
                 </label>
                 <input 
                   type="number" 
@@ -205,6 +205,9 @@ export default function Professores() {
                   value={newScore} 
                   onChange={e => setNewScore(Number(e.target.value))} 
                 />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Quanto maior, maior a prioridade quando mais de um professor puder assumir a disciplina.
+                </p>
               </div>
             </div>
 
@@ -227,7 +230,10 @@ export default function Professores() {
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-gray-600 mb-2 block">Disponibilidade de Horário (3 Turnos)</label>
+              <label className="text-sm font-semibold text-gray-600 mb-1 block">Disponibilidade de Horário</label>
+              <p className="text-xs text-gray-500 mb-2">
+                Desmarque os horários em que o professor não pode trabalhar aqui, inclusive quando já estiver em outra escola.
+              </p>
               <div className="border border-gray-300 rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
                 <table className="w-full text-sm text-center bg-white relative">
                   <thead className="bg-gray-100 text-gray-600 font-medium sticky top-0 z-10 shadow-sm">

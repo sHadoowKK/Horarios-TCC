@@ -5,11 +5,13 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 ## O que o sistema faz
 
 - cadastra cursos, turmas e disciplinas, incluindo turmas com divisão em grupos A/B;
+- permite escolher, em cada turma, quais disciplinas realmente existem, sua carga semanal e se ficam juntas ou separadas em A/B;
 - cadastra, edita e remove professores;
 - registra disponibilidade de professores em 16 períodos de aula possíveis ao longo do dia;
 - atribui disciplinas aos professores habilitados;
 - configura regras obrigatórias (Hard) e preferências (Soft);
 - gera uma grade evitando conflitos de turma e professor;
+- mantém disciplinas na grade mesmo quando ainda não existe professor disponível, exibindo "Sem professor";
 - considera carga horária, jornada da turma, disponibilidade, complexidade, grupos A/B, intervalos e janelas;
 - salva a última grade no SQLite;
 - permite visualizar a grade por turma ou professor.
@@ -72,11 +74,13 @@ python -m uvicorn app.main:app --reload
 
 A API abre em `http://localhost:8000` e a documentação em `http://localhost:8000/docs`.
 
-Para dados de demonstração, com o backend ligado:
+Para dados de demonstração, com o backend ligado e **somente em um banco vazio**:
 
 ```bash
 python seed.py
 ```
+
+O seed não deve ser executado repetidamente no mesmo banco, pois ele cria novos cadastros.
 
 Teste do otimizador:
 
@@ -104,19 +108,22 @@ O SQLite é criado automaticamente a partir dos modelos atuais. Como esta é uma
 
 O CP-SAT trata, entre outras, as seguintes condições:
 
-- uma turma não pode ter duas aulas no mesmo período;
+- uma turma ou grupo não pode ter duas aulas no mesmo período;
 - um professor não pode dar duas aulas simultâneas;
-- a carga horária semanal de cada disciplina deve ser cumprida;
+- a carga horária semanal configurada para cada turma deve ser cumprida;
 - aulas só podem ocorrer nos períodos válidos da jornada da turma (Manhã, Integral ou Noite);
-- indisponibilidades de professores são respeitadas;
-- existe limite diário e consecutivo para professores, com intervalos oficiais quebrando a sequência;
-- disciplinas de alta complexidade têm limite diário;
-- três aulas consecutivas da mesma disciplina são evitadas por regra obrigatória, respeitando intervalos;
-- janelas podem ser Hard ou Soft;
-- preferências Soft podem evitar primeira aula, última aula e sexta-feira;
-- a pontuação do professor participa da função objetivo.
+- indisponibilidades de professores são respeitadas, inclusive horários bloqueados por trabalho em outra escola;
+- a interjornada é calculada pelos horários reais e exige pelo menos **11 horas** entre o fim de uma aula e o início da próxima no dia seguinte;
+- um professor pode ter no máximo **9 aulas por dia**;
+- depois de até **6 aulas sem uma pausa de 1 hora**, não pode continuar sem o descanso necessário;
+- janelas para alunos são proibidas; intervalo e almoço oficiais não contam como janela;
+- janelas de professores podem ser tratadas como preferência ou regra obrigatória;
+- disciplinas de alta complexidade podem ter limite diário configurável;
+- divisões A/B são aproximadas no mesmo horário quando possível, mas um grupo pode ficar livre quando necessário;
+- a pontuação docente dá prioridade a professores com maior pontuação quando mais de um puder assumir a disciplina;
+- se nenhum professor puder assumir uma disciplina, a grade ainda pode ser gerada e as aulas aparecem como **Sem professor**.
 
-A regra de interjornada usada aqui é uma simplificação por turnos: professor que trabalha no período noturno não é alocado na manhã do dia seguinte.
+Blocos longos da mesma disciplina ou do mesmo professor são permitidos. Isso é necessário para representar grades reais, como disciplinas técnicas que ocupam três ou cinco aulas no mesmo dia.
 
 ## Jornadas e horários
 
@@ -128,16 +135,16 @@ O modelo atual representa três jornadas de turma:
 
 Intervalos e almoço aparecem visualmente na grade, mas não são períodos onde o solver possa colocar uma disciplina.
 
-## Turmas divididas em grupos
+## Matriz de cada turma e grupos A/B
 
-Uma turma pode ser cadastrada como simples ou como uma turma que utiliza **Grupo A** e **Grupo B**.
+Cada turma possui sua própria matriz. O usuário escolhe quais disciplinas realmente fazem parte dela e informa a carga semanal de cada uma. A carga cadastrada na disciplina funciona apenas como valor padrão ao adicioná-la a uma turma.
 
-A divisão é configurada **por turma e por disciplina**. Para cada disciplina de uma turma com grupos, quem monta o horário escolhe:
+Uma turma também pode utilizar **Grupo A** e **Grupo B**. Nesse caso, para cada disciplina presente nela, quem monta o horário escolhe:
 
 - **Turma inteira:** A e B têm a aula juntos no mesmo horário;
 - **Separada A/B:** cada grupo recebe a carga semanal da disciplina de forma independente.
 
-A categoria da disciplina (**Ensino Médio** ou **Técnica**) é apenas informativa e não determina automaticamente a divisão.
+A categoria da disciplina (**Ensino Médio** ou **Técnica**) é informativa e não determina automaticamente a divisão.
 
 Quando uma disciplina é separada:
 
@@ -148,3 +155,18 @@ Quando uma disciplina é separada:
 - os professores dos grupos podem ser diferentes.
 
 Uma aula marcada como **Turma inteira** ocupa os dois grupos e impede outra aula de A ou B no mesmo horário.
+
+
+## Fluxo de configuração recomendado
+
+Para reduzir trabalho manual, o fluxo pensado para quem monta a grade é:
+
+1. cadastrar cursos;
+2. cadastrar o catálogo de disciplinas;
+3. criar as turmas;
+4. abrir **Matérias da turma** e selecionar somente as disciplinas presentes, ajustando carga e divisão A/B;
+5. cadastrar professores, pontuação, disciplinas que podem lecionar e disponibilidade;
+6. ajustar apenas as preferências que podem variar;
+7. gerar a grade.
+
+Regras obrigatórias ficam embutidas no otimizador para não depender de o usuário lembrar de configurá-las.

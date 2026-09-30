@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -25,11 +25,22 @@ class Course(CourseBase):
         from_attributes = True
 
 
+class ClassroomSubjectSetting(BaseModel):
+    subject_id: int = Field(gt=0)
+    workload: int = Field(ge=1, le=25)
+    split: bool = False
+
+
 class ClassroomBase(BaseModel):
     name: str = Field(min_length=1)
     shift: Shift
     course_id: int = Field(gt=0)
     has_groups: bool = False
+    subject_settings: List[ClassroomSubjectSetting] = Field(
+        default_factory=list
+    )
+
+    # Compatibilidade com versões anteriores.
     split_subject_ids: List[int] = Field(default_factory=list)
 
 
@@ -100,10 +111,17 @@ class Period(PeriodBase):
 
 
 class SystemConfigBase(BaseModel):
-    max_classes_per_day: int = Field(default=9, ge=1, le=15)
-    max_consecutive_classes: int = Field(default=5, ge=1, le=15)
+    # Pode ser reduzido pela escola, mas nunca ultrapassa o teto de 9.
+    max_classes_per_day: int = Field(default=9, ge=1, le=9)
+
+    # Campo legado: a regra real de 6 aulas + 1h de descanso é fixa.
+    max_consecutive_classes: int = Field(default=6, ge=1, le=6)
+
     max_high_complexity_per_day: int = Field(default=2, ge=0, le=15)
+
+    # Alunos sem janelas é regra fixa. O campo permanece por compatibilidade.
     student_gaps_hard: bool = True
+
     teacher_gaps_hard: bool = False
     min_classes_students: int = Field(default=2, ge=0, le=15)
     min_classes_teachers: int = Field(default=2, ge=0, le=15)
@@ -111,7 +129,7 @@ class SystemConfigBase(BaseModel):
     avoid_last_period: bool = False
     avoid_friday: bool = False
     max_consec_per_teacher: int = Field(default=2, ge=1, le=15)
-    max_consec_teacher_mode: RuleMode = "hard"
+    max_consec_teacher_mode: RuleMode = "ignore"
 
 
 class SystemConfigUpdate(SystemConfigBase):
@@ -128,7 +146,7 @@ class SystemConfig(SystemConfigBase):
 class TimetableItemBase(BaseModel):
     classroom_id: int
     subject_id: int
-    teacher_id: int
+    teacher_id: Optional[int] = None
     day: int = Field(ge=0, le=4)
     period: int = Field(ge=0, le=15)
     student_group: StudentGroup = "Todos"

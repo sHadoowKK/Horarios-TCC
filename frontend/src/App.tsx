@@ -145,11 +145,22 @@ function App() {
   const getSubName = (id: number) =>
     subjects.find(subject => subject.id === id)?.name || "N/A";
 
-  const getProfName = (id: number) =>
-    teachers.find(teacher => teacher.id === id)?.name || "N/A";
+  const getProfName = (id: number | null | undefined) => {
+    if (id === null || id === undefined) {
+      return "Sem professor";
+    }
+
+    return (
+      teachers.find(teacher => teacher.id === id)?.name
+      || "Professor não encontrado"
+    );
+  };
 
   const getClassroomName = (id: number) =>
     classrooms.find(classroom => classroom.id === id)?.name || "N/A";
+
+  const unstaffedLessons =
+    schedule?.filter(item => item.teacher_id == null).length || 0;
 
   const renderScheduleGrid = () => {
     if (!schedule) {
@@ -247,7 +258,11 @@ function App() {
                               <span className="font-bold text-indigo-900">
                                 {getSubName(jointLesson.subject_id)}
                               </span>
-                              <span className="text-xs text-indigo-600 mt-1">
+                              <span className={`text-xs mt-1 ${
+                                jointLesson.teacher_id == null
+                                  ? "text-red-600 font-bold"
+                                  : "text-indigo-600"
+                              }`}>
                                 {getProfName(jointLesson.teacher_id)}
                               </span>
                             </div>
@@ -263,7 +278,11 @@ function App() {
                                   <span className="text-xs font-bold text-indigo-900 mt-0.5 leading-tight">
                                     {getSubName(item.subject_id)}
                                   </span>
-                                  <span className="text-[10px] text-indigo-600 mt-0.5 leading-tight">
+                                  <span className={`text-[10px] mt-0.5 leading-tight ${
+                                    item.teacher_id == null
+                                      ? "text-red-600 font-bold"
+                                      : "text-indigo-600"
+                                  }`}>
                                     {getProfName(item.teacher_id)}
                                   </span>
                                 </>
@@ -291,7 +310,11 @@ function App() {
                               <span className="font-bold text-indigo-900">
                                 {getSubName(currentLesson.subject_id)}
                               </span>
-                              <span className="text-xs text-indigo-600 mt-1">
+                              <span className={`text-xs mt-1 ${
+                                currentLesson.teacher_id == null
+                                  ? "text-red-600 font-bold"
+                                  : "text-indigo-600"
+                              }`}>
                                 {getProfName(currentLesson.teacher_id)}
                               </span>
                             </div>
@@ -417,6 +440,17 @@ function App() {
                   {error && (
                     <div className="mb-6 p-4 bg-red-100 border border-red-200 text-red-700 rounded-lg font-medium">
                       {error}
+                    </div>
+                  )}
+
+                  {!error && unstaffedLessons > 0 && (
+                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg">
+                      <strong>
+                        {unstaffedLessons} {unstaffedLessons === 1 ? "aula está" : "aulas estão"} sem professor.
+                      </strong>
+                      <span className="ml-1">
+                        A grade continua válida; essas aulas ficam reservadas até a escola atribuir um docente.
+                      </span>
                     </div>
                   )}
 
