@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Calendar, Users, BookOpen, Settings, Filter } from 'lucide-react';
+import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import Turmas from './pages/Turmas';
@@ -74,7 +74,22 @@ const PROFESSOR_ROWS: DisplayRow[] = [
   lesson(14), lesson(15),
 ];
 
+type Theme = "light" | "dark";
+
+function getInitialTheme(): Theme {
+  const savedTheme = localStorage.getItem("anatinus-theme");
+
+  if (savedTheme === "light" || savedTheme === "dark") {
+    return savedTheme;
+  }
+
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
 function App() {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [schedule, setSchedule] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -118,6 +133,20 @@ function App() {
   useEffect(() => {
     fetchBaseData();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      "dark-theme",
+      theme === "dark",
+    );
+    localStorage.setItem("anatinus-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(current =>
+      current === "dark" ? "light" : "dark",
+    );
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -415,7 +444,35 @@ function App() {
 
             <div className="flex-1" />
 
-            <Link to="/config" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors mt-auto">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors"
+              title={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
+              aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
+            >
+              <span className="flex items-center space-x-3">
+                {theme === "dark" ? (
+                  <Sun className="w-5 h-5 text-amber-400" />
+                ) : (
+                  <Moon className="w-5 h-5 text-gray-500" />
+                )}
+                <span className="font-medium">
+                  {theme === "dark" ? "Tema claro" : "Tema escuro"}
+                </span>
+              </span>
+
+              <span
+                className={`theme-switch ${
+                  theme === "dark" ? "theme-switch-on" : ""
+                }`}
+                aria-hidden="true"
+              >
+                <span className="theme-switch-knob" />
+              </span>
+            </button>
+
+            <Link to="/config" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
               <Settings className="w-5 h-5 text-gray-500" />
               <span className="font-medium">Regras e Leis</span>
             </Link>

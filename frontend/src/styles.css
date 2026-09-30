@@ -1,5 +1,319 @@
 @import "tailwindcss";
 
-html, body, #root { min-height: 100%; }
-body { margin: 0; background: #f8fafc; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-button, input, select { font: inherit; }
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: #f8fafc;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+body,
+aside,
+main,
+section,
+div,
+li,
+table,
+thead,
+tbody,
+tr,
+td,
+th,
+input,
+select,
+button {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+/* Alternância claro/escuro da barra lateral */
+.theme-switch {
+  position: relative;
+  width: 2.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  border-radius: 9999px;
+  background: #cbd5e1;
+  border: 1px solid #94a3b8;
+}
+
+.theme-switch-knob {
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
+  transition: transform 160ms ease;
+}
+
+.theme-switch-on {
+  background: #4f46e5;
+  border-color: #6366f1;
+}
+
+.theme-switch-on .theme-switch-knob {
+  transform: translateX(1rem);
+}
+
+/* ============================================================
+   TEMA ESCURO
+   A classe fica no <html>, então alcança todas as páginas.
+   ============================================================ */
+
+html.dark-theme {
+  color-scheme: dark;
+  background: #090e1a;
+}
+
+.dark-theme body {
+  background: #090e1a;
+  color: #e5e7eb;
+}
+
+/* Superfícies principais */
+.dark-theme .bg-white {
+  background-color: #111827 !important;
+}
+
+.dark-theme .bg-gray-50 {
+  background-color: #0f172a !important;
+}
+
+.dark-theme .bg-gray-100 {
+  background-color: #1e293b !important;
+}
+
+.dark-theme .bg-gray-200 {
+  background-color: #334155 !important;
+}
+
+.dark-theme .bg-slate-100 {
+  background-color: #172033 !important;
+}
+
+/* Bordas */
+.dark-theme .border-gray-100 {
+  border-color: #1e293b !important;
+}
+
+.dark-theme .border-gray-200 {
+  border-color: #2b3648 !important;
+}
+
+.dark-theme .border-gray-300 {
+  border-color: #475569 !important;
+}
+
+.dark-theme .border-slate-200 {
+  border-color: #334155 !important;
+}
+
+/* Texto neutro */
+.dark-theme .text-gray-900,
+.dark-theme .text-gray-800 {
+  color: #f1f5f9 !important;
+}
+
+.dark-theme .text-gray-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark-theme .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark-theme .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+.dark-theme .text-gray-400 {
+  color: #64748b !important;
+}
+
+.dark-theme .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+/* Campos */
+.dark-theme input,
+.dark-theme select {
+  background-color: #0b1220;
+  color: #e5e7eb;
+  border-color: #475569;
+}
+
+.dark-theme input::placeholder {
+  color: #64748b;
+}
+
+.dark-theme select option {
+  background: #111827;
+  color: #e5e7eb;
+}
+
+.dark-theme input:focus,
+.dark-theme select:focus {
+  background-color: #111827;
+}
+
+/* Hover neutro usado na navegação, linhas e cartões */
+.dark-theme .hover\:bg-gray-50:hover,
+.dark-theme .hover\:bg-gray-100:hover {
+  background-color: #1e293b !important;
+}
+
+/* Aulas / elementos índigo */
+.dark-theme .bg-indigo-50 {
+  background-color: #171a35 !important;
+}
+
+.dark-theme .bg-indigo-100 {
+  background-color: #242653 !important;
+}
+
+.dark-theme .border-indigo-100 {
+  border-color: #34376b !important;
+}
+
+.dark-theme .text-indigo-900,
+.dark-theme .text-indigo-800 {
+  color: #e0e7ff !important;
+}
+
+.dark-theme .text-indigo-700,
+.dark-theme .text-indigo-600 {
+  color: #a5b4fc !important;
+}
+
+.dark-theme .text-indigo-500,
+.dark-theme .text-indigo-400 {
+  color: #818cf8 !important;
+}
+
+/* Verde */
+.dark-theme .bg-emerald-50 {
+  background-color: #0d2a24 !important;
+}
+
+.dark-theme .bg-emerald-100 {
+  background-color: #123c32 !important;
+}
+
+.dark-theme .border-emerald-100,
+.dark-theme .border-emerald-200 {
+  border-color: #1f5a49 !important;
+}
+
+.dark-theme .text-emerald-900,
+.dark-theme .text-emerald-800,
+.dark-theme .text-emerald-700 {
+  color: #a7f3d0 !important;
+}
+
+.dark-theme .text-emerald-600 {
+  color: #6ee7b7 !important;
+}
+
+/* Disponibilidade e estados verdes */
+.dark-theme .bg-green-50 {
+  background-color: #102a22 !important;
+}
+
+.dark-theme .bg-green-100 {
+  background-color: #17392e !important;
+}
+
+.dark-theme .text-green-700 {
+  color: #86efac !important;
+}
+
+/* Vermelho / erros / indisponibilidade */
+.dark-theme .bg-red-50 {
+  background-color: #30171b !important;
+}
+
+.dark-theme .bg-red-100 {
+  background-color: #3d1b22 !important;
+}
+
+.dark-theme .border-red-200 {
+  border-color: #71313d !important;
+}
+
+.dark-theme .text-red-700,
+.dark-theme .text-red-600 {
+  color: #fca5a5 !important;
+}
+
+/* Amarelo / avisos / pontuação */
+.dark-theme .bg-yellow-100,
+.dark-theme .bg-amber-50 {
+  background-color: #332913 !important;
+}
+
+.dark-theme .border-amber-200 {
+  border-color: #6b5620 !important;
+}
+
+.dark-theme .text-yellow-700,
+.dark-theme .text-amber-800 {
+  color: #fde68a !important;
+}
+
+/* Roxo / azul usados na Gestão Acadêmica */
+.dark-theme .bg-purple-50,
+.dark-theme .bg-purple-100 {
+  background-color: #2a1740 !important;
+}
+
+.dark-theme .text-purple-700,
+.dark-theme .text-purple-600 {
+  color: #d8b4fe !important;
+}
+
+.dark-theme .bg-blue-50,
+.dark-theme .bg-blue-100 {
+  background-color: #122641 !important;
+}
+
+.dark-theme .text-blue-700,
+.dark-theme .text-blue-600 {
+  color: #93c5fd !important;
+}
+
+/* Linhas vazias da grade ficam visíveis sem parecer cartões brancos */
+.dark-theme .border-dashed.border-gray-200 {
+  border-color: #334155 !important;
+  background-color: #0b1220 !important;
+}
+
+/* Barra de rolagem discreta no tema escuro */
+.dark-theme * {
+  scrollbar-color: #475569 #111827;
+}
+
+/* Switch no tema escuro quando estiver desligado */
+.dark-theme .theme-switch:not(.theme-switch-on) {
+  background: #334155;
+  border-color: #475569;
+}

@@ -14,7 +14,8 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 - mantém disciplinas na grade mesmo quando ainda não existe professor disponível, exibindo "Sem professor";
 - considera carga horária, jornada da turma, disponibilidade, complexidade, grupos A/B, intervalos e janelas;
 - salva a última grade no SQLite;
-- permite visualizar a grade por turma ou professor.
+- permite visualizar a grade por turma ou professor;
+- possui tema claro/escuro com preferência salva no navegador.
 
 ## Estrutura
 
