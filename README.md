@@ -4,13 +4,13 @@ Sistema para cadastro de dados acadêmicos e geração automática de grade hor�
 
 ## O que o sistema faz
 
-- cadastra cursos, turmas e disciplinas;
+- cadastra cursos, turmas e disciplinas, incluindo turmas com divisão em grupos A/B;
 - cadastra, edita e remove professores;
 - registra disponibilidade de professores em 16 períodos de aula possíveis ao longo do dia;
 - atribui disciplinas aos professores habilitados;
 - configura regras obrigatórias (Hard) e preferências (Soft);
 - gera uma grade evitando conflitos de turma e professor;
-- considera carga horária, jornada da turma, disponibilidade, complexidade, intervalos e janelas;
+- considera carga horária, jornada da turma, disponibilidade, complexidade, grupos A/B, intervalos e janelas;
 - salva a última grade no SQLite;
 - permite visualizar a grade por turma ou professor.
 
@@ -127,3 +127,14 @@ O modelo atual representa três jornadas de turma:
 - **Noite:** 5 aulas, de 19:00 a 23:00.
 
 Intervalos e almoço aparecem visualmente na grade, mas não são períodos onde o solver possa colocar uma disciplina.
+
+## Turmas divididas em grupos
+
+Uma turma pode ser cadastrada como simples ou dividida em **Grupo A** e **Grupo B**.
+
+- disciplinas de **Ensino Médio** são aulas conjuntas e ocupam os dois grupos;
+- disciplinas **Técnicas** são geradas separadamente para A e B;
+- os dois grupos precisam cumprir a mesma carga semanal das disciplinas técnicas;
+- A e B podem ter a mesma matéria, matérias diferentes ou apenas um dos grupos ter aula em determinado horário;
+- os professores dos dois grupos podem ser diferentes;
+- uma aula conjunta impede qualquer aula técnica de A ou B no mesmo horário.

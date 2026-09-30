@@ -207,24 +207,87 @@ function App() {
                     let cellContent = null;
 
                     if (viewMode === "turma") {
-                      const currentLesson = schedule.find(
+                      const classroom = classrooms.find(
+                        item => item.id === selectedId
+                      );
+
+                      const lessons = schedule.filter(
                         item =>
                           item.day === day &&
                           item.period === period &&
                           item.classroom_id === selectedId
                       );
 
-                      if (currentLesson) {
-                        cellContent = (
-                          <div className="flex flex-col items-center justify-center p-2 h-full bg-indigo-50 border border-indigo-100 rounded">
-                            <span className="font-bold text-indigo-900">
-                              {getSubName(currentLesson.subject_id)}
-                            </span>
-                            <span className="text-xs text-indigo-600 mt-1">
-                              {getProfName(currentLesson.teacher_id)}
-                            </span>
-                          </div>
+                      if (classroom?.has_groups) {
+                        const jointLesson = lessons.find(
+                          item => item.student_group === "Todos"
                         );
+                        const groupA = lessons.find(
+                          item => item.student_group === "A"
+                        );
+                        const groupB = lessons.find(
+                          item => item.student_group === "B"
+                        );
+
+                        if (jointLesson) {
+                          cellContent = (
+                            <div className="flex flex-col items-center justify-center p-2 h-full bg-indigo-50 border border-indigo-100 rounded">
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-400 mb-1">
+                                Turma inteira
+                              </span>
+                              <span className="font-bold text-indigo-900">
+                                {getSubName(jointLesson.subject_id)}
+                              </span>
+                              <span className="text-xs text-indigo-600 mt-1">
+                                {getProfName(jointLesson.teacher_id)}
+                              </span>
+                            </div>
+                          );
+                        } else {
+                          const renderGroup = (group: "A" | "B", item: any) => (
+                            <div className="min-h-16 flex flex-col items-center justify-center p-1.5 bg-indigo-50 border border-indigo-100 rounded">
+                              <span className="text-[10px] font-bold uppercase text-indigo-400">
+                                Grupo {group}
+                              </span>
+                              {item ? (
+                                <>
+                                  <span className="text-xs font-bold text-indigo-900 mt-0.5 leading-tight">
+                                    {getSubName(item.subject_id)}
+                                  </span>
+                                  <span className="text-[10px] text-indigo-600 mt-0.5 leading-tight">
+                                    {getProfName(item.teacher_id)}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-[10px] text-gray-400 mt-1">
+                                  Livre
+                                </span>
+                              )}
+                            </div>
+                          );
+
+                          cellContent = (
+                            <div className="grid grid-cols-2 gap-1 h-full">
+                              {renderGroup("A", groupA)}
+                              {renderGroup("B", groupB)}
+                            </div>
+                          );
+                        }
+                      } else {
+                        const currentLesson = lessons[0];
+
+                        if (currentLesson) {
+                          cellContent = (
+                            <div className="flex flex-col items-center justify-center p-2 h-full bg-indigo-50 border border-indigo-100 rounded">
+                              <span className="font-bold text-indigo-900">
+                                {getSubName(currentLesson.subject_id)}
+                              </span>
+                              <span className="text-xs text-indigo-600 mt-1">
+                                {getProfName(currentLesson.teacher_id)}
+                              </span>
+                            </div>
+                          );
+                        }
                       }
                     } else {
                       const currentLesson = schedule.find(
@@ -235,6 +298,12 @@ function App() {
                       );
 
                       if (currentLesson) {
+                        const groupLabel =
+                          currentLesson.student_group &&
+                          currentLesson.student_group !== "Todos"
+                            ? ` · Grupo ${currentLesson.student_group}`
+                            : "";
+
                         cellContent = (
                           <div className="flex flex-col items-center justify-center p-2 h-full bg-emerald-50 border border-emerald-100 rounded">
                             <span className="font-bold text-emerald-900">
@@ -242,6 +311,7 @@ function App() {
                             </span>
                             <span className="text-xs text-emerald-700 mt-1">
                               {getClassroomName(currentLesson.classroom_id)}
+                              {groupLabel}
                             </span>
                           </div>
                         );
@@ -364,7 +434,7 @@ function App() {
 
                       {viewMode === "turma" && classrooms.map(classroom => (
                         <option key={classroom.id} value={classroom.id}>
-                          {classroom.name} ({classroom.shift})
+                          {classroom.name} ({classroom.shift}{classroom.has_groups ? " · Grupos A/B" : ""})
                         </option>
                       ))}
 

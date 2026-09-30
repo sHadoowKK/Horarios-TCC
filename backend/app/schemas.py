@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 
 Shift = Literal["Manhã", "Integral", "Noite"]
 Complexity = Literal["Alta", "Media", "Baixa"]
+SubjectCategory = Literal["Ensino Médio", "Técnica"]
+StudentGroup = Literal["Todos", "A", "B"]
 RuleMode = Literal["ignore", "soft", "hard"]
 
 
@@ -17,6 +19,7 @@ class CourseCreate(CourseBase):
 
 class Course(CourseBase):
     id: int
+
     class Config:
         from_attributes = True
 
@@ -25,6 +28,7 @@ class ClassroomBase(BaseModel):
     name: str = Field(min_length=1)
     shift: Shift
     course_id: int = Field(gt=0)
+    has_groups: bool = False
 
 
 class ClassroomCreate(ClassroomBase):
@@ -33,6 +37,7 @@ class ClassroomCreate(ClassroomBase):
 
 class Classroom(ClassroomBase):
     id: int
+
     class Config:
         from_attributes = True
 
@@ -41,6 +46,7 @@ class SubjectBase(BaseModel):
     name: str = Field(min_length=1)
     workload: int = Field(ge=1, le=25)
     complexity: Complexity
+    category: SubjectCategory = "Ensino Médio"
     course_ids: List[int]
 
 
@@ -50,6 +56,7 @@ class SubjectCreate(SubjectBase):
 
 class Subject(SubjectBase):
     id: int
+
     class Config:
         from_attributes = True
 
@@ -67,6 +74,7 @@ class TeacherCreate(TeacherBase):
 
 class Teacher(TeacherBase):
     id: int
+
     class Config:
         from_attributes = True
 
@@ -84,6 +92,7 @@ class PeriodCreate(PeriodBase):
 
 class Period(PeriodBase):
     id: int
+
     class Config:
         from_attributes = True
 
@@ -109,6 +118,7 @@ class SystemConfigUpdate(SystemConfigBase):
 
 class SystemConfig(SystemConfigBase):
     id: int
+
     class Config:
         from_attributes = True
 
@@ -119,6 +129,7 @@ class TimetableItemBase(BaseModel):
     teacher_id: int
     day: int = Field(ge=0, le=4)
     period: int = Field(ge=0, le=15)
+    student_group: StudentGroup = "Todos"
 
 
 class TimetableItemCreate(TimetableItemBase):
@@ -127,5 +138,6 @@ class TimetableItemCreate(TimetableItemBase):
 
 class TimetableItem(TimetableItemBase):
     id: int
+
     class Config:
         from_attributes = True

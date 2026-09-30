@@ -16,6 +16,7 @@ class Classroom(Base):
     name = Column(String, nullable=False, index=True)
     shift = Column(String, nullable=False)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    has_groups = Column(Boolean, default=False)
     course = relationship("Course", back_populates="classes")
 
 
@@ -25,6 +26,7 @@ class Subject(Base):
     name = Column(String, nullable=False, index=True)
     workload = Column(Integer, nullable=False)
     complexity = Column(String, nullable=False)
+    category = Column(String, default="Ensino Médio")
     course_ids = Column(JSON, default=list)
 
 
@@ -71,3 +73,4 @@ class TimetableItem(Base):
     teacher_id = Column(Integer, index=True, nullable=False)
     day = Column(Integer, nullable=False)
     period = Column(Integer, nullable=False)
+    student_group = Column(String, default="Todos", nullable=False)

@@ -16,7 +16,6 @@ Base = declarative_base()
 def ensure_database_compatibility():
     """Atualiza automaticamente bancos locais antigos para a estrutura atual."""
     with engine.begin() as conn:
-        # Preferências separadas de primeira e última aula.
         config_columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info(system_configs)"))
@@ -43,6 +42,38 @@ def ensure_database_compatibility():
                     "UPDATE system_configs "
                     "SET avoid_last_period = avoid_edges"
                 ))
+
+        classroom_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(classrooms)"))
+        }
+        if "has_groups" not in classroom_columns:
+            conn.execute(text(
+                "ALTER TABLE classrooms "
+                "ADD COLUMN has_groups BOOLEAN DEFAULT 0"
+            ))
+
+        subject_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(subjects)"))
+        }
+        if "category" not in subject_columns:
+            conn.execute(text(
+                "ALTER TABLE subjects "
+                "ADD COLUMN category VARCHAR DEFAULT 'Ensino Médio'"
+            ))
+
+        timetable_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(timetable)"))
+        }
+        timetable_structure_changed = False
+        if "student_group" not in timetable_columns:
+            conn.execute(text(
+                "ALTER TABLE timetable "
+                "ADD COLUMN student_group VARCHAR DEFAULT 'Todos'"
+            ))
+            timetable_structure_changed = True
 
         # O antigo tipo de turma "Tarde" passa a representar a jornada Integral.
         old_afternoon_count = conn.execute(
@@ -80,8 +111,6 @@ def ensure_database_compatibility():
 
             for day, values in availability.items():
                 if isinstance(values, list) and len(values) == 15:
-                    # A nova 6ª aula da manhã herda a disponibilidade da
-                    # antiga última aula matutina, evitando inventar um valor.
                     availability[day] = (
                         values[:5] + [values[4]] + values[5:]
                     )
@@ -102,9 +131,13 @@ def ensure_database_compatibility():
                 )
                 availability_changed = True
 
-        # Grades antigas usam índices de período diferentes.
-        # É mais seguro apagá-las e gerar uma nova do que reinterpretá-las errado.
-        if old_afternoon_count or availability_changed:
+        # Grades antigas não conhecem grupos e/ou usam índices de período antigos.
+        # É mais seguro gerar uma grade nova do que reinterpretá-las incorretamente.
+        if (
+            old_afternoon_count
+            or availability_changed
+            or timetable_structure_changed
+        ):
             conn.execute(text("DELETE FROM timetable"))
 
 

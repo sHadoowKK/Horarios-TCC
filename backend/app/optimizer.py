@@ -1,26 +1,24 @@
-from ortools.sat.python import cp_model
 from typing import Any, Dict, List
 import time
 
+from ortools.sat.python import cp_model
 
-# Índices dos períodos de aula ao longo do dia.
-# Intervalos e almoço NÃO recebem índice porque nunca podem receber aula.
+
 JOURNEY_PERIODS = {
     "Manhã": [0, 1, 2, 3, 4, 5],
     "Integral": [0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
     "Noite": [11, 12, 13, 14, 15],
-    # Compatibilidade defensiva com bancos antigos.
     "Tarde": [6, 7, 8, 9, 10],
 }
 
-# Blocos realmente consecutivos. Um intervalo oficial quebra a sequência.
+# Um intervalo oficial quebra uma sequência de aulas.
 CONTINUOUS_SEGMENTS = [
-    [0, 1, 2],       # manhã antes do intervalo
-    [3, 4, 5],       # manhã depois do intervalo
-    [6, 7],          # tarde antes do intervalo
-    [8, 9, 10],      # tarde depois do intervalo
-    [11, 12, 13],    # noite antes do intervalo
-    [14, 15],        # noite depois do intervalo
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7],
+    [8, 9, 10],
+    [11, 12, 13],
+    [14, 15],
 ]
 
 JOURNEY_SEGMENTS = {
@@ -29,6 +27,8 @@ JOURNEY_SEGMENTS = {
     "Noite": [[11, 12, 13], [14, 15]],
     "Tarde": [[6, 7], [8, 9, 10]],
 }
+
+TECHNICAL_CATEGORY = "Técnica"
 
 
 def _subjects_for_classroom(classroom, subjects):
@@ -39,12 +39,25 @@ def _subjects_for_classroom(classroom, subjects):
     ]
 
 
-def _teacher_lesson_vars(Y, teacher_id, classrooms, subjects, day, period):
-    return [
-        Y[(classroom["id"], subject["id"], teacher_id, day, period)]
-        for classroom in classrooms
-        for subject in _subjects_for_classroom(classroom, subjects)
-    ]
+def _targets_for(classroom, subject):
+    """
+    Turma sem divisão: toda disciplina ocupa a turma inteira.
+
+    Turma com grupos:
+    - Ensino Médio ocupa A + B juntos ("Todos");
+    - Técnica cria uma carga independente para A e outra para B.
+    """
+    if (
+        classroom.get("has_groups", False)
+        and subject.get("category", "Ensino Médio") == TECHNICAL_CATEGORY
+    ):
+        return ["A", "B"]
+
+    return ["Todos"]
+
+
+def _audiences_for(classroom):
+    return ["A", "B"] if classroom.get("has_groups", False) else ["Todos"]
 
 
 def generate_schedule(
@@ -58,471 +71,779 @@ def generate_schedule(
     model = cp_model.CpModel()
     penalties = []
 
-    # Y[c,s,t,d,p] = 1 se a turma c tem a disciplina s com o professor t
-    # no dia d e período p.
-    Y = {}
+    classroom_subjects = {
+        classroom["id"]: _subjects_for_classroom(classroom, subjects)
+        for classroom in classrooms
+    }
 
-    # A[c,s,t] = 1 se o professor t é o professor escolhido para aquela
-    # disciplina naquela turma.
-    A = {}
+    classroom_by_id = {
+        classroom["id"]: classroom
+        for classroom in classrooms
+    }
 
-    # ------------------------------------------------------------------
-    # VARIÁVEIS E RESTRIÇÕES BÁSICAS
-    # ------------------------------------------------------------------
+    # Cada unidade é uma carga semanal independente.
+    # Ex.: Matemática conjunta -> target "Todos".
+    #      UDA técnica em turma dividida -> target "A" e target "B".
+    units = []
     for classroom in classrooms:
-        journey = classroom.get("shift", "Manhã")
-        allowed_periods = set(JOURNEY_PERIODS.get(journey, JOURNEY_PERIODS["Manhã"]))
-        classroom_subjects = _subjects_for_classroom(classroom, subjects)
+        for subject in classroom_subjects[classroom["id"]]:
+            for target in _targets_for(classroom, subject):
+                units.append((classroom, subject, target))
 
-        for subject in classroom_subjects:
-            for teacher in teachers:
-                can_teach = subject["id"] in teacher.get("allowed_subjects", [])
+    # A[c,s,g,t] escolhe um professor para aquela carga semanal.
+    assignment = {}
 
-                assignment_key = (classroom["id"], subject["id"], teacher["id"])
-                A[assignment_key] = model.NewBoolVar(
-                    f"A_c{classroom['id']}_s{subject['id']}_t{teacher['id']}"
-                )
+    # Y[c,s,g,t,d,p] = 1 quando a aula é alocada naquele horário.
+    lesson = {}
 
-                if not can_teach:
-                    model.Add(A[assignment_key] == 0)
+    for classroom, subject, target in units:
+        allowed_periods = set(
+            JOURNEY_PERIODS.get(
+                classroom.get("shift", "Manhã"),
+                JOURNEY_PERIODS["Manhã"],
+            )
+        )
 
-                for day in range(num_days):
-                    for period in range(num_periods):
-                        key = (
-                            classroom["id"],
-                            subject["id"],
-                            teacher["id"],
-                            day,
-                            period,
-                        )
-                        Y[key] = model.NewBoolVar(
-                            f"Y_c{classroom['id']}_s{subject['id']}_"
-                            f"t{teacher['id']}_d{day}_p{period}"
-                        )
-
-                        model.Add(Y[key] <= A[assignment_key])
-
-                        # A turma só pode receber aulas nos períodos de sua jornada.
-                        if period not in allowed_periods:
-                            model.Add(Y[key] == 0)
-
-                        # Disponibilidade do professor.
-                        availability = teacher.get("availability", {})
-                        day_availability = availability.get(str(day))
-                        if day_availability is not None:
-                            if period >= len(day_availability) or not day_availability[period]:
-                                model.Add(Y[key] == 0)
-
-    # 1. Exatamente um professor por disciplina/turma.
-    for classroom in classrooms:
-        for subject in _subjects_for_classroom(classroom, subjects):
-            if subject["workload"] > 0:
-                model.AddExactlyOne([
-                    A[(classroom["id"], subject["id"], teacher["id"])]
-                    for teacher in teachers
-                ])
-
-    # 2. Carga horária semanal exata.
-    for classroom in classrooms:
-        for subject in _subjects_for_classroom(classroom, subjects):
-            model.Add(
-                sum(
-                    Y[(classroom["id"], subject["id"], teacher["id"], day, period)]
-                    for teacher in teachers
-                    for day in range(num_days)
-                    for period in range(num_periods)
-                )
-                == subject["workload"]
+        for teacher in teachers:
+            assignment_key = (
+                classroom["id"],
+                subject["id"],
+                target,
+                teacher["id"],
+            )
+            assignment[assignment_key] = model.NewBoolVar(
+                f"A_c{classroom['id']}_s{subject['id']}_"
+                f"g{target}_t{teacher['id']}"
             )
 
-    # 3. Uma turma não pode ter duas aulas ao mesmo tempo.
-    for classroom in classrooms:
-        classroom_subjects = _subjects_for_classroom(classroom, subjects)
-        for day in range(num_days):
-            for period in range(num_periods):
-                model.AddAtMostOne([
-                    Y[(classroom["id"], subject["id"], teacher["id"], day, period)]
-                    for subject in classroom_subjects
-                    for teacher in teachers
-                ])
+            can_teach = (
+                subject["id"] in teacher.get("allowed_subjects", [])
+            )
+            if not can_teach:
+                model.Add(assignment[assignment_key] == 0)
 
-    # 4. Um professor não pode estar em duas turmas ao mesmo tempo.
+            for day in range(num_days):
+                for period in range(num_periods):
+                    key = (
+                        classroom["id"],
+                        subject["id"],
+                        target,
+                        teacher["id"],
+                        day,
+                        period,
+                    )
+                    lesson[key] = model.NewBoolVar(
+                        f"Y_c{classroom['id']}_s{subject['id']}_"
+                        f"g{target}_t{teacher['id']}_d{day}_p{period}"
+                    )
+
+                    model.Add(
+                        lesson[key] <= assignment[assignment_key]
+                    )
+
+                    if period not in allowed_periods:
+                        model.Add(lesson[key] == 0)
+
+                    availability = teacher.get("availability", {})
+                    day_availability = availability.get(str(day))
+                    if day_availability is not None:
+                        if (
+                            period >= len(day_availability)
+                            or not day_availability[period]
+                        ):
+                            model.Add(lesson[key] == 0)
+
+    # 1. Cada carga semanal usa exatamente um professor.
+    for classroom, subject, target in units:
+        choices = [
+            assignment[(
+                classroom["id"],
+                subject["id"],
+                target,
+                teacher["id"],
+            )]
+            for teacher in teachers
+        ]
+        if choices:
+            model.AddExactlyOne(choices)
+
+    # 2. Carga horária semanal exata.
+    for classroom, subject, target in units:
+        model.Add(
+            sum(
+                lesson[(
+                    classroom["id"],
+                    subject["id"],
+                    target,
+                    teacher["id"],
+                    day,
+                    period,
+                )]
+                for teacher in teachers
+                for day in range(num_days)
+                for period in range(num_periods)
+            )
+            == subject["workload"]
+        )
+
+    def unit_vars_for_audience(classroom, audience, day, period):
+        vars_for_audience = []
+
+        for subject in classroom_subjects[classroom["id"]]:
+            targets = _targets_for(classroom, subject)
+
+            if targets == ["A", "B"]:
+                target = audience
+                if target not in targets:
+                    continue
+            else:
+                target = "Todos"
+
+            for teacher in teachers:
+                vars_for_audience.append(
+                    lesson[(
+                        classroom["id"],
+                        subject["id"],
+                        target,
+                        teacher["id"],
+                        day,
+                        period,
+                    )]
+                )
+
+        return vars_for_audience
+
+    def teacher_vars(teacher_id, day, period):
+        return [
+            lesson[(
+                classroom["id"],
+                subject["id"],
+                target,
+                teacher_id,
+                day,
+                period,
+            )]
+            for classroom, subject, target in units
+        ]
+
+    # 3. Conflitos de turma/grupo.
+    #
+    # Uma aula conjunta ("Todos") aparece tanto na ocupação de A quanto de B.
+    # Assim ela bloqueia os dois grupos. Aulas técnicas A e B podem ocorrer
+    # simultaneamente, inclusive com matérias diferentes.
+    for classroom in classrooms:
+        for audience in _audiences_for(classroom):
+            for day in range(num_days):
+                for period in range(num_periods):
+                    vars_for_audience = unit_vars_for_audience(
+                        classroom,
+                        audience,
+                        day,
+                        period,
+                    )
+                    if vars_for_audience:
+                        model.AddAtMostOne(vars_for_audience)
+
+    # 4. Um professor não pode dar duas aulas ao mesmo tempo.
     for teacher in teachers:
         for day in range(num_days):
             for period in range(num_periods):
-                model.AddAtMostOne(
-                    _teacher_lesson_vars(
-                        Y, teacher["id"], classrooms, subjects, day, period
-                    )
+                vars_for_teacher = teacher_vars(
+                    teacher["id"],
+                    day,
+                    period,
                 )
+                if vars_for_teacher:
+                    model.AddAtMostOne(vars_for_teacher)
 
-    # ------------------------------------------------------------------
-    # REGRAS TRABALHISTAS E PEDAGÓGICAS
-    # ------------------------------------------------------------------
+    # Ocupação booleana de cada grupo/turma e de cada professor.
+    student_occupancy = {}
+    for classroom in classrooms:
+        allowed_periods = JOURNEY_PERIODS.get(
+            classroom.get("shift", "Manhã"),
+            JOURNEY_PERIODS["Manhã"],
+        )
+
+        for audience in _audiences_for(classroom):
+            for day in range(num_days):
+                for period in allowed_periods:
+                    occupancy = model.NewBoolVar(
+                        f"occ_c{classroom['id']}_g{audience}_"
+                        f"d{day}_p{period}"
+                    )
+                    vars_for_audience = unit_vars_for_audience(
+                        classroom,
+                        audience,
+                        day,
+                        period,
+                    )
+                    if vars_for_audience:
+                        model.AddMaxEquality(
+                            occupancy,
+                            vars_for_audience,
+                        )
+                    else:
+                        model.Add(occupancy == 0)
+
+                    student_occupancy[(
+                        classroom["id"],
+                        audience,
+                        day,
+                        period,
+                    )] = occupancy
+
+    teacher_occupancy = {}
+    for teacher in teachers:
+        for day in range(num_days):
+            for period in range(num_periods):
+                occupancy = model.NewBoolVar(
+                    f"occ_t{teacher['id']}_d{day}_p{period}"
+                )
+                vars_for_teacher = teacher_vars(
+                    teacher["id"],
+                    day,
+                    period,
+                )
+                if vars_for_teacher:
+                    model.AddMaxEquality(
+                        occupancy,
+                        vars_for_teacher,
+                    )
+                else:
+                    model.Add(occupancy == 0)
+
+                teacher_occupancy[(
+                    teacher["id"],
+                    day,
+                    period,
+                )] = occupancy
 
     # 5. Interjornada simplificada:
-    # se o professor trabalha à noite, não recebe aula pela manhã no dia seguinte.
+    # quem trabalha à noite não recebe aula na manhã do dia seguinte.
     night_periods = JOURNEY_PERIODS["Noite"]
     morning_periods = JOURNEY_PERIODS["Manhã"]
 
     for teacher in teachers:
         for day in range(num_days - 1):
-            night_vars = [
-                var
+            worked_at_night = model.NewBoolVar(
+                f"night_t{teacher['id']}_d{day}"
+            )
+
+            night_occ = [
+                teacher_occupancy[(teacher["id"], day, period)]
                 for period in night_periods
-                for var in _teacher_lesson_vars(
-                    Y, teacher["id"], classrooms, subjects, day, period
-                )
-            ]
-            next_morning_vars = [
-                var
-                for period in morning_periods
-                for var in _teacher_lesson_vars(
-                    Y, teacher["id"], classrooms, subjects, day + 1, period
-                )
             ]
 
-            if night_vars and next_morning_vars:
-                taught_at_night = model.NewBoolVar(
-                    f"night_t{teacher['id']}_d{day}"
+            model.AddMaxEquality(worked_at_night, night_occ)
+
+            model.Add(
+                sum(
+                    teacher_occupancy[(
+                        teacher["id"],
+                        day + 1,
+                        period,
+                    )]
+                    for period in morning_periods
                 )
-                model.Add(sum(night_vars) > 0).OnlyEnforceIf(taught_at_night)
-                model.Add(sum(night_vars) == 0).OnlyEnforceIf(taught_at_night.Not())
-                model.Add(sum(next_morning_vars) == 0).OnlyEnforceIf(taught_at_night)
+                == 0
+            ).OnlyEnforceIf(worked_at_night)
 
     # 6. Máximo de aulas consecutivas do professor.
-    # Intervalos oficiais quebram a sequência.
-    max_consecutive = sys_config.get("max_consecutive_classes", 5)
+    max_consecutive = sys_config.get(
+        "max_consecutive_classes",
+        5,
+    )
+
     for teacher in teachers:
         for day in range(num_days):
             for segment in CONTINUOUS_SEGMENTS:
                 window_size = max_consecutive + 1
                 if len(segment) < window_size:
                     continue
-                for start in range(len(segment) - window_size + 1):
-                    window_periods = segment[start:start + window_size]
-                    window_vars = [
-                        var
-                        for period in window_periods
-                        for var in _teacher_lesson_vars(
-                            Y, teacher["id"], classrooms, subjects, day, period
-                        )
+
+                for start in range(
+                    len(segment) - window_size + 1
+                ):
+                    periods = segment[
+                        start:start + window_size
                     ]
-                    if window_vars:
-                        model.Add(sum(window_vars) <= max_consecutive)
+                    model.Add(
+                        sum(
+                            teacher_occupancy[(
+                                teacher["id"],
+                                day,
+                                period,
+                            )]
+                            for period in periods
+                        )
+                        <= max_consecutive
+                    )
 
     # 7. Máximo de aulas por dia do professor.
-    max_classes = sys_config.get("max_classes_per_day", 9)
+    max_classes = sys_config.get(
+        "max_classes_per_day",
+        9,
+    )
+
     for teacher in teachers:
         for day in range(num_days):
-            day_vars = [
-                var
-                for period in range(num_periods)
-                for var in _teacher_lesson_vars(
-                    Y, teacher["id"], classrooms, subjects, day, period
+            model.Add(
+                sum(
+                    teacher_occupancy[(
+                        teacher["id"],
+                        day,
+                        period,
+                    )]
+                    for period in range(num_periods)
                 )
-            ]
-            if day_vars:
-                model.Add(sum(day_vars) <= max_classes)
+                <= max_classes
+            )
 
-    # 8. Máximo de aulas de alta complexidade por dia para cada turma.
-    max_high = sys_config.get("max_high_complexity_per_day", 2)
+    # 8. Máximo diário de matérias de alta complexidade.
+    # Em turma dividida, a regra é aplicada separadamente para A e B.
+    max_high = sys_config.get(
+        "max_high_complexity_per_day",
+        2,
+    )
+
     for classroom in classrooms:
-        high_subjects = [
-            subject
-            for subject in _subjects_for_classroom(classroom, subjects)
+        allowed_periods = JOURNEY_PERIODS.get(
+            classroom.get("shift", "Manhã"),
+            JOURNEY_PERIODS["Manhã"],
+        )
+
+        high_subjects = {
+            subject["id"]
+            for subject in classroom_subjects[classroom["id"]]
             if subject.get("complexity") == "Alta"
-        ]
-        for day in range(num_days):
-            high_vars = [
-                Y[(classroom["id"], subject["id"], teacher["id"], day, period)]
-                for subject in high_subjects
-                for teacher in teachers
-                for period in range(num_periods)
-            ]
-            if high_vars:
-                model.Add(sum(high_vars) <= max_high)
+        }
 
-    # 9. Máximo de 2 aulas consecutivas da mesma disciplina.
-    # Um intervalo oficial quebra a sequência.
-    for classroom in classrooms:
-        journey = classroom.get("shift", "Manhã")
-        segments = JOURNEY_SEGMENTS.get(journey, JOURNEY_SEGMENTS["Manhã"])
-
-        for subject in _subjects_for_classroom(classroom, subjects):
+        for audience in _audiences_for(classroom):
             for day in range(num_days):
-                for segment in segments:
-                    if len(segment) < 3:
+                high_vars = []
+
+                for subject in classroom_subjects[classroom["id"]]:
+                    if subject["id"] not in high_subjects:
                         continue
-                    for start in range(len(segment) - 2):
-                        periods = segment[start:start + 3]
-                        model.Add(
-                            sum(
-                                Y[(
+
+                    targets = _targets_for(classroom, subject)
+                    target = (
+                        audience
+                        if targets == ["A", "B"]
+                        else "Todos"
+                    )
+
+                    for teacher in teachers:
+                        for period in allowed_periods:
+                            high_vars.append(
+                                lesson[(
                                     classroom["id"],
                                     subject["id"],
+                                    target,
                                     teacher["id"],
                                     day,
                                     period,
                                 )]
-                                for teacher in teachers
-                                for period in periods
                             )
-                            <= 2
-                        )
 
-    # 9b. Máximo de aulas seguidas do mesmo professor na mesma turma.
-    max_same_teacher = sys_config.get("max_consec_per_teacher", 2)
-    same_teacher_mode = sys_config.get("max_consec_teacher_mode", "hard")
+                if high_vars:
+                    model.Add(sum(high_vars) <= max_high)
+
+    # 9. Máximo de 2 aulas consecutivas da mesma disciplina.
+    for classroom, subject, target in units:
+        segments = JOURNEY_SEGMENTS.get(
+            classroom.get("shift", "Manhã"),
+            JOURNEY_SEGMENTS["Manhã"],
+        )
+
+        for day in range(num_days):
+            for segment in segments:
+                if len(segment) < 3:
+                    continue
+
+                for start in range(len(segment) - 2):
+                    periods = segment[start:start + 3]
+
+                    model.Add(
+                        sum(
+                            lesson[(
+                                classroom["id"],
+                                subject["id"],
+                                target,
+                                teacher["id"],
+                                day,
+                                period,
+                            )]
+                            for teacher in teachers
+                            for period in periods
+                        )
+                        <= 2
+                    )
+
+    # 9b. Máximo de aulas seguidas do mesmo professor para os mesmos alunos.
+    max_same_teacher = sys_config.get(
+        "max_consec_per_teacher",
+        2,
+    )
+    same_teacher_mode = sys_config.get(
+        "max_consec_teacher_mode",
+        "hard",
+    )
 
     if same_teacher_mode != "ignore":
         for classroom in classrooms:
-            journey = classroom.get("shift", "Manhã")
-            segments = JOURNEY_SEGMENTS.get(journey, JOURNEY_SEGMENTS["Manhã"])
-            classroom_subjects = _subjects_for_classroom(classroom, subjects)
+            segments = JOURNEY_SEGMENTS.get(
+                classroom.get("shift", "Manhã"),
+                JOURNEY_SEGMENTS["Manhã"],
+            )
 
-            for teacher in teachers:
-                for day in range(num_days):
-                    window_size = max_same_teacher + 1
-                    for segment in segments:
-                        if len(segment) < window_size:
-                            continue
-                        for start in range(len(segment) - window_size + 1):
-                            periods = segment[start:start + window_size]
-                            class_sum = sum(
-                                Y[(
-                                    classroom["id"],
-                                    subject["id"],
-                                    teacher["id"],
-                                    day,
-                                    period,
-                                )]
-                                for subject in classroom_subjects
-                                for period in periods
-                            )
+            for audience in _audiences_for(classroom):
+                for teacher in teachers:
+                    for day in range(num_days):
+                        window_size = max_same_teacher + 1
 
-                            if same_teacher_mode == "hard":
-                                model.Add(class_sum <= max_same_teacher)
-                            elif same_teacher_mode == "soft":
-                                penalty = model.NewIntVar(
-                                    0,
-                                    window_size,
-                                    f"pen_consec_t{teacher['id']}_"
-                                    f"c{classroom['id']}_d{day}_s{start}",
-                                )
-                                model.Add(
-                                    penalty >= class_sum - max_same_teacher
-                                )
-                                penalties.append(penalty * 40)
+                        for segment in segments:
+                            if len(segment) < window_size:
+                                continue
+
+                            for start in range(
+                                len(segment) - window_size + 1
+                            ):
+                                periods = segment[
+                                    start:start + window_size
+                                ]
+                                class_vars = []
+
+                                for subject in classroom_subjects[
+                                    classroom["id"]
+                                ]:
+                                    targets = _targets_for(
+                                        classroom,
+                                        subject,
+                                    )
+                                    target = (
+                                        audience
+                                        if targets == ["A", "B"]
+                                        else "Todos"
+                                    )
+
+                                    for period in periods:
+                                        class_vars.append(
+                                            lesson[(
+                                                classroom["id"],
+                                                subject["id"],
+                                                target,
+                                                teacher["id"],
+                                                day,
+                                                period,
+                                            )]
+                                        )
+
+                                class_sum = sum(class_vars)
+
+                                if same_teacher_mode == "hard":
+                                    model.Add(
+                                        class_sum
+                                        <= max_same_teacher
+                                    )
+                                elif same_teacher_mode == "soft":
+                                    penalty = model.NewIntVar(
+                                        0,
+                                        window_size,
+                                        f"pen_consec_t{teacher['id']}_"
+                                        f"c{classroom['id']}_g{audience}_"
+                                        f"d{day}_s{start}",
+                                    )
+                                    model.Add(
+                                        penalty
+                                        >= class_sum
+                                        - max_same_teacher
+                                    )
+                                    penalties.append(
+                                        penalty * 40
+                                    )
 
     # 10. Janelas dos alunos.
-    # A lista da jornada já ignora intervalos e almoço, então eles nunca
-    # são tratados como "buracos" na grade.
-    student_gaps_hard = sys_config.get("student_gaps_hard", True)
+    student_gaps_hard = sys_config.get(
+        "student_gaps_hard",
+        True,
+    )
 
     for classroom in classrooms:
-        journey = classroom.get("shift", "Manhã")
         allowed_periods = JOURNEY_PERIODS.get(
-            journey, JOURNEY_PERIODS["Manhã"]
+            classroom.get("shift", "Manhã"),
+            JOURNEY_PERIODS["Manhã"],
         )
-        classroom_subjects = _subjects_for_classroom(classroom, subjects)
 
-        for day in range(num_days):
-            has_class = []
-            for period in allowed_periods:
-                period_var = model.NewBoolVar(
-                    f"c_has_class_c{classroom['id']}_d{day}_p{period}"
-                )
-                model.AddMaxEquality(
-                    period_var,
-                    [
-                        Y[(
-                            classroom["id"],
-                            subject["id"],
-                            teacher["id"],
-                            day,
-                            period,
-                        )]
-                        for subject in classroom_subjects
-                        for teacher in teachers
-                    ],
-                )
-                has_class.append(period_var)
+        for audience in _audiences_for(classroom):
+            for day in range(num_days):
+                day_occ = [
+                    student_occupancy[(
+                        classroom["id"],
+                        audience,
+                        day,
+                        period,
+                    )]
+                    for period in allowed_periods
+                ]
 
-            # Proíbe/penaliza qualquer buraco entre duas aulas do mesmo dia.
-            for left in range(len(has_class) - 2):
-                for middle in range(left + 1, len(has_class) - 1):
-                    for right in range(middle + 1, len(has_class)):
-                        expression = (
-                            has_class[left]
-                            + (1 - has_class[middle])
-                            + has_class[right]
-                        )
-                        if student_gaps_hard:
-                            model.Add(expression <= 2)
-                        else:
-                            gap_penalty = model.NewBoolVar(
-                                f"gap_c{classroom['id']}_d{day}_"
-                                f"{left}_{middle}_{right}"
+                for left in range(len(day_occ) - 2):
+                    for middle in range(
+                        left + 1,
+                        len(day_occ) - 1,
+                    ):
+                        for right in range(
+                            middle + 1,
+                            len(day_occ),
+                        ):
+                            expression = (
+                                day_occ[left]
+                                + (1 - day_occ[middle])
+                                + day_occ[right]
                             )
-                            model.Add(expression - 2 <= gap_penalty)
-                            penalties.append(gap_penalty * 100)
+
+                            if student_gaps_hard:
+                                model.Add(
+                                    expression <= 2
+                                )
+                            else:
+                                gap_penalty = model.NewBoolVar(
+                                    f"gap_c{classroom['id']}_"
+                                    f"g{audience}_d{day}_"
+                                    f"{left}_{middle}_{right}"
+                                )
+                                model.Add(
+                                    expression - 2
+                                    <= gap_penalty
+                                )
+                                penalties.append(
+                                    gap_penalty * 100
+                                )
 
     # 11. Janelas dos professores.
-    # Só contam dentro de blocos sem intervalo oficial.
-    teacher_gaps_hard = sys_config.get("teacher_gaps_hard", False)
+    teacher_gaps_hard = sys_config.get(
+        "teacher_gaps_hard",
+        False,
+    )
 
     for teacher in teachers:
         for day in range(num_days):
-            has_class = []
-            for period in range(num_periods):
-                period_var = model.NewBoolVar(
-                    f"t_has_class_t{teacher['id']}_d{day}_p{period}"
-                )
-                model.AddMaxEquality(
-                    period_var,
-                    _teacher_lesson_vars(
-                        Y, teacher["id"], classrooms, subjects, day, period
-                    ),
-                )
-                has_class.append(period_var)
-
             for segment in CONTINUOUS_SEGMENTS:
                 if len(segment) < 3:
                     continue
-                for left_index in range(len(segment) - 2):
-                    for middle_index in range(left_index + 1, len(segment) - 1):
-                        for right_index in range(middle_index + 1, len(segment)):
+
+                for left_index in range(
+                    len(segment) - 2
+                ):
+                    for middle_index in range(
+                        left_index + 1,
+                        len(segment) - 1,
+                    ):
+                        for right_index in range(
+                            middle_index + 1,
+                            len(segment),
+                        ):
                             left = segment[left_index]
                             middle = segment[middle_index]
                             right = segment[right_index]
+
                             expression = (
-                                has_class[left]
-                                + (1 - has_class[middle])
-                                + has_class[right]
+                                teacher_occupancy[(
+                                    teacher["id"],
+                                    day,
+                                    left,
+                                )]
+                                + (
+                                    1
+                                    - teacher_occupancy[(
+                                        teacher["id"],
+                                        day,
+                                        middle,
+                                    )]
+                                )
+                                + teacher_occupancy[(
+                                    teacher["id"],
+                                    day,
+                                    right,
+                                )]
                             )
 
                             if teacher_gaps_hard:
-                                model.Add(expression <= 2)
+                                model.Add(
+                                    expression <= 2
+                                )
                             else:
                                 gap_penalty = model.NewBoolVar(
-                                    f"gap_t{teacher['id']}_d{day}_"
-                                    f"{left}_{middle}_{right}"
+                                    f"gap_t{teacher['id']}_"
+                                    f"d{day}_{left}_{middle}_{right}"
                                 )
-                                model.Add(expression - 2 <= gap_penalty)
-                                penalties.append(gap_penalty * 80)
+                                model.Add(
+                                    expression - 2
+                                    <= gap_penalty
+                                )
+                                penalties.append(
+                                    gap_penalty * 80
+                                )
 
     # ------------------------------------------------------------------
     # FUNÇÃO OBJETIVO
     # ------------------------------------------------------------------
     objective_terms = []
 
-    # Pontuação dos professores: quanto maior, mais o solver prefere esse
-    # professor quando mais de um pode dar a mesma disciplina.
-    for classroom in classrooms:
-        for subject in _subjects_for_classroom(classroom, subjects):
-            for teacher in teachers:
-                score = teacher.get("score", 0)
-                if score <= 0:
-                    continue
-                for day in range(num_days):
-                    for period in range(num_periods):
-                        objective_terms.append(
-                            score
-                            * Y[(
-                                classroom["id"],
-                                subject["id"],
-                                teacher["id"],
-                                day,
-                                period,
-                            )]
-                        )
+    # Professores com maior pontuação são preferidos quando houver escolha.
+    for classroom, subject, target in units:
+        for teacher in teachers:
+            score = teacher.get("score", 0)
+            if score <= 0:
+                continue
 
-    min_classes_students = sys_config.get("min_classes_students", 2)
-    min_classes_teachers = sys_config.get("min_classes_teachers", 2)
-    avoid_first_period = sys_config.get("avoid_first_period", False)
-    avoid_last_period = sys_config.get("avoid_last_period", False)
-    avoid_friday = sys_config.get("avoid_friday", False)
-
-    # Preferência: evitar que o professor vá à escola para pouquíssimas aulas.
-    for teacher in teachers:
-        for day in range(num_days):
-            day_vars = [
-                var
-                for period in range(num_periods)
-                for var in _teacher_lesson_vars(
-                    Y, teacher["id"], classrooms, subjects, day, period
-                )
-            ]
-
-            if day_vars:
-                active = model.NewBoolVar(
-                    f"active_t{teacher['id']}_d{day}"
-                )
-                model.Add(sum(day_vars) > 0).OnlyEnforceIf(active)
-                model.Add(sum(day_vars) == 0).OnlyEnforceIf(active.Not())
-
-                penalty = model.NewIntVar(
-                    0, num_periods, f"pen_min_t{teacher['id']}_d{day}"
-                )
-                model.Add(
-                    penalty >= min_classes_teachers - sum(day_vars)
-                ).OnlyEnforceIf(active)
-                model.Add(penalty == 0).OnlyEnforceIf(active.Not())
-                penalties.append(penalty * 100)
-
-    # Preferências da turma.
-    for classroom in classrooms:
-        journey = classroom.get("shift", "Manhã")
-        allowed_periods = JOURNEY_PERIODS.get(
-            journey, JOURNEY_PERIODS["Manhã"]
-        )
-        classroom_subjects = _subjects_for_classroom(classroom, subjects)
-
-        first_period = allowed_periods[0]
-        last_period = allowed_periods[-1]
-
-        for day in range(num_days):
-            day_vars = []
-
-            for period in allowed_periods:
-                for subject in classroom_subjects:
-                    for teacher in teachers:
-                        lesson = Y[(
+            for day in range(num_days):
+                for period in range(num_periods):
+                    objective_terms.append(
+                        score
+                        * lesson[(
                             classroom["id"],
                             subject["id"],
+                            target,
                             teacher["id"],
                             day,
                             period,
                         )]
-                        day_vars.append(lesson)
+                    )
 
-                        if avoid_first_period and period == first_period:
-                            penalties.append(lesson * 20)
+    min_classes_students = sys_config.get(
+        "min_classes_students",
+        2,
+    )
+    min_classes_teachers = sys_config.get(
+        "min_classes_teachers",
+        2,
+    )
+    avoid_first_period = sys_config.get(
+        "avoid_first_period",
+        False,
+    )
+    avoid_last_period = sys_config.get(
+        "avoid_last_period",
+        False,
+    )
+    avoid_friday = sys_config.get(
+        "avoid_friday",
+        False,
+    )
 
-                        if avoid_last_period and period == last_period:
-                            penalties.append(lesson * 20)
+    # Evitar que professor vá à escola para pouquíssimas aulas.
+    for teacher in teachers:
+        for day in range(num_days):
+            day_occ = [
+                teacher_occupancy[(
+                    teacher["id"],
+                    day,
+                    period,
+                )]
+                for period in range(num_periods)
+            ]
 
-                        if avoid_friday and day == 4:
-                            penalties.append(lesson * 30)
+            active = model.NewBoolVar(
+                f"active_t{teacher['id']}_d{day}"
+            )
+            model.Add(sum(day_occ) > 0).OnlyEnforceIf(active)
+            model.Add(sum(day_occ) == 0).OnlyEnforceIf(
+                active.Not()
+            )
 
-            if day_vars:
+            penalty = model.NewIntVar(
+                0,
+                num_periods,
+                f"pen_min_t{teacher['id']}_d{day}",
+            )
+            model.Add(
+                penalty
+                >= min_classes_teachers - sum(day_occ)
+            ).OnlyEnforceIf(active)
+            model.Add(penalty == 0).OnlyEnforceIf(
+                active.Not()
+            )
+            penalties.append(penalty * 100)
+
+    # Preferências dos alunos, avaliadas por grupo quando houver divisão.
+    for classroom in classrooms:
+        allowed_periods = JOURNEY_PERIODS.get(
+            classroom.get("shift", "Manhã"),
+            JOURNEY_PERIODS["Manhã"],
+        )
+        first_period = allowed_periods[0]
+        last_period = allowed_periods[-1]
+
+        for audience in _audiences_for(classroom):
+            for day in range(num_days):
+                day_occ = [
+                    student_occupancy[(
+                        classroom["id"],
+                        audience,
+                        day,
+                        period,
+                    )]
+                    for period in allowed_periods
+                ]
+
+                if avoid_first_period:
+                    penalties.append(
+                        student_occupancy[(
+                            classroom["id"],
+                            audience,
+                            day,
+                            first_period,
+                        )]
+                        * 20
+                    )
+
+                if avoid_last_period:
+                    penalties.append(
+                        student_occupancy[(
+                            classroom["id"],
+                            audience,
+                            day,
+                            last_period,
+                        )]
+                        * 20
+                    )
+
+                if avoid_friday and day == 4:
+                    penalties.extend(
+                        occupancy * 30
+                        for occupancy in day_occ
+                    )
+
                 active = model.NewBoolVar(
-                    f"active_c{classroom['id']}_d{day}"
-                )
-                model.Add(sum(day_vars) > 0).OnlyEnforceIf(active)
-                model.Add(sum(day_vars) == 0).OnlyEnforceIf(active.Not())
-
-                penalty = model.NewIntVar(
-                    0, num_periods, f"pen_min_c{classroom['id']}_d{day}"
+                    f"active_c{classroom['id']}_"
+                    f"g{audience}_d{day}"
                 )
                 model.Add(
-                    penalty >= min_classes_students - sum(day_vars)
+                    sum(day_occ) > 0
                 ).OnlyEnforceIf(active)
-                model.Add(penalty == 0).OnlyEnforceIf(active.Not())
+                model.Add(
+                    sum(day_occ) == 0
+                ).OnlyEnforceIf(active.Not())
+
+                penalty = model.NewIntVar(
+                    0,
+                    num_periods,
+                    f"pen_min_c{classroom['id']}_"
+                    f"g{audience}_d{day}",
+                )
+                model.Add(
+                    penalty
+                    >= min_classes_students - sum(day_occ)
+                ).OnlyEnforceIf(active)
+                model.Add(
+                    penalty == 0
+                ).OnlyEnforceIf(active.Not())
                 penalties.append(penalty * 100)
 
-    model.Maximize(sum(objective_terms) - sum(penalties))
+    model.Maximize(
+        sum(objective_terms) - sum(penalties)
+    )
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 15.0
@@ -531,35 +852,41 @@ def generate_schedule(
     status = solver.Solve(model)
     elapsed = time.perf_counter() - started
 
-    if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+    if status in (
+        cp_model.OPTIMAL,
+        cp_model.FEASIBLE,
+    ):
         schedule = []
 
-        for classroom in classrooms:
-            for subject in _subjects_for_classroom(classroom, subjects):
-                for teacher in teachers:
-                    for day in range(num_days):
-                        for period in range(num_periods):
-                            if solver.Value(
-                                Y[(
-                                    classroom["id"],
-                                    subject["id"],
-                                    teacher["id"],
-                                    day,
-                                    period,
-                                )]
-                            ) == 1:
-                                schedule.append({
-                                    "classroom_id": classroom["id"],
-                                    "subject_id": subject["id"],
-                                    "teacher_id": teacher["id"],
-                                    "day": day,
-                                    "period": period,
-                                })
+        for classroom, subject, target in units:
+            for teacher in teachers:
+                for day in range(num_days):
+                    for period in range(num_periods):
+                        if solver.Value(
+                            lesson[(
+                                classroom["id"],
+                                subject["id"],
+                                target,
+                                teacher["id"],
+                                day,
+                                period,
+                            )]
+                        ) == 1:
+                            schedule.append({
+                                "classroom_id": classroom["id"],
+                                "subject_id": subject["id"],
+                                "teacher_id": teacher["id"],
+                                "day": day,
+                                "period": period,
+                                "student_group": target,
+                            })
 
         return {
             "status": "success",
             "solution_status": (
-                "optimal" if status == cp_model.OPTIMAL else "feasible"
+                "optimal"
+                if status == cp_model.OPTIMAL
+                else "feasible"
             ),
             "solve_time_seconds": round(elapsed, 3),
             "schedule": schedule,
@@ -568,6 +895,7 @@ def generate_schedule(
     return {
         "status": "infeasible",
         "message": (
-            "Não foi possível gerar uma grade com as restrições informadas."
+            "Não foi possível gerar uma grade com as "
+            "restrições informadas."
         ),
     }
