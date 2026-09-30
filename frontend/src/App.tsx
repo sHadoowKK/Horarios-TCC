@@ -136,7 +136,19 @@ function App() {
       // Salva a grade mais recente para ela reaparecer ao abrir o sistema.
       await api.post("/timetable/", newSchedule);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Erro ao gerar grade");
+      const detail = err.response?.data?.detail;
+      const responseText =
+        typeof err.response?.data === "string"
+          ? err.response.data
+          : "";
+      const message =
+        detail
+        || responseText
+        || err.message
+        || "Erro ao gerar grade";
+
+      setError(`Erro ao gerar grade: ${message}`);
+      console.error("Erro ao gerar grade", err);
     } finally {
       setLoading(false);
     }
