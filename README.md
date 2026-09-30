@@ -123,7 +123,7 @@ O CP-SAT trata, entre outras, as seguintes condições:
 - a pontuação docente dá prioridade a professores com maior pontuação quando mais de um puder assumir a disciplina;
 - se nenhum professor puder assumir uma disciplina, a grade ainda pode ser gerada e as aulas aparecem como **Sem professor**.
 
-Blocos longos da mesma disciplina ou do mesmo professor são permitidos. Isso é necessário para representar grades reais, como disciplinas técnicas que ocupam três ou cinco aulas no mesmo dia.
+Na distribuição das disciplinas, turmas de **Manhã/Integral** têm preferência por blocos de **2 aulas**, evitando espalhar uma matéria em várias aulas únicas e evitando blocos de 3 ou mais quando houver alternativa. Essa é uma preferência, não uma proibição. No **Noite**, blocos de 3, 4 ou 5 aulas são aceitos normalmente para representar grades reais de cursos noturnos.
 
 ## Jornadas e horários
 

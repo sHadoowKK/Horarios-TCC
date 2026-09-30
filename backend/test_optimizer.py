@@ -526,5 +526,147 @@ class OptimizerTests(unittest.TestCase):
         )
 
 
+    def test_daytime_workload_four_prefers_two_plus_two(self):
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [{
+                    "subject_id": 1,
+                    "workload": 4,
+                    "split": False,
+                }],
+            )
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            [subject(1, "Português")],
+            [teacher(1, [1], score=100)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+
+        counts_by_day = {}
+        for item in result["schedule"]:
+            counts_by_day[item["day"]] = (
+                counts_by_day.get(item["day"], 0) + 1
+            )
+
+        active_counts = sorted(counts_by_day.values())
+        self.assertEqual(active_counts, [2, 2])
+
+    def test_daytime_workload_three_prefers_two_plus_one(self):
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [{
+                    "subject_id": 1,
+                    "workload": 3,
+                    "split": False,
+                }],
+            )
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            [subject(1, "Português")],
+            [teacher(1, [1], score=100)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+
+        counts_by_day = {}
+        for item in result["schedule"]:
+            counts_by_day[item["day"]] = (
+                counts_by_day.get(item["day"], 0) + 1
+            )
+
+        active_counts = sorted(counts_by_day.values())
+        self.assertEqual(active_counts, [1, 2])
+
+    def test_night_workload_three_can_form_triple_block(self):
+        classrooms = [
+            classroom(
+                1,
+                "Módulo 1",
+                "Noite",
+                [{
+                    "subject_id": 1,
+                    "workload": 3,
+                    "split": False,
+                }],
+            )
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            [subject(1, "Banco de Dados")],
+            [teacher(1, [1], score=100)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+
+        counts_by_day = {}
+        for item in result["schedule"]:
+            counts_by_day[item["day"]] = (
+                counts_by_day.get(item["day"], 0) + 1
+            )
+
+        self.assertEqual(
+            max(counts_by_day.values()),
+            3,
+        )
+
+    def test_daytime_three_same_day_still_possible_if_needed(self):
+        availability = empty_availability()
+        availability["0"][0] = True
+        availability["0"][1] = True
+        availability["0"][2] = True
+
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [{
+                    "subject_id": 1,
+                    "workload": 3,
+                    "split": False,
+                }],
+            )
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            [subject(1, "Português")],
+            [
+                teacher(
+                    1,
+                    [1],
+                    availability,
+                    score=100,
+                )
+            ],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(
+            result["unstaffed_lessons"],
+            0,
+        )
+        self.assertEqual(
+            len(result["schedule"]),
+            3,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

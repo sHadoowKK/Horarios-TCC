@@ -666,6 +666,134 @@ def generate_schedule(
                         sum(high_values) <= max_high
                     )
 
+    # Preferência de distribuição das disciplinas.
+    #
+    # Manhã/Integral: o padrão desejado é trabalhar em blocos de 2.
+    # Uma aula isolada é permitida quando a carga semanal exigir.
+    # Três ou mais aulas da mesma disciplina no mesmo dia também continuam
+    # possíveis, mas são mais indesejáveis do que uma aula isolada.
+    #
+    # Noite: blocos maiores (3, 4 ou 5) fazem parte de grades reais e não
+    # recebem a penalidade de excesso. Ainda preferimos aulas agrupadas.
+    for classroom, subject, target in units:
+        allowed_periods = JOURNEY_PERIODS.get(
+            classroom.get("shift", "Manhã"),
+            JOURNEY_PERIODS["Manhã"],
+        )
+        is_night = classroom.get("shift") == "Noite"
+
+        for day in range(num_days):
+            period_occurrences = []
+
+            for period in allowed_periods:
+                period_occurrences.append(
+                    sum(
+                        vars_for_unit_at(
+                            classroom,
+                            subject,
+                            target,
+                            day,
+                            period,
+                        )
+                    )
+                )
+
+            day_count = model.NewIntVar(
+                0,
+                len(allowed_periods),
+                f"subject_day_count_c{classroom['id']}_"
+                f"s{subject['id']}_g{target}_d{day}",
+            )
+            model.Add(
+                day_count == sum(period_occurrences)
+            )
+
+            active = model.NewBoolVar(
+                f"subject_day_active_c{classroom['id']}_"
+                f"s{subject['id']}_g{target}_d{day}"
+            )
+            model.Add(
+                day_count >= 1
+            ).OnlyEnforceIf(active)
+            model.Add(
+                day_count == 0
+            ).OnlyEnforceIf(active.Not())
+
+            # Se o dia estiver ativo, 2 aulas é o alvo mínimo.
+            # count=1 -> penalidade; count>=2 -> zero.
+            singleton_penalty = model.NewIntVar(
+                0,
+                1,
+                f"subject_single_c{classroom['id']}_"
+                f"s{subject['id']}_g{target}_d{day}",
+            )
+            model.Add(
+                singleton_penalty
+                >= 2 * active - day_count
+            )
+            penalties.append(
+                singleton_penalty * 120
+            )
+
+            if not is_night:
+                # No diurno, passar de 2 no mesmo dia é desencorajado
+                # com peso maior que deixar uma aula isolada.
+                excess = model.NewIntVar(
+                    0,
+                    len(allowed_periods),
+                    f"subject_excess_c{classroom['id']}_"
+                    f"s{subject['id']}_g{target}_d{day}",
+                )
+                model.Add(
+                    excess >= day_count - 2
+                )
+                penalties.append(
+                    excess * 300
+                )
+
+            # Além de cair no mesmo dia, tentamos deixar as duas aulas juntas.
+            # Intervalos curtos continuam contando como sequência; almoço
+            # de 1h ou mais não conta como uma dobradinha.
+            for index in range(
+                len(allowed_periods) - 1
+            ):
+                left_period = allowed_periods[index]
+                right_period = allowed_periods[index + 1]
+
+                break_minutes = (
+                    PERIOD_START_MINUTES[right_period]
+                    - PERIOD_END_MINUTES[left_period]
+                )
+
+                if break_minutes >= 60:
+                    continue
+
+                left_occurrence = period_occurrences[index]
+                right_occurrence = period_occurrences[index + 1]
+
+                adjacent_pair = model.NewBoolVar(
+                    f"subject_pair_c{classroom['id']}_"
+                    f"s{subject['id']}_g{target}_d{day}_"
+                    f"p{left_period}_{right_period}"
+                )
+
+                model.Add(
+                    adjacent_pair <= left_occurrence
+                )
+                model.Add(
+                    adjacent_pair <= right_occurrence
+                )
+                model.Add(
+                    adjacent_pair
+                    >= left_occurrence
+                    + right_occurrence
+                    - 1
+                )
+
+                rewards.append(
+                    adjacent_pair * 80
+                )
+
     # Regra opcional legada de mesmo professor seguido.
     # Por padrão fica ignorada porque horários reais podem ter blocos longos.
     max_same_teacher = int(
