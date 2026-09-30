@@ -4,10 +4,13 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  Edit,
   Layers,
   Plus,
+  Save,
   School,
   Trash2,
+  X,
 } from "lucide-react";
 
 interface Course {
@@ -50,6 +53,34 @@ export default function Turmas() {
     useState<Record<number, string>>({});
 
   const [newCourseName, setNewCourseName] = useState("");
+  const [editingCourseId, setEditingCourseId] =
+    useState<number | null>(null);
+  const [editingCourseName, setEditingCourseName] =
+    useState("");
+
+  const [editingClassroomId, setEditingClassroomId] =
+    useState<number | null>(null);
+  const [classroomDraft, setClassroomDraft] = useState({
+    name: "",
+    shift: "Manhã",
+    course_id: 0,
+  });
+
+  const [editingSubjectId, setEditingSubjectId] =
+    useState<number | null>(null);
+  const [subjectDraft, setSubjectDraft] = useState<{
+    name: string;
+    workload: number;
+    complexity: string;
+    category: "Ensino Médio" | "Técnica";
+    course_ids: number[];
+  }>({
+    name: "",
+    workload: 1,
+    complexity: "Media",
+    category: "Ensino Médio",
+    course_ids: [],
+  });
 
   const [newClassName, setNewClassName] = useState("");
   const [newClassShift, setNewClassShift] = useState("Manhã");
@@ -99,6 +130,126 @@ export default function Turmas() {
     });
 
     setNewCourseName("");
+    fetchData();
+  };
+
+  const startCourseEdit = (
+    course: Course,
+  ) => {
+    setEditingCourseId(course.id);
+    setEditingCourseName(course.name);
+  };
+
+  const saveCourseEdit = async (
+    course: Course,
+  ) => {
+    const name = editingCourseName.trim();
+    if (!name) return;
+
+    await api.put(
+      `/courses/${course.id}`,
+      { name },
+    );
+
+    setEditingCourseId(null);
+    setEditingCourseName("");
+    fetchData();
+  };
+
+  const startClassroomEdit = (
+    classroom: Classroom,
+  ) => {
+    setEditingClassroomId(classroom.id);
+    setClassroomDraft({
+      name: classroom.name,
+      shift: classroom.shift,
+      course_id: classroom.course_id,
+    });
+  };
+
+  const saveClassroomEdit = async (
+    classroom: Classroom,
+  ) => {
+    const name = classroomDraft.name.trim();
+    if (!name || !classroomDraft.course_id) {
+      return;
+    }
+
+    const validSubjectIds = new Set(
+      subjects
+        .filter(subject =>
+          subject.course_ids?.includes(
+            classroomDraft.course_id,
+          ),
+        )
+        .map(subject => subject.id),
+    );
+
+    await saveClassroom(classroom, {
+      name,
+      shift: classroomDraft.shift,
+      course_id: classroomDraft.course_id,
+      subject_settings: (
+        classroom.subject_settings || []
+      ).filter(setting =>
+        validSubjectIds.has(
+          setting.subject_id,
+        ),
+      ),
+    });
+
+    setEditingClassroomId(null);
+  };
+
+  const startSubjectEdit = (
+    subject: Subject,
+  ) => {
+    setEditingSubjectId(subject.id);
+    setSubjectDraft({
+      name: subject.name,
+      workload: subject.workload,
+      complexity: subject.complexity,
+      category: subject.category,
+      course_ids: [
+        ...(subject.course_ids || []),
+      ],
+    });
+  };
+
+  const saveSubjectEdit = async (
+    subject: Subject,
+  ) => {
+    const name = subjectDraft.name.trim();
+
+    if (
+      !name
+      || subjectDraft.course_ids.length === 0
+    ) {
+      alert(
+        "Informe o nome e mantenha pelo menos um curso associado.",
+      );
+      return;
+    }
+
+    await api.put(
+      `/subjects/${subject.id}`,
+      {
+        name,
+        workload: Math.max(
+          1,
+          Math.round(
+            Number(subjectDraft.workload),
+          ),
+        ),
+        complexity:
+          subjectDraft.complexity,
+        category: subjectDraft.category,
+        course_ids:
+          subjectDraft.course_ids,
+      },
+    );
+
+    setEditingSubjectId(null);
     fetchData();
   };
 
@@ -523,26 +674,76 @@ export default function Turmas() {
             {courses.map(course => (
               <li
                 key={course.id}
-                className="p-3 bg-gray-50 border border-gray-100 rounded-lg flex justify-between items-center gap-2"
+                className="p-3 bg-gray-50 border border-gray-100 rounded-lg"
               >
-                <span className="font-medium text-gray-800 flex-1 min-w-0 truncate">
-                  {course.name}
-                </span>
+                {editingCourseId === course.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={editingCourseName}
+                      onChange={event =>
+                        setEditingCourseName(
+                          event.target.value,
+                        )
+                      }
+                      className="min-w-0 flex-1 border border-gray-300 rounded p-1.5"
+                      autoFocus
+                    />
 
-                <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
-                  ID: {course.id}
-                </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        saveCourseEdit(course)
+                      }
+                      className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded"
+                      title="Salvar"
+                    >
+                      <Save className="w-4 h-4" />
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleDeleteCourse(course)
-                  }
-                  className="p-1.5 text-red-600 hover:bg-red-100 rounded"
-                  title="Remover curso"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditingCourseId(null)
+                      }
+                      className="p-1.5 text-gray-500 hover:bg-gray-200 rounded"
+                      title="Cancelar"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="font-medium text-gray-800 flex-1 min-w-0 truncate">
+                      {course.name}
+                    </span>
+
+                    <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
+                      ID: {course.id}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        startCourseEdit(course)
+                      }
+                      className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded"
+                      title="Editar curso"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDeleteCourse(course)
+                      }
+                      className="p-1.5 text-red-600 hover:bg-red-100 rounded"
+                      title="Remover curso"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
 
@@ -661,28 +862,122 @@ export default function Turmas() {
                   key={classroom.id}
                   className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-sm flex flex-col gap-2"
                 >
-                  <div className="flex justify-between gap-2 items-start">
-                    <strong className="text-gray-800 text-base flex-1 min-w-0 truncate">
-                      {classroom.name}
-                    </strong>
+                  {editingClassroomId === classroom.id ? (
+                    <div className="space-y-2 rounded-lg border border-emerald-200 bg-white p-2">
+                      <input
+                        value={classroomDraft.name}
+                        onChange={event =>
+                          setClassroomDraft(current => ({
+                            ...current,
+                            name: event.target.value,
+                          }))
+                        }
+                        className="w-full border border-gray-300 rounded p-1.5"
+                        placeholder="Nome da turma"
+                      />
 
-                    <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
-                      {classroom.shift}
-                    </span>
+                      <div className="flex gap-2">
+                        <select
+                          value={classroomDraft.shift}
+                          onChange={event =>
+                            setClassroomDraft(current => ({
+                              ...current,
+                              shift: event.target.value,
+                            }))
+                          }
+                          className="min-w-0 flex-1 border border-gray-300 rounded p-1.5 bg-white"
+                        >
+                          <option value="Manhã">Manhã</option>
+                          <option value="Integral">Integral</option>
+                          <option value="Noite">Noite</option>
+                        </select>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleDeleteClassroom(
-                          classroom,
-                        )
-                      }
-                      className="p-1 text-red-600 hover:bg-red-100 rounded"
-                      title="Remover turma"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                        <select
+                          value={classroomDraft.course_id}
+                          onChange={event =>
+                            setClassroomDraft(current => ({
+                              ...current,
+                              course_id: Number(
+                                event.target.value,
+                              ),
+                            }))
+                          }
+                          className="min-w-0 flex-1 border border-gray-300 rounded p-1.5 bg-white"
+                        >
+                          {courses.map(course => (
+                            <option
+                              key={course.id}
+                              value={course.id}
+                            >
+                              {course.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            saveClassroomEdit(
+                              classroom,
+                            )
+                          }
+                          className="text-xs px-2 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                          Salvar
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditingClassroomId(
+                              null,
+                            )
+                          }
+                          className="text-xs px-2 py-1 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between gap-2 items-start">
+                      <strong className="text-gray-800 text-base flex-1 min-w-0 truncate">
+                        {classroom.name}
+                      </strong>
+
+                      <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+                        {classroom.shift}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          startClassroomEdit(
+                            classroom,
+                          )
+                        }
+                        className="p-1 text-indigo-600 hover:bg-indigo-100 rounded"
+                        title="Editar turma"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDeleteClassroom(
+                            classroom,
+                          )
+                        }
+                        className="p-1 text-red-600 hover:bg-red-100 rounded"
+                        title="Remover turma"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
 
                   <div className="text-xs text-emerald-600 font-medium">
                     Curso:{" "}
@@ -1095,79 +1390,225 @@ export default function Turmas() {
                 key={subject.id}
                 className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-sm flex flex-col gap-2"
               >
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <strong className="text-gray-800 text-base block truncate">
-                      {subject.name}
-                    </strong>
+                {editingSubjectId === subject.id ? (
+                  <div className="space-y-2">
+                    <input
+                      value={subjectDraft.name}
+                      onChange={event =>
+                        setSubjectDraft(current => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                      className="w-full border border-gray-300 rounded p-1.5"
+                      placeholder="Nome da disciplina"
+                    />
 
-                    <span className="text-xs text-gray-500">
-                      Padrão: {subject.workload} aulas
-                      semanais
-                    </span>
-                  </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        value={subjectDraft.workload}
+                        onChange={event =>
+                          setSubjectDraft(current => ({
+                            ...current,
+                            workload: Number(
+                              event.target.value,
+                            ),
+                          }))
+                        }
+                        className="w-20 border border-gray-300 rounded p-1.5"
+                        title="Carga padrão"
+                      />
 
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
-                        subject.complexity === "Alta"
-                          ? "bg-red-100 text-red-700"
-                          : subject.complexity === "Media"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-green-100 text-green-700"
-                      }`}
+                      <select
+                        value={subjectDraft.complexity}
+                        onChange={event =>
+                          setSubjectDraft(current => ({
+                            ...current,
+                            complexity:
+                              event.target.value,
+                          }))
+                        }
+                        className="min-w-0 flex-1 border border-gray-300 rounded p-1.5 bg-white"
+                      >
+                        <option value="Alta">Alta</option>
+                        <option value="Media">Média</option>
+                        <option value="Baixa">Baixa</option>
+                      </select>
+                    </div>
+
+                    <select
+                      value={subjectDraft.category}
+                      onChange={event =>
+                        setSubjectDraft(current => ({
+                          ...current,
+                          category:
+                            event.target.value as
+                              | "Ensino Médio"
+                              | "Técnica",
+                        }))
+                      }
+                      className="w-full border border-gray-300 rounded p-1.5 bg-white"
                     >
-                      {subject.complexity}
-                    </span>
+                      <option value="Ensino Médio">
+                        Ensino Médio
+                      </option>
+                      <option value="Técnica">
+                        Técnica
+                      </option>
+                    </select>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleDeleteSubject(
+                    <div className="border border-gray-200 rounded p-2 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-gray-500">
+                        Cursos associados
+                      </span>
+
+                      {courses.map(course => (
+                        <label
+                          key={course.id}
+                          className="flex items-center gap-2 text-xs text-gray-700"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={subjectDraft.course_ids.includes(
+                              course.id,
+                            )}
+                            onChange={event =>
+                              setSubjectDraft(current => ({
+                                ...current,
+                                course_ids:
+                                  event.target.checked
+                                    ? Array.from(
+                                        new Set([
+                                          ...current.course_ids,
+                                          course.id,
+                                        ]),
+                                      )
+                                    : current.course_ids.filter(
+                                        id =>
+                                          id !== course.id,
+                                      ),
+                              }))
+                            }
+                          />
+                          {course.name}
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          saveSubjectEdit(subject)
+                        }
+                        className="text-xs px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-700"
+                      >
+                        Salvar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingSubjectId(null)
+                        }
+                        className="text-xs px-2 py-1 rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <strong className="text-gray-800 text-base block truncate">
+                          {subject.name}
+                        </strong>
+
+                        <span className="text-xs text-gray-500">
+                          Padrão: {subject.workload} aulas
+                          semanais
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <span
+                          className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
+                            subject.complexity === "Alta"
+                              ? "bg-red-100 text-red-700"
+                              : subject.complexity === "Media"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {subject.complexity}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            startSubjectEdit(
+                              subject,
+                            )
+                          }
+                          className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded"
+                          title="Editar disciplina"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDeleteSubject(
+                              subject,
+                            )
+                          }
+                          className="p-1.5 text-red-600 hover:bg-red-100 rounded"
+                          title="Remover disciplina"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <select
+                      value={subject.category}
+                      onChange={event =>
+                        handleSubjectCategory(
                           subject,
+                          event.target.value as
+                            | "Ensino Médio"
+                            | "Técnica",
                         )
                       }
-                      className="p-1.5 text-red-600 hover:bg-red-100 rounded"
-                      title="Remover disciplina"
+                      className="text-xs border border-gray-200 bg-white rounded p-1.5"
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+                      <option value="Ensino Médio">
+                        Ensino Médio
+                      </option>
+                      <option value="Técnica">
+                        Técnica
+                      </option>
+                    </select>
 
-                <select
-                  value={subject.category}
-                  onChange={event =>
-                    handleSubjectCategory(
-                      subject,
-                      event.target.value as
-                        | "Ensino Médio"
-                        | "Técnica",
-                    )
-                  }
-                  className="text-xs border border-gray-200 bg-white rounded p-1.5"
-                >
-                  <option value="Ensino Médio">
-                    Ensino Médio
-                  </option>
-                  <option value="Técnica">
-                    Técnica
-                  </option>
-                </select>
-
-                <div className="text-xs text-purple-600 font-medium">
-                  Cursos:{" "}
-                  {subject.course_ids
-                    ?.map(
-                      id =>
-                        courses.find(
-                          course =>
-                            course.id === id,
-                        )?.name || id,
-                    )
-                    .join(", ")
-                    || "Nenhum"}
-                </div>
+                    <div className="text-xs text-purple-600 font-medium">
+                      Cursos:{" "}
+                      {subject.course_ids
+                        ?.map(
+                          id =>
+                            courses.find(
+                              course =>
+                                course.id === id,
+                            )?.name || id,
+                        )
+                        .join(", ")
+                        || "Nenhum"}
+                    </div>
+                  </>
+                )}
               </li>
             ))}
 

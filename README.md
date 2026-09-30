@@ -196,3 +196,14 @@ Cursos, turmas e disciplinas podem ser removidos pela própria interface.
 - um curso só pode ser removido quando não houver turmas ligadas a ele; a associação do curso nas disciplinas é limpa automaticamente.
 
 Essas exclusões evitam deixar referências quebradas no banco.
+
+
+## Correção dos cadastros
+
+Os cadastros principais também podem ser corrigidos sem precisar apagar e refazer tudo:
+
+- curso: nome editável;
+- turma: nome, jornada e curso editáveis;
+- disciplina: nome, carga padrão, complexidade, categoria e cursos associados editáveis.
+
+Ao trocar o curso de uma turma ou retirar uma disciplina de um curso, o backend remove automaticamente combinações que deixariam de ser válidas, evitando matérias escondidas na matriz.

@@ -76,6 +76,27 @@ def read_courses(db: Session = Depends(get_db)):
     return db.query(models.Course).all()
 
 
+@app.put("/courses/{course_id}", response_model=schemas.Course)
+def update_course(
+    course_id: int,
+    data: schemas.CourseCreate,
+    db: Session = Depends(get_db),
+):
+    item = (
+        db.query(models.Course)
+        .filter(models.Course.id == course_id)
+        .first()
+    )
+
+    if not item:
+        raise HTTPException(404, "Curso não encontrado")
+
+    item.name = data.name
+    db.commit()
+    db.refresh(item)
+    return item
+
+
 @app.delete("/courses/{course_id}")
 def delete_course(
     course_id: int,
@@ -154,7 +175,34 @@ def update_classroom(
     if not item:
         raise HTTPException(404, "Turma não encontrada")
 
-    for key, value in data.model_dump().items():
+    values = data.model_dump()
+
+    valid_subject_ids = {
+        subject.id
+        for subject in db.query(models.Subject).all()
+        if values["course_id"] in (subject.course_ids or [])
+    }
+
+    values["subject_settings"] = [
+        {
+            **setting,
+            "split": (
+                bool(setting.get("split"))
+                if values["has_groups"]
+                else False
+            ),
+        }
+        for setting in values.get("subject_settings", [])
+        if setting.get("subject_id") in valid_subject_ids
+    ]
+
+    values["split_subject_ids"] = [
+        subject_id
+        for subject_id in values.get("split_subject_ids", [])
+        if subject_id in valid_subject_ids
+    ]
+
+    for key, value in values.items():
         setattr(item, key, value)
 
     db.commit()
@@ -221,8 +269,27 @@ def update_subject(
     if not item:
         raise HTTPException(404, "Disciplina não encontrada")
 
-    for key, value in data.model_dump().items():
+    values = data.model_dump()
+
+    for key, value in values.items():
         setattr(item, key, value)
+
+    valid_course_ids = set(values.get("course_ids", []))
+
+    for classroom in db.query(models.Classroom).all():
+        if classroom.course_id in valid_course_ids:
+            continue
+
+        classroom.subject_settings = [
+            setting
+            for setting in (classroom.subject_settings or [])
+            if setting.get("subject_id") != subject_id
+        ]
+        classroom.split_subject_ids = [
+            current_id
+            for current_id in (classroom.split_subject_ids or [])
+            if current_id != subject_id
+        ]
 
     db.commit()
     db.refresh(item)
