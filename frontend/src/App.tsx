@@ -86,32 +86,36 @@ function App() {
   const [viewMode, setViewMode] = useState<"turma" | "professor">("turma");
   const [selectedId, setSelectedId] = useState<number | "">("");
 
-  useEffect(() => {
-    const fetchBaseData = async () => {
-      try {
-        const [cRes, sRes, tRes, timeRes] = await Promise.all([
-          api.get("/classrooms/"),
-          api.get("/subjects/"),
-          api.get("/teachers/"),
-          api.get("/timetable/"),
-        ]);
+  const fetchBaseData = async (loadSavedSchedule = true) => {
+    try {
+      const requests = [
+        api.get("/classrooms/"),
+        api.get("/subjects/"),
+        api.get("/teachers/"),
+      ];
 
-        setClassrooms(cRes.data);
-        setSubjects(sRes.data);
-        setTeachers(tRes.data);
+      const [cRes, sRes, tRes] = await Promise.all(requests);
 
+      setClassrooms(cRes.data);
+      setSubjects(sRes.data);
+      setTeachers(tRes.data);
+
+      if (!selectedId && cRes.data.length > 0) {
+        setSelectedId(cRes.data[0].id);
+      }
+
+      if (loadSavedSchedule) {
+        const timeRes = await api.get("/timetable/");
         if (timeRes.data.length > 0) {
           setSchedule(timeRes.data);
         }
-
-        if (cRes.data.length > 0) {
-          setSelectedId(cRes.data[0].id);
-        }
-      } catch (err) {
-        console.error("Erro ao buscar dados iniciais", err);
       }
-    };
+    } catch (err) {
+      console.error("Erro ao buscar dados acadêmicos", err);
+    }
+  };
 
+  useEffect(() => {
     fetchBaseData();
   }, []);
 
@@ -120,6 +124,11 @@ function App() {
     setError("");
 
     try {
+      // Recarrega turmas, disciplinas e professores antes de gerar.
+      // Isso evita usar na grade dados antigos que foram alterados
+      // em outra página, como Grupos A/B e tipo da disciplina.
+      await fetchBaseData(false);
+
       const response = await api.post("/generate/");
       const newSchedule = response.data.schedule;
       setSchedule(newSchedule);
