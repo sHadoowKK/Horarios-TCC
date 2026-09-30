@@ -165,7 +165,7 @@ Para reduzir trabalho manual, o fluxo pensado para quem monta a grade é:
 1. cadastrar cursos;
 2. cadastrar o catálogo de disciplinas;
 3. criar as turmas;
-4. abrir **Matérias da turma** e selecionar somente as disciplinas presentes, ajustando carga e divisão A/B;
+4. abrir **Matérias da turma** e selecionar somente as disciplinas presentes, ajustando carga e divisão A/B; turmas do mesmo curso também podem copiar essa configuração umas das outras;
 5. cadastrar professores, pontuação, disciplinas que podem lecionar e disponibilidade;
 6. ajustar apenas as preferências que podem variar;
 7. gerar a grade.

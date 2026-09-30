@@ -45,6 +45,8 @@ export default function Turmas() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [expandedClassrooms, setExpandedClassrooms] =
     useState<Set<number>>(new Set());
+  const [copySourceByClassroom, setCopySourceByClassroom] =
+    useState<Record<number, string>>({});
 
   const [newCourseName, setNewCourseName] = useState("");
 
@@ -302,6 +304,58 @@ export default function Turmas() {
     });
   };
 
+  const handleCopySubjects = async (
+    targetClassroom: Classroom,
+  ) => {
+    const sourceId = Number(
+      copySourceByClassroom[targetClassroom.id],
+    );
+
+    const sourceClassroom = classrooms.find(
+      item => item.id === sourceId,
+    );
+
+    if (!sourceClassroom) return;
+
+    if (
+      (targetClassroom.subject_settings || []).length > 0
+      && !confirm(
+        `Substituir as matérias de ${targetClassroom.name} pelas configurações de ${sourceClassroom.name}?`,
+      )
+    ) {
+      return;
+    }
+
+    const validSubjectIds = new Set(
+      subjectsForClassroom(targetClassroom).map(
+        subject => subject.id,
+      ),
+    );
+
+    const copiedSettings = (
+      sourceClassroom.subject_settings || []
+    )
+      .filter(setting =>
+        validSubjectIds.has(setting.subject_id),
+      )
+      .map(setting => ({
+        ...setting,
+        split:
+          targetClassroom.has_groups
+            ? setting.split
+            : false,
+      }));
+
+    await saveClassroom(targetClassroom, {
+      subject_settings: copiedSettings,
+    });
+
+    setCopySourceByClassroom(current => ({
+      ...current,
+      [targetClassroom.id]: "",
+    }));
+  };
+
   const handleAddSubject = async (
     event: React.FormEvent,
   ) => {
@@ -504,6 +558,12 @@ export default function Turmas() {
                 subjectsForClassroom(classroom);
               const selectedCount =
                 classroom.subject_settings?.length || 0;
+              const copySources = classrooms.filter(
+                other =>
+                  other.id !== classroom.id
+                  && other.course_id === classroom.course_id
+                  && (other.subject_settings || []).length > 0,
+              );
 
               return (
                 <li
@@ -572,6 +632,58 @@ export default function Turmas() {
                       classroom.id,
                     ) && (
                       <div className="mt-3 space-y-3">
+                        {copySources.length > 0 && (
+                          <div className="flex gap-2">
+                            <select
+                              value={
+                                copySourceByClassroom[
+                                  classroom.id
+                                ] || ""
+                              }
+                              onChange={event =>
+                                setCopySourceByClassroom(
+                                  current => ({
+                                    ...current,
+                                    [classroom.id]:
+                                      event.target.value,
+                                  }),
+                                )
+                              }
+                              className="min-w-0 flex-1 text-[11px] border border-gray-300 rounded p-1.5 bg-white"
+                            >
+                              <option value="">
+                                Copiar matérias de...
+                              </option>
+
+                              {copySources.map(source => (
+                                <option
+                                  key={source.id}
+                                  value={source.id}
+                                >
+                                  {source.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            <button
+                              type="button"
+                              disabled={
+                                !copySourceByClassroom[
+                                  classroom.id
+                                ]
+                              }
+                              onClick={() =>
+                                handleCopySubjects(
+                                  classroom,
+                                )
+                              }
+                              className="text-[11px] px-2 py-1 rounded border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              Copiar
+                            </button>
+                          </div>
+                        )}
+
                         <div className="flex gap-2">
                           <button
                             type="button"
