@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { BookOpen, School, Layers, Plus } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronUp, School, Layers, Plus } from "lucide-react";
 
 interface Course {
   id: number;
@@ -29,6 +29,9 @@ export default function Turmas() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [expandedClassrooms, setExpandedClassrooms] = useState<Set<number>>(
+    new Set(),
+  );
 
   const [newCourseName, setNewCourseName] = useState("");
 
@@ -107,8 +110,32 @@ export default function Turmas() {
   };
 
   const handleToggleClassGroups = async (classroom: Classroom) => {
+    const nextHasGroups = !classroom.has_groups;
+
     await saveClassroom(classroom, {
-      has_groups: !classroom.has_groups,
+      has_groups: nextHasGroups,
+    });
+
+    if (!nextHasGroups) {
+      setExpandedClassrooms(current => {
+        const next = new Set(current);
+        next.delete(classroom.id);
+        return next;
+      });
+    }
+  };
+
+  const toggleClassroomDetails = (classroomId: number) => {
+    setExpandedClassrooms(current => {
+      const next = new Set(current);
+
+      if (next.has(classroomId)) {
+        next.delete(classroomId);
+      } else {
+        next.add(classroomId);
+      }
+
+      return next;
     });
   };
 
@@ -334,55 +361,66 @@ export default function Turmas() {
 
                   {classroom.has_groups && (
                     <div className="mt-1 border-t border-gray-200 pt-2">
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2">
-                        Organização das disciplinas
-                      </div>
-
-                      <div className="space-y-2">
-                        {classSubjects.map(subject => {
-                          const isSplit =
-                            classroom.split_subject_ids?.includes(subject.id);
-
-                          return (
-                            <div
-                              key={subject.id}
-                              className="flex items-center gap-2"
-                            >
-                              <span
-                                className="text-xs text-gray-700 flex-1 truncate"
-                                title={subject.name}
-                              >
-                                {subject.name}
-                              </span>
-
-                              <select
-                                value={isSplit ? "Grupos" : "Todos"}
-                                onChange={event =>
-                                  handleSubjectMode(
-                                    classroom,
-                                    subject.id,
-                                    event.target.value as "Todos" | "Grupos",
-                                  )
-                                }
-                                className="text-[11px] border border-gray-300 rounded p-1 bg-white"
-                              >
-                                <option value="Todos">
-                                  Turma inteira
-                                </option>
-                                <option value="Grupos">
-                                  Separada A/B
-                                </option>
-                              </select>
-                            </div>
-                          );
-                        })}
-
-                        {classSubjects.length === 0 && (
-                          <span className="text-xs text-gray-400">
-                            Nenhuma disciplina associada ao curso.
-                          </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleClassroomDetails(classroom.id)}
+                        className="w-full flex items-center justify-between gap-2 text-left text-[11px] font-bold uppercase tracking-wide text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        <span>Organização das disciplinas</span>
+                        {expandedClassrooms.has(classroom.id) ? (
+                          <ChevronUp className="w-4 h-4 shrink-0" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 shrink-0" />
                         )}
-                      </div>
+                      </button>
+
+                      {expandedClassrooms.has(classroom.id) && (
+                        <div className="space-y-2 mt-2">
+                          {classSubjects.map(subject => {
+                            const isSplit =
+                              classroom.split_subject_ids?.includes(subject.id);
+
+                            return (
+                              <div
+                                key={subject.id}
+                                className="flex items-center gap-2"
+                              >
+                                <span
+                                  className="text-xs text-gray-700 flex-1 truncate"
+                                  title={subject.name}
+                                >
+                                  {subject.name}
+                                </span>
+
+                                <select
+                                  value={isSplit ? "Grupos" : "Todos"}
+                                  onChange={event =>
+                                    handleSubjectMode(
+                                      classroom,
+                                      subject.id,
+                                      event.target.value as "Todos" | "Grupos",
+                                    )
+                                  }
+                                  className="text-[11px] border border-gray-300 rounded p-1 bg-white"
+                                >
+                                  <option value="Todos">
+                                    Turma inteira
+                                  </option>
+                                  <option value="Grupos">
+                                    Separada A/B
+                                  </option>
+                                </select>
+                              </div>
+                            );
+                          })}
+
+                          {classSubjects.length === 0 && (
+                            <span className="text-xs text-gray-400">
+                              Nenhuma disciplina associada ao curso.
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </li>
