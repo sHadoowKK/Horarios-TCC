@@ -526,6 +526,144 @@ class OptimizerTests(unittest.TestCase):
         )
 
 
+    def test_real_night_class_complete_week_25_lessons(self):
+        """
+        Cenário baseado em uma grade noturna real usada no projeto.
+
+        Cargas semanais:
+        SBD 5, SI 2, PTCC 3, DSE 2, PC2 5, RDS 5, GSO2 3.
+        Total: 25 aulas, exatamente a capacidade semanal do noturno.
+        """
+        settings = [
+            {
+                "subject_id": 1,
+                "workload": 5,
+                "split": False,
+            },
+            {
+                "subject_id": 2,
+                "workload": 2,
+                "split": False,
+            },
+            {
+                "subject_id": 3,
+                "workload": 3,
+                "split": False,
+            },
+            {
+                "subject_id": 4,
+                "workload": 2,
+                "split": False,
+            },
+            {
+                "subject_id": 5,
+                "workload": 5,
+                "split": False,
+            },
+            {
+                "subject_id": 6,
+                "workload": 5,
+                "split": False,
+            },
+            {
+                "subject_id": 7,
+                "workload": 3,
+                "split": False,
+            },
+        ]
+
+        classrooms = [
+            classroom(
+                1,
+                "TI Noite Completa",
+                "Noite",
+                settings,
+            )
+        ]
+
+        subjects = [
+            subject(1, "SBD", workload=5),
+            subject(2, "SI", workload=2),
+            subject(3, "PTCC", workload=3),
+            subject(4, "DSE", workload=2),
+            subject(5, "PC2", workload=5),
+            subject(6, "RDS", workload=5),
+            subject(7, "GSO2", workload=3),
+        ]
+
+        # Professores correspondem às combinações observadas na grade real:
+        # 1 -> SBD
+        # 2 -> SI
+        # 3 -> PTCC + PC2
+        # 4 -> DSE + GSO2
+        # 5 -> RDS
+        teachers = [
+            teacher(1, [1], score=100),
+            teacher(2, [2], score=100),
+            teacher(3, [3, 5], score=100),
+            teacher(4, [4, 7], score=100),
+            teacher(5, [6], score=100),
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(
+            result["unstaffed_lessons"],
+            0,
+        )
+        self.assertEqual(
+            len(result["schedule"]),
+            25,
+        )
+
+        # Uma turma noturna de 25 aulas deve ocupar os 5 períodos
+        # dos 5 dias da semana.
+        lessons_by_day = {
+            day: 0
+            for day in range(5)
+        }
+
+        lessons_by_subject = {
+            subject_id: 0
+            for subject_id in range(1, 8)
+        }
+
+        for item in result["schedule"]:
+            self.assertIn(
+                item["period"],
+                [11, 12, 13, 14, 15],
+            )
+
+            lessons_by_day[item["day"]] += 1
+            lessons_by_subject[
+                item["subject_id"]
+            ] += 1
+
+        self.assertEqual(
+            list(lessons_by_day.values()),
+            [5, 5, 5, 5, 5],
+        )
+
+        self.assertEqual(
+            lessons_by_subject,
+            {
+                1: 5,
+                2: 2,
+                3: 3,
+                4: 2,
+                5: 5,
+                6: 5,
+                7: 3,
+            },
+        )
+
+
     def test_daytime_workload_four_prefers_two_plus_two(self):
         classrooms = [
             classroom(

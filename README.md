@@ -89,6 +89,8 @@ Teste do otimizador:
 python -m unittest test_optimizer.py
 ```
 
+A suíte também inclui um cenário de **semana noturna completa com 25 aulas**, baseado em uma grade real usada durante o desenvolvimento. Esse teste verifica se todas as cargas são atendidas, se os cinco períodos noturnos são preenchidos em cada dia e se nenhuma aula fica sem professor quando todos os docentes necessários estão disponíveis.
+
 ## Frontend
 
 Em outro terminal:
