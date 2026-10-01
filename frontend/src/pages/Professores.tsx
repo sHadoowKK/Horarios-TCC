@@ -873,7 +873,7 @@ export default function Professores() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="bg-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-400 flex items-center justify-center gap-2 font-medium"
+                  className="secondary-action-button p-3 rounded-lg flex items-center justify-center gap-2 font-medium"
                 >
                   <X className="w-5 h-5" />
                   Cancelar
