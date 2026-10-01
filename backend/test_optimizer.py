@@ -526,6 +526,142 @@ class OptimizerTests(unittest.TestCase):
         )
 
 
+    def test_integral_groups_can_have_different_subjects_at_same_time(self):
+        """
+        Cenário estrutural inspirado no 3º INFO Integral.
+
+        A turma possui grupos A/B. UDA e SW2 são separadas, enquanto
+        Matemática é conjunta. Como existe apenas um professor para UDA
+        e um para SW2, os grupos precisam poder cursar matérias diferentes
+        simultaneamente em pelo menos parte da grade.
+        """
+        classrooms = [
+            classroom(
+                1,
+                "3º INFO",
+                "Integral",
+                [
+                    {
+                        "subject_id": 1,
+                        "workload": 1,
+                        "split": True,
+                    },
+                    {
+                        "subject_id": 2,
+                        "workload": 1,
+                        "split": True,
+                    },
+                    {
+                        "subject_id": 3,
+                        "workload": 2,
+                        "split": False,
+                    },
+                ],
+                has_groups=True,
+            )
+        ]
+
+        subjects = [
+            subject(1, "UDA", workload=1),
+            subject(2, "SW2", workload=1),
+            subject(3, "Matemática", workload=2),
+        ]
+
+        teachers = [
+            teacher(1, [1], score=100),
+            teacher(2, [2], score=100),
+            teacher(3, [3], score=100),
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(
+            result["unstaffed_lessons"],
+            0,
+        )
+
+        # UDA e SW2 geram uma aula para A e uma para B.
+        # Matemática conjunta gera apenas duas aulas para "Todos".
+        split_items = [
+            item
+            for item in result["schedule"]
+            if item["subject_id"] in (1, 2)
+        ]
+        joint_items = [
+            item
+            for item in result["schedule"]
+            if item["subject_id"] == 3
+        ]
+
+        self.assertEqual(len(split_items), 4)
+        self.assertEqual(len(joint_items), 2)
+        self.assertTrue(
+            all(
+                item["student_group"] in ("A", "B")
+                for item in split_items
+            )
+        )
+        self.assertTrue(
+            all(
+                item["student_group"] == "Todos"
+                for item in joint_items
+            )
+        )
+
+        # Como há um único professor por disciplina separada,
+        # A e B não podem fazer a mesma matéria separada simultaneamente.
+        for subject_id in (1, 2):
+            by_slot = {}
+
+            for item in split_items:
+                if item["subject_id"] != subject_id:
+                    continue
+
+                slot = (
+                    item["day"],
+                    item["period"],
+                )
+                by_slot.setdefault(slot, []).append(
+                    item["student_group"]
+                )
+
+            self.assertTrue(
+                all(
+                    len(groups) == 1
+                    for groups in by_slot.values()
+                )
+            )
+
+        # Deve existir ao menos um horário em que A e B estejam ocupados
+        # simultaneamente com matérias separadas diferentes.
+        split_by_slot = {}
+
+        for item in split_items:
+            slot = (
+                item["day"],
+                item["period"],
+            )
+            split_by_slot.setdefault(
+                slot,
+                {},
+            )[item["student_group"]] = item["subject_id"]
+
+        simultaneous_different = any(
+            slot_items.get("A")
+            and slot_items.get("B")
+            and slot_items["A"] != slot_items["B"]
+            for slot_items in split_by_slot.values()
+        )
+
+        self.assertTrue(simultaneous_different)
+
+
     def test_real_night_class_complete_week_25_lessons(self):
         """
         Cenário baseado em uma grade noturna real usada no projeto.
