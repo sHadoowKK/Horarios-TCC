@@ -145,7 +145,7 @@ Uma turma também pode utilizar **Grupo A** e **Grupo B**. Nesse caso, para cada
 - **Turma inteira:** A e B têm a aula juntos no mesmo horário;
 - **Separada A/B:** cada grupo recebe a carga semanal da disciplina de forma independente.
 
-A categoria da disciplina (**Ensino Médio** ou **Técnica**) é informativa e não determina automaticamente a divisão.
+A antiga categoria da disciplina (**Ensino Médio** ou **Técnica**) deixou de aparecer na interface porque não participa mais das regras. O que define onde a disciplina pode ser usada são os **cursos associados**, e o modo **Turma inteira / Separada A/B** é configurado dentro de cada turma.
 
 Quando uma disciplina é separada:
 
@@ -207,3 +207,15 @@ Os cadastros principais também podem ser corrigidos sem precisar apagar e refaz
 - disciplina: nome, carga padrão, complexidade, categoria e cursos associados editáveis.
 
 Ao trocar o curso de uma turma ou retirar uma disciplina de um curso, o backend remove automaticamente combinações que deixariam de ser válidas, evitando matérias escondidas na matriz.
+
+
+## Simplificação do cadastro de disciplinas
+
+O campo visual de **Categoria** foi removido por ser redundante. A disciplina passa a ser configurada pelo que realmente interfere no uso:
+
+- nome;
+- carga semanal padrão;
+- complexidade;
+- cursos associados.
+
+O campo antigo continua temporariamente no banco apenas para compatibilidade com versões anteriores, sem influência sobre a geração da grade.

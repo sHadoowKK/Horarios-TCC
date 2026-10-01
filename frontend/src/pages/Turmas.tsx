@@ -72,13 +72,11 @@ export default function Turmas() {
     name: string;
     workload: number;
     complexity: string;
-    category: "Ensino Médio" | "Técnica";
     course_ids: number[];
   }>({
     name: "",
     workload: 1,
     complexity: "Media",
-    category: "Ensino Médio",
     course_ids: [],
   });
 
@@ -92,8 +90,6 @@ export default function Turmas() {
   const [newSubWorkload, setNewSubWorkload] = useState(4);
   const [newSubComplexity, setNewSubComplexity] =
     useState("Media");
-  const [newSubCategory, setNewSubCategory] =
-    useState<"Ensino Médio" | "Técnica">("Ensino Médio");
   const [newSubCourseIds, setNewSubCourseIds] =
     useState<number[]>([]);
 
@@ -209,7 +205,6 @@ export default function Turmas() {
       name: subject.name,
       workload: subject.workload,
       complexity: subject.complexity,
-      category: subject.category,
       course_ids: [
         ...(subject.course_ids || []),
       ],
@@ -243,7 +238,8 @@ export default function Turmas() {
         ),
         complexity:
           subjectDraft.complexity,
-        category: subjectDraft.category,
+        // Campo legado mantido apenas para compatibilidade do backend.
+        category: subject.category || "Ensino Médio",
         course_ids:
           subjectDraft.course_ids,
       },
@@ -603,32 +599,14 @@ export default function Turmas() {
       name: newSubName,
       workload: Number(newSubWorkload),
       complexity: newSubComplexity,
-      category: newSubCategory,
+      // Categoria não participa mais das regras; fica apenas como legado.
+      category: "Ensino Médio",
       course_ids: newSubCourseIds,
     });
 
     setNewSubName("");
     setNewSubWorkload(4);
-    setNewSubCategory("Ensino Médio");
     setNewSubCourseIds([]);
-    fetchData();
-  };
-
-  const handleSubjectCategory = async (
-    subject: Subject,
-    category: "Ensino Médio" | "Técnica",
-  ) => {
-    await api.put(
-      `/subjects/${subject.id}`,
-      {
-        name: subject.name,
-        workload: subject.workload,
-        complexity: subject.complexity,
-        category,
-        course_ids: subject.course_ids,
-      },
-    );
-
     fetchData();
   };
 
@@ -1304,36 +1282,6 @@ export default function Turmas() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500 uppercase">
-                Categoria
-              </label>
-
-              <select
-                className="border border-gray-300 p-2 rounded-lg w-full bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={newSubCategory}
-                onChange={event =>
-                  setNewSubCategory(
-                    event.target.value as
-                      | "Ensino Médio"
-                      | "Técnica",
-                  )
-                }
-              >
-                <option value="Ensino Médio">
-                  Ensino Médio
-                </option>
-                <option value="Técnica">
-                  Técnica
-                </option>
-              </select>
-
-              <span className="text-[11px] text-gray-400">
-                A categoria é informativa. A divisão
-                A/B é escolhida dentro de cada turma.
-              </span>
-            </div>
-
             <div className="border border-gray-300 p-2 rounded-lg bg-white max-h-32 overflow-y-auto flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-500 uppercase mb-1">
                 Cursos Associados
@@ -1437,27 +1385,6 @@ export default function Turmas() {
                         <option value="Baixa">Baixa</option>
                       </select>
                     </div>
-
-                    <select
-                      value={subjectDraft.category}
-                      onChange={event =>
-                        setSubjectDraft(current => ({
-                          ...current,
-                          category:
-                            event.target.value as
-                              | "Ensino Médio"
-                              | "Técnica",
-                        }))
-                      }
-                      className="w-full border border-gray-300 rounded p-1.5 bg-white"
-                    >
-                      <option value="Ensino Médio">
-                        Ensino Médio
-                      </option>
-                      <option value="Técnica">
-                        Técnica
-                      </option>
-                    </select>
 
                     <div className="border border-gray-200 rounded p-2 space-y-1">
                       <span className="text-[10px] uppercase font-bold text-gray-500">
@@ -1573,26 +1500,6 @@ export default function Turmas() {
                         </button>
                       </div>
                     </div>
-
-                    <select
-                      value={subject.category}
-                      onChange={event =>
-                        handleSubjectCategory(
-                          subject,
-                          event.target.value as
-                            | "Ensino Médio"
-                            | "Técnica",
-                        )
-                      }
-                      className="text-xs border border-gray-200 bg-white rounded p-1.5"
-                    >
-                      <option value="Ensino Médio">
-                        Ensino Médio
-                      </option>
-                      <option value="Técnica">
-                        Técnica
-                      </option>
-                    </select>
 
                     <div className="text-xs text-purple-600 font-medium">
                       Cursos:{" "}
