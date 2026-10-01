@@ -91,6 +91,18 @@ python -m unittest test_optimizer.py
 
 A suíte também inclui um cenário de **semana noturna completa com 25 aulas**, baseado em uma grade real usada durante o desenvolvimento. Esse teste verifica se todas as cargas são atendidas, se os cinco períodos noturnos são preenchidos em cada dia e se nenhuma aula fica sem professor quando todos os docentes necessários estão disponíveis.
 
+### Benchmark de carga
+
+Além dos testes funcionais, existe um benchmark **sintético** separado para medir o comportamento do solver com volumes maiores. Ele não representa a matriz oficial da escola e não é executado junto com os testes rápidos.
+
+```bash
+python benchmark_optimizer.py --size small
+python benchmark_optimizer.py --size medium
+python benchmark_optimizer.py --size large
+```
+
+O benchmark informa quantidade de turmas, professores, aulas previstas, estado da solução, tempo de resolução e quantidade de aulas sem professor. Isso permite comparar desempenho entre versões sem transformar tempo de execução em um teste frágil.
+
 ## Frontend
 
 Em outro terminal:
@@ -206,7 +218,7 @@ Os cadastros principais também podem ser corrigidos sem precisar apagar e refaz
 
 - curso: nome editável;
 - turma: nome, jornada e curso editáveis;
-- disciplina: nome, carga padrão, complexidade, categoria e cursos associados editáveis.
+- disciplina: nome, carga padrão, complexidade e cursos associados editáveis.
 
 Ao trocar o curso de uma turma ou retirar uma disciplina de um curso, o backend remove automaticamente combinações que deixariam de ser válidas, evitando matérias escondidas na matriz.
 
