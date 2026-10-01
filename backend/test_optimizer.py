@@ -526,6 +526,189 @@ class OptimizerTests(unittest.TestCase):
         )
 
 
+    def test_small_school_multiple_classrooms_and_shared_teachers(self):
+        """
+        Cenário integrado de uma pequena escola.
+
+        Três turmas possuem matérias ministradas por professores que
+        também trabalham nas outras turmas. O teste verifica a geração
+        conjunta da semana, sem choque de professor ou de turma.
+        """
+        classrooms = [
+            classroom(
+                1,
+                "1º A",
+                "Manhã",
+                [
+                    {
+                        "subject_id": 1,
+                        "workload": 2,
+                        "split": False,
+                    },
+                    {
+                        "subject_id": 2,
+                        "workload": 2,
+                        "split": False,
+                    },
+                    {
+                        "subject_id": 3,
+                        "workload": 2,
+                        "split": False,
+                    },
+                ],
+            ),
+            classroom(
+                2,
+                "2º A",
+                "Manhã",
+                [
+                    {
+                        "subject_id": 1,
+                        "workload": 2,
+                        "split": False,
+                    },
+                    {
+                        "subject_id": 4,
+                        "workload": 2,
+                        "split": False,
+                    },
+                    {
+                        "subject_id": 3,
+                        "workload": 2,
+                        "split": False,
+                    },
+                ],
+            ),
+            classroom(
+                3,
+                "3º A",
+                "Manhã",
+                [
+                    {
+                        "subject_id": 1,
+                        "workload": 2,
+                        "split": False,
+                    },
+                    {
+                        "subject_id": 2,
+                        "workload": 2,
+                        "split": False,
+                    },
+                    {
+                        "subject_id": 3,
+                        "workload": 2,
+                        "split": False,
+                    },
+                ],
+            ),
+        ]
+
+        subjects = [
+            subject(1, "Matemática", workload=2),
+            subject(2, "Português", workload=2),
+            subject(3, "História", workload=2),
+            subject(4, "Física", workload=2),
+        ]
+
+        # Os professores são compartilhados pelas três turmas.
+        teachers = [
+            teacher(1, [1], score=100),
+            teacher(2, [2, 4], score=100),
+            teacher(3, [3], score=100),
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(
+            result["unstaffed_lessons"],
+            0,
+        )
+
+        # Cada turma possui 6 aulas semanais.
+        self.assertEqual(
+            len(result["schedule"]),
+            18,
+        )
+
+        lessons_by_classroom = {
+            1: 0,
+            2: 0,
+            3: 0,
+        }
+
+        teacher_slots = {
+            1: set(),
+            2: set(),
+            3: set(),
+        }
+
+        classroom_slots = {
+            1: set(),
+            2: set(),
+            3: set(),
+        }
+
+        for item in result["schedule"]:
+            classroom_id = item["classroom_id"]
+            teacher_id = item["teacher_id"]
+            slot = (
+                item["day"],
+                item["period"],
+            )
+
+            lessons_by_classroom[
+                classroom_id
+            ] += 1
+
+            # Nenhuma turma pode receber duas aulas no mesmo horário.
+            self.assertNotIn(
+                slot,
+                classroom_slots[classroom_id],
+            )
+            classroom_slots[
+                classroom_id
+            ].add(slot)
+
+            # Nenhum professor pode estar em duas turmas simultaneamente.
+            self.assertIsNotNone(teacher_id)
+            self.assertNotIn(
+                slot,
+                teacher_slots[teacher_id],
+            )
+            teacher_slots[
+                teacher_id
+            ].add(slot)
+
+        self.assertEqual(
+            lessons_by_classroom,
+            {
+                1: 6,
+                2: 6,
+                3: 6,
+            },
+        )
+
+        # Cargas compartilhadas dos professores.
+        self.assertEqual(
+            len(teacher_slots[1]),
+            6,
+        )
+        self.assertEqual(
+            len(teacher_slots[2]),
+            6,
+        )
+        self.assertEqual(
+            len(teacher_slots[3]),
+            6,
+        )
+
+
     def test_two_classrooms_compete_for_same_teacher_without_conflict(self):
         """
         Duas turmas diferentes disputam o mesmo professor.
