@@ -584,4 +584,10 @@ def generate_timetable(db: Session = Depends(get_db)):
     if result["status"] == "infeasible":
         raise HTTPException(400, result["message"])
 
+    if result["status"] == "timeout":
+        raise HTTPException(504, result["message"])
+
+    if result["status"] == "error":
+        raise HTTPException(500, result["message"])
+
     return result

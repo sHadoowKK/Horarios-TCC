@@ -1190,22 +1190,50 @@ def generate_schedule(
     # RESOLUÇÃO
     # ------------------------------------------------------------------
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 20.0
+    solver.parameters.max_time_in_seconds = 30.0
 
     started = time.perf_counter()
     status = solver.Solve(model)
     elapsed = time.perf_counter() - started
+
+    if status == cp_model.INFEASIBLE:
+        return {
+            "status": "infeasible",
+            "message": (
+                "Não existe uma grade que cumpra todas as "
+                "restrições atuais. Revise cargas horárias, "
+                "jornadas e disponibilidade."
+            ),
+        }
+
+    if status == cp_model.MODEL_INVALID:
+        return {
+            "status": "error",
+            "message": (
+                "O modelo de geração ficou inválido. "
+                "Isso indica um erro interno do Anatinus."
+            ),
+        }
+
+    if status == cp_model.UNKNOWN:
+        return {
+            "status": "timeout",
+            "message": (
+                "O Anatinus não conseguiu concluir a busca "
+                "dentro do tempo de cálculo. Tente gerar novamente "
+                "ou revise restrições muito concentradas."
+            ),
+        }
 
     if status not in (
         cp_model.OPTIMAL,
         cp_model.FEASIBLE,
     ):
         return {
-            "status": "infeasible",
+            "status": "error",
             "message": (
-                "Não foi possível gerar uma grade com as "
-                "restrições informadas. Revise cargas horárias, "
-                "jornadas e disponibilidade."
+                "Ocorreu um problema inesperado durante "
+                "a geração da grade."
             ),
         }
 
