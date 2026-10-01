@@ -526,6 +526,121 @@ class OptimizerTests(unittest.TestCase):
         )
 
 
+    def test_two_classrooms_compete_for_same_teacher_without_conflict(self):
+        """
+        Duas turmas diferentes disputam o mesmo professor.
+
+        O professor possui quatro períodos disponíveis na segunda-feira
+        e precisa cumprir duas aulas em cada turma. O solver deve usar
+        os quatro períodos sem colocar o docente em duas turmas ao mesmo
+        tempo.
+        """
+        availability = empty_availability()
+
+        for period in [0, 1, 2, 3]:
+            availability["0"][period] = True
+
+        classrooms = [
+            classroom(
+                1,
+                "1º A",
+                "Manhã",
+                [{
+                    "subject_id": 1,
+                    "workload": 2,
+                    "split": False,
+                }],
+            ),
+            classroom(
+                2,
+                "2º A",
+                "Manhã",
+                [{
+                    "subject_id": 2,
+                    "workload": 2,
+                    "split": False,
+                }],
+            ),
+        ]
+
+        subjects = [
+            subject(1, "Matemática 1", workload=2),
+            subject(2, "Matemática 2", workload=2),
+        ]
+
+        teachers = [
+            teacher(
+                1,
+                [1, 2],
+                availability,
+                score=100,
+            )
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(
+            result["unstaffed_lessons"],
+            0,
+        )
+        self.assertEqual(
+            len(result["schedule"]),
+            4,
+        )
+
+        teacher_slots = [
+            (
+                item["day"],
+                item["period"],
+            )
+            for item in result["schedule"]
+            if item["teacher_id"] == 1
+        ]
+
+        # O mesmo professor nunca pode aparecer em duas turmas
+        # no mesmo dia/período.
+        self.assertEqual(
+            len(teacher_slots),
+            len(set(teacher_slots)),
+        )
+
+        # Como só existe disponibilidade nesses quatro horários,
+        # todos eles precisam ser utilizados.
+        self.assertEqual(
+            set(teacher_slots),
+            {
+                (0, 0),
+                (0, 1),
+                (0, 2),
+                (0, 3),
+            },
+        )
+
+        lessons_by_classroom = {
+            1: 0,
+            2: 0,
+        }
+
+        for item in result["schedule"]:
+            lessons_by_classroom[
+                item["classroom_id"]
+            ] += 1
+
+        self.assertEqual(
+            lessons_by_classroom,
+            {
+                1: 2,
+                2: 2,
+            },
+        )
+
+
     def test_integral_groups_can_have_different_subjects_at_same_time(self):
         """
         Cenário estrutural inspirado no 3º INFO Integral.
