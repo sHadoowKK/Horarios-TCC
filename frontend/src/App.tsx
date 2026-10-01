@@ -76,11 +76,6 @@ const PROFESSOR_ROWS: DisplayRow[] = [
 
 type Theme = "light" | "dark";
 
-interface GenerationInfo {
-  solveTimeSeconds?: number;
-  solutionStatus?: string;
-}
-
 function getInitialTheme(): Theme {
   const savedTheme = localStorage.getItem("anatinus-theme");
 
@@ -98,8 +93,8 @@ function App() {
   const [schedule, setSchedule] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [generationInfo, setGenerationInfo] =
-    useState<GenerationInfo | null>(null);
+  const [generationSuccess, setGenerationSuccess] =
+    useState(false);
 
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -158,6 +153,7 @@ function App() {
   const handleGenerate = async () => {
     setLoading(true);
     setError("");
+    setGenerationSuccess(false);
 
     try {
       // Recarrega turmas, disciplinas e professores antes de gerar.
@@ -168,17 +164,12 @@ function App() {
       const response = await api.post("/generate/");
       const newSchedule = response.data.schedule;
       setSchedule(newSchedule);
-      setGenerationInfo({
-        solveTimeSeconds:
-          response.data.solve_time_seconds,
-        solutionStatus:
-          response.data.solution_status,
-      });
+      setGenerationSuccess(true);
 
       // Salva a grade mais recente para ela reaparecer ao abrir o sistema.
       await api.post("/timetable/", newSchedule);
     } catch (err: any) {
-      setGenerationInfo(null);
+      setGenerationSuccess(false);
       const detail = err.response?.data?.detail;
       const responseText =
         typeof err.response?.data === "string"
@@ -559,14 +550,9 @@ function App() {
                     </div>
                   )}
 
-                  {!error && generationInfo && (
-                    <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm">
-                      <strong>Grade gerada.</strong>
-                      {typeof generationInfo.solveTimeSeconds === "number" && (
-                        <span className="ml-1">
-                          Cálculo em {generationInfo.solveTimeSeconds.toFixed(2)}s.
-                        </span>
-                      )}
+                  {!error && generationSuccess && (
+                    <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm font-semibold">
+                      Grade gerada.
                     </div>
                   )}
 
