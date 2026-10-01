@@ -561,7 +561,7 @@ function App() {
                       className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                       {loading ? (
-                        <span className="animate-pulse">Calculando Grade...</span>
+                        <span className="animate-pulse">Gerando grade...</span>
                       ) : (
                         "Gerar Nova Grade"
                       )}
@@ -571,6 +571,15 @@ function App() {
                   {error && (
                     <div className="mb-6 p-4 bg-red-100 border border-red-200 text-red-700 rounded-lg font-medium">
                       {error}
+                    </div>
+                  )}
+
+                  {loading && schedule && (
+                    <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium">
+                      <strong>Gerando nova grade.</strong>
+                      <span className="ml-1">
+                        Enquanto o cálculo não termina, a grade abaixo ainda é a última grade salva.
+                      </span>
                     </div>
                   )}
 
