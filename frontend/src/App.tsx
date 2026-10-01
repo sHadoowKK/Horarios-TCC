@@ -117,9 +117,15 @@ function App() {
       setSubjects(sRes.data);
       setTeachers(tRes.data);
 
-      if (!selectedId && cRes.data.length > 0) {
-        setSelectedId(cRes.data[0].id);
-      }
+      setSelectedId(current => {
+        if (current !== "") {
+          return current;
+        }
+
+        return cRes.data.length > 0
+          ? cRes.data[0].id
+          : "";
+      });
 
       if (loadSavedSchedule) {
         const timeRes = await api.get("/timetable/");
@@ -134,6 +140,24 @@ function App() {
 
   useEffect(() => {
     fetchBaseData();
+  }, []);
+
+  useEffect(() => {
+    const handleAcademicDataChanged = () => {
+      fetchBaseData(false);
+    };
+
+    window.addEventListener(
+      "anatinus:academic-data-changed",
+      handleAcademicDataChanged,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "anatinus:academic-data-changed",
+        handleAcademicDataChanged,
+      );
+    };
   }, []);
 
   useEffect(() => {
