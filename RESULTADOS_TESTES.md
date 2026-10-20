@@ -4,18 +4,16 @@ Este arquivo separa **o que já foi observado** do que ainda precisa ser repetid
 
 ## 1. Testes automatizados
 
-### Última execução confirmada antes das otimizações de desempenho
+### Execução confirmada após as otimizações de desempenho
 
-Resultado informado em 01/10/2026:
+O GitHub Actions executou automaticamente a suíte no commit de verificação de 19/10/2026, já incluindo a nova modelagem da regra de descanso e a remoção de variáveis de professores inelegíveis:
 
 ```text
-Ran 17 tests
+Ran 18 tests in 1.562s
 OK
 ```
 
-Depois disso foi adicionado mais um teste específico para confirmar que uma 7ª aula é permitida quando existe descanso real de pelo menos 1 hora.
-
-Portanto, a suíte atual contém **18 testes**, mas deve ser executada novamente após as otimizações mais recentes.
+O tempo acima pertence ao runner do GitHub e não deve ser comparado diretamente com medições feitas no computador local. O dado relevante aqui é que **os 18 testes passaram após as alterações estruturais do solver**.
 
 ### Casos cobertos
 
@@ -42,18 +40,14 @@ Portanto, a suíte atual contém **18 testes**, mas deve ser executada novamente
 
 ## 2. Build do frontend
 
-Execução confirmada em 01/10/2026:
+O build local já havia sido validado em 01/10/2026. Após as alterações mais recentes, o GitHub Actions executou novamente a compilação de produção e concluiu com sucesso:
 
 ```text
-vite v8.3.1 building client environment for production...
-✓ 1951 modules transformed.
-dist/index.html                   0.52 kB
-dist/assets/index-B2OmRWc9.css   28.01 kB
-dist/assets/index-DFB08cYH.js   372.66 kB
-✓ built in 8.42s
+✓ 1988 modules transformed.
+✓ built
 ```
 
-Esse build foi realizado antes das alterações posteriores. Deve ser repetido na versão atual.
+O tempo do build depende do ambiente e não é usado como métrica de desempenho do Anatinus.
 
 ---
 
