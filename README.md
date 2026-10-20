@@ -8,6 +8,8 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 - [RESULTADOS_TESTES.md](RESULTADOS_TESTES.md): evidências e medições;
 - [GUIA_APRESENTACAO.md](GUIA_APRESENTACAO.md): roteiro de demo e perguntas da banca;
 - [CHECKLIST_ENTREGA.md](CHECKLIST_ENTREGA.md): lista final de validação.
+- [REVISAO_CODIGO.md](REVISAO_CODIGO.md): revisão técnica, riscos e critérios de mudança;
+- [CONTEXTO_MESTRE_ANATINUS.md](CONTEXTO_MESTRE_ANATINUS.md): contexto completo para continuar o projeto em outro chat ou conta.
 
 ## O que o sistema faz
 
