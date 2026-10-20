@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from . import models, schemas
 from .database import engine, ensure_database_compatibility, get_db
-from .optimizer import generate_schedule
+from .optimizer import JOURNEY_PERIODS, generate_schedule
 
 models.Base.metadata.create_all(bind=engine)
 ensure_database_compatibility()
@@ -396,6 +396,15 @@ def delete_teacher(
     if not item:
         raise HTTPException(404, "Professor não encontrado")
 
+    # Preserva a última grade como referência histórica, mas as aulas
+    # do professor removido passam a aparecer como "Sem professor".
+    db.query(models.TimetableItem).filter(
+        models.TimetableItem.teacher_id == teacher_id
+    ).update(
+        {models.TimetableItem.teacher_id: None},
+        synchronize_session=False,
+    )
+
     db.delete(item)
     db.commit()
 
@@ -555,6 +564,85 @@ def generate_timetable(db: Session = Depends(get_db)):
 
     config = get_or_create_config(db)
 
+    # --------------------------------------------------------------
+    # PRÉ-VALIDAÇÃO
+    # --------------------------------------------------------------
+    # Alguns cenários podem ser identificados como impossíveis sem
+    # construir o modelo CP-SAT. Isso economiza tempo e produz mensagens
+    # mais úteis para quem está montando a grade.
+    subject_by_id = {
+        subject["id"]: subject
+        for subject in subjects
+    }
+
+    preflight_errors = []
+
+    for classroom in classrooms:
+        weekly_capacity = (
+            len(
+                JOURNEY_PERIODS.get(
+                    classroom.get("shift", "Manhã"),
+                    JOURNEY_PERIODS["Manhã"],
+                )
+            )
+            * 5
+        )
+
+        settings = classroom.get(
+            "subject_settings",
+            [],
+        ) or []
+
+        total_workload = sum(
+            int(setting.get("workload", 0) or 0)
+            for setting in settings
+        )
+
+        if total_workload > weekly_capacity:
+            preflight_errors.append(
+                f"{classroom['name']}: "
+                f"{total_workload} aulas semanais para "
+                f"{weekly_capacity} períodos disponíveis."
+            )
+
+        high_workload = 0
+
+        for setting in settings:
+            subject = subject_by_id.get(
+                setting.get("subject_id")
+            )
+
+            if (
+                subject
+                and subject.get("complexity") == "Alta"
+            ):
+                high_workload += int(
+                    setting.get("workload", 0) or 0
+                )
+
+        high_capacity = (
+            int(
+                config.max_high_complexity_per_day
+            )
+            * 5
+        )
+
+        if high_workload > high_capacity:
+            preflight_errors.append(
+                f"{classroom['name']}: "
+                f"{high_workload} aulas de alta complexidade, "
+                f"mas o limite atual permite no máximo "
+                f"{high_capacity} por semana."
+            )
+
+    if preflight_errors:
+        raise HTTPException(
+            400,
+            "A configuração possui impossibilidades antes "
+            "da geração: "
+            + " | ".join(preflight_errors),
+        )
+
     sys_config = {
         "max_classes_per_day": min(
             config.max_classes_per_day,
@@ -589,5 +677,18 @@ def generate_timetable(db: Session = Depends(get_db)):
 
     if result["status"] == "error":
         raise HTTPException(500, result["message"])
+
+    # A geração e o salvamento passam a fazer parte da mesma operação.
+    # Assim a interface nunca precisa depender de uma segunda requisição
+    # para persistir a grade recém-calculada.
+    db.query(models.TimetableItem).delete()
+
+    rows = [
+        models.TimetableItem(**item)
+        for item in result["schedule"]
+    ]
+
+    db.add_all(rows)
+    db.commit()
 
     return result

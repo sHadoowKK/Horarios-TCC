@@ -189,9 +189,6 @@ function App() {
       const newSchedule = response.data.schedule;
       setSchedule(newSchedule);
       setGenerationSuccess(true);
-
-      // Salva a grade mais recente para ela reaparecer ao abrir o sistema.
-      await api.post("/timetable/", newSchedule);
     } catch (err: any) {
       setGenerationSuccess(false);
       const detail = err.response?.data?.detail;
