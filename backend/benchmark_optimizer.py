@@ -280,6 +280,16 @@ def main():
 
     if result["status"] != "success":
         print(f"Mensagem: {result.get('message', 'sem mensagem')}")
+        if "model_variables" in result:
+            print(
+                "Variáveis do modelo: "
+                f"{result['model_variables']}"
+            )
+        if "model_constraints" in result:
+            print(
+                "Restrições do modelo: "
+                f"{result['model_constraints']}"
+            )
         return
 
     print(
@@ -289,6 +299,22 @@ def main():
     print(
         "Tempo informado pelo solver: "
         f"{result.get('solve_time_seconds', 0):.3f}s"
+    )
+    print(
+        "Variáveis do modelo: "
+        f"{result.get('model_variables', 'n/d')}"
+    )
+    print(
+        "Restrições do modelo: "
+        f"{result.get('model_constraints', 'n/d')}"
+    )
+    print(
+        "Objetivo: "
+        f"{result.get('objective_value', 'n/d')}"
+    )
+    print(
+        "Melhor limite do objetivo: "
+        f"{result.get('best_objective_bound', 'n/d')}"
     )
     print(f"Aulas geradas: {len(result['schedule'])}")
     print(

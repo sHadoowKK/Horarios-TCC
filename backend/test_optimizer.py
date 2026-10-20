@@ -427,6 +427,61 @@ class OptimizerTests(unittest.TestCase):
             1,
         )
 
+    def test_seventh_class_is_allowed_after_one_hour_break(self):
+        availability = empty_availability()
+
+        # Seis aulas durante o dia e uma à noite. Entre 17:20 e 19:00
+        # há 1h40 de descanso, portanto a sétima aula deve ser permitida.
+        for period in [0, 1, 2, 3, 4, 5, 11]:
+            availability["0"][period] = True
+
+        classrooms = [
+            classroom(
+                index,
+                f"Turma {index}",
+                "Noite" if index == 7 else "Manhã",
+                [{
+                    "subject_id": index,
+                    "workload": 1,
+                    "split": False,
+                }],
+            )
+            for index in range(1, 8)
+        ]
+
+        subjects = [
+            subject(index, f"Disciplina {index}")
+            for index in range(1, 8)
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            [
+                teacher(
+                    1,
+                    list(range(1, 8)),
+                    availability,
+                    score=100,
+                )
+            ],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(
+            result["unstaffed_lessons"],
+            0,
+        )
+        self.assertEqual(
+            sum(
+                item["teacher_id"] == 1
+                for item in result["schedule"]
+            ),
+            7,
+        )
+
+
     def test_maximum_nine_classes_per_day_is_hard(self):
         availability = empty_availability()
 

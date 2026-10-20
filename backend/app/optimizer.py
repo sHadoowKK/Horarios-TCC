@@ -1,4 +1,3 @@
-from itertools import combinations
 from typing import Any, Dict, List
 import time
 
@@ -127,35 +126,6 @@ def _audiences_for(classroom):
         return ["A", "B"]
 
     return ["Todos"]
-
-
-def _seven_class_sequences_without_one_hour_break():
-    """
-    Lista combinações de 7 aulas em que, entre cada aula ministrada
-    e a próxima, não existe descanso de 60 minutos.
-
-    Proibir as 7 simultaneamente garante que, após no máximo 6 aulas,
-    exista pelo menos uma pausa de 1 hora antes de continuar.
-    """
-    sequences = []
-
-    for sequence in combinations(range(16), 7):
-        gaps = [
-            PERIOD_START_MINUTES[next_period]
-            - PERIOD_END_MINUTES[current_period]
-            for current_period, next_period
-            in zip(sequence, sequence[1:])
-        ]
-
-        if all(gap < 60 for gap in gaps):
-            sequences.append(sequence)
-
-    return sequences
-
-
-SEVEN_CLASS_SEQUENCES = (
-    _seven_class_sequences_without_one_hour_break()
-)
 
 
 def generate_schedule(
@@ -574,20 +544,81 @@ def generate_schedule(
 
     # 2) Após no máximo 6 aulas sem uma pausa de 1 hora,
     # precisa existir descanso antes de continuar.
+    #
+    # Em vez de enumerar todas as combinações possíveis de 7 aulas,
+    # mantemos um contador de sequência para cada período. Se duas
+    # aulas ocupadas tiverem menos de 60 minutos de descanso entre
+    # elas, a segunda precisa ter contador maior que a primeira.
+    # Como o contador máximo é 6, uma sétima aula sem pausa suficiente
+    # torna a combinação inviável. A regra é equivalente à anterior,
+    # mas gera muito menos restrições no modelo.
+    short_rest_edges = []
+
+    for current_period in range(num_periods):
+        for next_period in range(
+            current_period + 1,
+            num_periods,
+        ):
+            rest_minutes = (
+                PERIOD_START_MINUTES[next_period]
+                - PERIOD_END_MINUTES[current_period]
+            )
+
+            if rest_minutes < 60:
+                short_rest_edges.append(
+                    (current_period, next_period)
+                )
+
     for teacher in teachers:
         for day in range(num_days):
-            for sequence in SEVEN_CLASS_SEQUENCES:
-                model.Add(
-                    sum(
-                        teacher_occupancy[(
-                            teacher["id"],
-                            day,
-                            period,
-                        )]
-                        for period in sequence
-                    )
-                    <= 6
+            streak = {}
+
+            for period in range(num_periods):
+                occupancy = teacher_occupancy[(
+                    teacher["id"],
+                    day,
+                    period,
+                )]
+
+                streak[period] = model.NewIntVar(
+                    0,
+                    6,
+                    f"streak_t{teacher['id']}_d{day}_p{period}",
                 )
+
+                # Sem aula, a sequência naquele período vale zero.
+                # Com aula, começa em pelo menos uma.
+                model.Add(
+                    streak[period]
+                    <= 6 * occupancy
+                )
+                model.Add(
+                    streak[period]
+                    >= occupancy
+                )
+
+            for (
+                current_period,
+                next_period,
+            ) in short_rest_edges:
+                current_occupancy = teacher_occupancy[(
+                    teacher["id"],
+                    day,
+                    current_period,
+                )]
+                next_occupancy = teacher_occupancy[(
+                    teacher["id"],
+                    day,
+                    next_period,
+                )]
+
+                model.Add(
+                    streak[next_period]
+                    >= streak[current_period] + 1
+                ).OnlyEnforceIf([
+                    current_occupancy,
+                    next_occupancy,
+                ])
 
     # 3) Máximo absoluto de 9 aulas por dia.
     configured_max = int(
@@ -1189,6 +1220,10 @@ def generate_schedule(
     # ------------------------------------------------------------------
     # RESOLUÇÃO
     # ------------------------------------------------------------------
+    model_proto = model.Proto()
+    model_variables = len(model_proto.variables)
+    model_constraints = len(model_proto.constraints)
+
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 30.0
 
@@ -1223,6 +1258,9 @@ def generate_schedule(
                 "dentro do tempo de cálculo. Tente gerar novamente "
                 "ou revise restrições muito concentradas."
             ),
+            "solve_time_seconds": round(elapsed, 3),
+            "model_variables": model_variables,
+            "model_constraints": model_constraints,
         }
 
     if status not in (
@@ -1336,6 +1374,16 @@ def generate_schedule(
             elapsed,
             3,
         ),
+        "objective_value": round(
+            solver.ObjectiveValue(),
+            3,
+        ),
+        "best_objective_bound": round(
+            solver.BestObjectiveBound(),
+            3,
+        ),
+        "model_variables": model_variables,
+        "model_constraints": model_constraints,
         "schedule": schedule,
         "unstaffed_lessons": sum(
             item["teacher_id"] is None
