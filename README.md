@@ -2,6 +2,13 @@
 
 O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração automática de grade horária escolar com **React**, **FastAPI**, **SQLite/SQLAlchemy** e **Google OR-Tools (CP-SAT)**.
 
+## Documentação do projeto
+
+- [DOCUMENTACAO_TCC.md](DOCUMENTACAO_TCC.md): estado técnico e decisões do sistema;
+- [RESULTADOS_TESTES.md](RESULTADOS_TESTES.md): evidências e medições;
+- [GUIA_APRESENTACAO.md](GUIA_APRESENTACAO.md): roteiro de demo e perguntas da banca;
+- [CHECKLIST_ENTREGA.md](CHECKLIST_ENTREGA.md): lista final de validação.
+
 ## O que o sistema faz
 
 - cadastra cursos, turmas e disciplinas, incluindo turmas com divisão em grupos A/B;
@@ -15,6 +22,8 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 - considera carga horária, jornada da turma, disponibilidade, complexidade, grupos A/B, intervalos e janelas;
 - salva a última grade no SQLite;
 - permite visualizar a grade por turma ou professor;
+- exporta a grade completa em CSV;
+- permite imprimir a visualização atual;
 - possui tema claro/escuro com preferência salva no navegador.
 
 ## Estrutura
@@ -114,6 +123,8 @@ npm run dev
 ```
 
 A interface abre em `http://localhost:5173`.
+
+Para usar outro endereço de API, copie `frontend/.env.example` para `frontend/.env` e altere `VITE_API_URL`.
 
 ## Observação sobre o banco
 
@@ -233,3 +244,18 @@ O campo visual de **Categoria** foi removido por ser redundante. A disciplina pa
 - cursos associados.
 
 O campo antigo continua temporariamente no banco apenas para compatibilidade com versões anteriores, sem influência sobre a geração da grade.
+
+
+## Verificação rápida antes de entregar
+
+No PowerShell, a partir da raiz do projeto:
+
+```powershell
+.\verify.ps1
+```
+
+O script executa:
+1. testes automatizados do backend;
+2. build de produção do frontend.
+
+Ele para imediatamente se uma das etapas falhar.
