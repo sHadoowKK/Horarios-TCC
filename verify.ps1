@@ -15,7 +15,7 @@ if (-not (Test-Path $venvPython)) {
     throw "Ambiente virtual nao encontrado em backend\.venv. Crie o venv e instale requirements.txt."
 }
 
-& $venvPython -m unittest test_optimizer.py
+& $venvPython -m unittest discover -p "test_*.py"
 
 if ($LASTEXITCODE -ne 0) {
     throw "Os testes do backend falharam."
