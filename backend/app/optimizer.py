@@ -158,6 +158,24 @@ def generate_schedule(
             for target in _targets_for(classroom, subject):
                 units.append((classroom, subject, target))
 
+    # Só criamos variáveis para professores que realmente podem lecionar
+    # a disciplina daquela unidade. Antes, o modelo criava milhares de
+    # variáveis impossíveis e depois as fixava em zero.
+    eligible_teachers = {}
+
+    for classroom, subject, target in units:
+        unit_key = (
+            classroom["id"],
+            subject["id"],
+            target,
+        )
+        eligible_teachers[unit_key] = [
+            teacher
+            for teacher in teachers
+            if subject["id"]
+            in teacher.get("allowed_subjects", [])
+        ]
+
     # A[c,s,g,t] = professor escolhido para a carga semanal.
     assignment = {}
 
@@ -212,7 +230,13 @@ def generate_schedule(
                 if period not in allowed_periods:
                     model.Add(no_teacher_lesson[key] == 0)
 
-        for teacher in teachers:
+        unit_key = (
+            classroom["id"],
+            subject["id"],
+            target,
+        )
+
+        for teacher in eligible_teachers[unit_key]:
             assignment_key = (
                 classroom["id"],
                 subject["id"],
@@ -224,16 +248,6 @@ def generate_schedule(
                 f"A_c{classroom['id']}_s{subject['id']}_"
                 f"g{target}_t{teacher['id']}"
             )
-
-            can_teach = (
-                subject["id"]
-                in teacher.get("allowed_subjects", [])
-            )
-
-            if not can_teach:
-                model.Add(
-                    assignment[assignment_key] == 0
-                )
 
             for day in range(num_days):
                 for period in range(num_periods):
@@ -285,6 +299,12 @@ def generate_schedule(
             target,
         )
 
+        unit_key = (
+            classroom["id"],
+            subject["id"],
+            target,
+        )
+
         choices = [
             assignment[(
                 classroom["id"],
@@ -292,7 +312,7 @@ def generate_schedule(
                 target,
                 teacher["id"],
             )]
-            for teacher in teachers
+            for teacher in eligible_teachers[unit_key]
         ]
         choices.append(no_teacher_assignment[none_key])
 
@@ -312,7 +332,7 @@ def generate_schedule(
                     )]
                 )
 
-                for teacher in teachers:
+                for teacher in eligible_teachers[unit_key]:
                     workload_vars.append(
                         lesson[(
                             classroom["id"],
@@ -346,6 +366,12 @@ def generate_schedule(
             )]
         ]
 
+        unit_key = (
+            classroom["id"],
+            subject["id"],
+            target,
+        )
+
         values.extend(
             lesson[(
                 classroom["id"],
@@ -355,7 +381,7 @@ def generate_schedule(
                 day,
                 period,
             )]
-            for teacher in teachers
+            for teacher in eligible_teachers[unit_key]
         )
 
         return values
@@ -396,17 +422,22 @@ def generate_schedule(
         day,
         period,
     ):
-        return [
-            lesson[(
+        values = []
+
+        for classroom, subject, target in units:
+            key = (
                 classroom["id"],
                 subject["id"],
                 target,
                 teacher_id,
                 day,
                 period,
-            )]
-            for classroom, subject, target in units
-        ]
+            )
+
+            if key in lesson:
+                values.append(lesson[key])
+
+        return values
 
     # ------------------------------------------------------------------
     # CONFLITOS DE TURMA / GRUPO
@@ -834,16 +865,19 @@ def generate_schedule(
                                 )
 
                                 for period in periods:
-                                    class_values.append(
-                                        lesson[(
-                                            classroom["id"],
-                                            subject["id"],
-                                            target,
-                                            teacher["id"],
-                                            day,
-                                            period,
-                                        )]
+                                    lesson_key = (
+                                        classroom["id"],
+                                        subject["id"],
+                                        target,
+                                        teacher["id"],
+                                        day,
+                                        period,
                                     )
+
+                                    if lesson_key in lesson:
+                                        class_values.append(
+                                            lesson[lesson_key]
+                                        )
 
                             class_sum = sum(class_values)
 
@@ -1032,7 +1066,13 @@ def generate_schedule(
 
     # Pontuação docente: quanto maior, maior a prioridade quando há escolha.
     for classroom, subject, target in units:
-        for teacher in teachers:
+        unit_key = (
+            classroom["id"],
+            subject["id"],
+            target,
+        )
+
+        for teacher in eligible_teachers[unit_key]:
             score = int(
                 teacher.get("score", 0) or 0
             )
@@ -1300,7 +1340,13 @@ def generate_schedule(
                         "student_group": target,
                     })
 
-                for teacher in teachers:
+                unit_key = (
+                    classroom["id"],
+                    subject["id"],
+                    target,
+                )
+
+                for teacher in eligible_teachers[unit_key]:
                     lesson_key = (
                         classroom["id"],
                         subject["id"],
