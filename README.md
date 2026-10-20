@@ -92,13 +92,13 @@ python seed.py
 
 O seed não deve ser executado repetidamente no mesmo banco, pois ele cria novos cadastros.
 
-Teste do otimizador:
+Todos os testes automatizados:
 
 ```bash
-python -m unittest test_optimizer.py
+python -m unittest discover -p "test_*.py"
 ```
 
-A suíte também inclui um cenário de **semana noturna completa com 25 aulas**, baseado em uma grade real usada durante o desenvolvimento. Esse teste verifica se todas as cargas são atendidas, se os cinco períodos noturnos são preenchidos em cada dia e se nenhuma aula fica sem professor quando todos os docentes necessários estão disponíveis.
+A suíte atual possui **22 testes automatizados**: 18 cenários do solucionador e 4 testes de integração do backend. Entre eles há um cenário de **semana noturna completa com 25 aulas**, baseado em uma grade real usada durante o desenvolvimento.
 
 ### Benchmark de carga
 

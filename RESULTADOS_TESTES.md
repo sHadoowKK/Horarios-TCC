@@ -4,16 +4,22 @@ Este arquivo separa **o que já foi observado** do que ainda precisa ser repetid
 
 ## 1. Testes automatizados
 
-### Execução confirmada após as otimizações de desempenho
+### Execução confirmada após as otimizações e testes de integração
 
-O GitHub Actions executou automaticamente a suíte no commit de verificação de 19/10/2026, já incluindo a nova modelagem da regra de descanso e a remoção de variáveis de professores inelegíveis:
+O GitHub Actions executou automaticamente a suíte completa em 19/10/2026. A versão atual possui **22 testes**: 18 cenários do otimizador e 4 testes de integração do backend.
 
 ```text
-Ran 18 tests in 1.562s
+Ran 22 tests in 1.752s
 OK
 ```
 
-O tempo acima pertence ao runner do GitHub e não deve ser comparado diretamente com medições feitas no computador local. O dado relevante aqui é que **os 18 testes passaram após as alterações estruturais do solver**.
+Os quatro testes de integração acrescentados verificam:
+- geração e salvamento automático da grade;
+- substituição da grade salva em uma nova geração;
+- exclusão de professor preservando as aulas como "Sem professor";
+- pré-validação de carga semanal acima da capacidade da turma.
+
+O tempo acima pertence ao runner do GitHub e não deve ser comparado diretamente com medições feitas no computador local. O dado relevante é que **os 22 testes passaram na versão atual**.
 
 ### Casos cobertos
 
