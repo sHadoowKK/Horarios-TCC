@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun } from 'lucide-react';
+import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import Turmas from './pages/Turmas';
@@ -207,6 +207,65 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportCsv = () => {
+    if (!schedule || schedule.length === 0) {
+      return;
+    }
+
+    const escapeCsv = (value: unknown) => {
+      const text = String(value ?? "");
+      return `"${text.replaceAll('"', '""')}"`;
+    };
+
+    const rows = [
+      [
+        "Dia",
+        "Horário",
+        "Turma",
+        "Grupo",
+        "Disciplina",
+        "Professor",
+      ],
+      ...[...schedule]
+        .sort(
+          (a, b) =>
+            a.day - b.day
+            || a.period - b.period
+            || a.classroom_id - b.classroom_id,
+        )
+        .map(item => [
+          DAYS[item.day] || item.day,
+          PERIOD_NAMES[item.period] || item.period,
+          getClassroomName(item.classroom_id),
+          item.student_group || "Todos",
+          getSubName(item.subject_id),
+          getProfName(item.teacher_id),
+        ]),
+    ];
+
+    const csv = rows
+      .map(row => row.map(escapeCsv).join(";"))
+      .join("\r\n");
+
+    const blob = new Blob(
+      ["\ufeff", csv],
+      { type: "text/csv;charset=utf-8;" },
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "anatinus-grade.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   const getSubName = (id: number) =>
@@ -552,17 +611,43 @@ function App() {
                       </p>
                     </div>
 
-                    <button
-                      onClick={handleGenerate}
-                      disabled={loading}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {loading ? (
-                        <span className="animate-pulse">Gerando grade...</span>
-                      ) : (
-                        "Gerar Nova Grade"
+                    <div className="flex flex-wrap justify-end gap-2 no-print">
+                      {schedule && schedule.length > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleExportCsv}
+                            className="secondary-action-button px-4 py-3 rounded-lg font-bold flex items-center gap-2"
+                            title="Exportar a grade completa em CSV"
+                          >
+                            <Download className="w-4 h-4" />
+                            Exportar CSV
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handlePrint}
+                            className="secondary-action-button px-4 py-3 rounded-lg font-bold flex items-center gap-2"
+                            title="Imprimir a visualização atual"
+                          >
+                            <Printer className="w-4 h-4" />
+                            Imprimir
+                          </button>
+                        </>
                       )}
-                    </button>
+
+                      <button
+                        onClick={handleGenerate}
+                        disabled={loading}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {loading ? (
+                          <span className="animate-pulse">Gerando grade...</span>
+                        ) : (
+                          "Gerar Nova Grade"
+                        )}
+                      </button>
+                    </div>
                   </header>
 
                   {error && (

@@ -371,3 +371,66 @@ html.dark-theme {
   color: #64748b;
   border-color: #334155;
 }
+
+
+/* ============================================================
+   IMPRESSÃO DA GRADE
+   ============================================================ */
+@media print {
+  @page {
+    size: landscape;
+    margin: 1cm;
+  }
+
+  html,
+  body,
+  #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  aside,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    overflow: visible !important;
+  }
+
+  main > * {
+    max-width: none !important;
+  }
+
+  table {
+    width: 100% !important;
+    break-inside: avoid;
+  }
+
+  th,
+  td {
+    color: #000000 !important;
+    border-color: #666666 !important;
+    background: #ffffff !important;
+  }
+
+  .bg-indigo-50,
+  .bg-emerald-50,
+  .bg-gray-50,
+  .bg-gray-100,
+  .bg-slate-100 {
+    background: #ffffff !important;
+  }
+
+  .text-indigo-900,
+  .text-indigo-700,
+  .text-indigo-600,
+  .text-emerald-900,
+  .text-emerald-700,
+  .text-gray-700,
+  .text-gray-600,
+  .text-gray-500,
+  .text-slate-500 {
+    color: #000000 !important;
+  }
+}
