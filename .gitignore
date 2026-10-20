@@ -19,3 +19,6 @@ frontend/dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local database backups
+backups/

@@ -259,3 +259,20 @@ O script executa:
 2. build de produção do frontend.
 
 Ele para imediatamente se uma das etapas falhar.
+
+
+## Atalhos no Windows
+
+Iniciar backend e frontend em terminais separados:
+
+```powershell
+.\start-dev.ps1
+```
+
+Criar uma cópia local do banco antes de testes ou cadastro em massa:
+
+```powershell
+.\backup-db.ps1
+```
+
+Os backups ficam em `backups/` com data e hora no nome e não são enviados ao GitHub.
