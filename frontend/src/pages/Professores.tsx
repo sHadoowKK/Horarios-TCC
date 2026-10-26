@@ -889,7 +889,7 @@ export default function Professores() {
             </span>
           </h3>
 
-          <ul className="space-y-4 flex-1 overflow-y-auto max-h-[760px] pr-2">
+          <ul className="app-record-list">
             {teachers.map(teacher => (
               <li
                 key={teacher.id}

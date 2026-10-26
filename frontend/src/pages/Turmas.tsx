@@ -644,7 +644,7 @@ export default function Turmas() {
             </button>
           </form>
 
-          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[520px] pr-2">
+          <ul className="app-record-list">
             {courses.map(course => (
               <li
                 key={course.id}
@@ -814,7 +814,7 @@ export default function Turmas() {
             </button>
           </form>
 
-          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-2">
+          <ul className="app-record-list">
             {classrooms.map(classroom => {
               const candidates =
                 subjectsForClassroom(classroom);
@@ -1324,7 +1324,7 @@ export default function Turmas() {
             </button>
           </form>
 
-          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[520px] pr-2">
+          <ul className="app-record-list">
             {subjects.map(subject => (
               <li
                 key={subject.id}
