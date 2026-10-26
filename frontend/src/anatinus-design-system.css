@@ -964,7 +964,7 @@ textarea {
 
 .app-empty-state {
   display: flex;
-  min-height: 310px;
+  min-height: 220px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -974,7 +974,7 @@ textarea {
 }
 
 .app-empty-state-compact {
-  min-height: 235px;
+  min-height: 155px;
 }
 
 .app-empty-icon {
