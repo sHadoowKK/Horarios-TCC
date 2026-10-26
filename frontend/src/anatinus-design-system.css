@@ -11,7 +11,6 @@
   --an-bg: #f2f3f7;
   --an-sidebar: #fafaff;
   --an-panel: #ffffff;
-  --an-panel-raised: #ffffff;
   --an-surface: #f7f8fb;
   --an-surface-2: #eceef4;
   --an-field: #ffffff;
@@ -40,7 +39,6 @@ html.dark-theme {
   --an-bg: #202127;
   --an-sidebar: #252630;
   --an-panel: #292b35;
-  --an-panel-raised: #30323d;
   --an-surface: #252731;
   --an-surface-2: #30323d;
   --an-field: #22242d;
@@ -1375,6 +1373,7 @@ textarea {
 }
 
 .app-settings-sections {
+  display: grid;
   gap: 15px !important;
 }
 

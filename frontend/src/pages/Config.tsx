@@ -119,7 +119,7 @@ export default function Config() {
           {saveMessage.text}
         </div>
       )}
-      <div className="app-settings-sections space-y-6">
+      <div className="app-settings-sections">
         {/* REGRAS FIXAS */}
         <section className="app-panel app-settings-section bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-4">
@@ -152,7 +152,7 @@ export default function Config() {
         </section>
 
         {/* LIMITES QUE PODEM VARIAR */}
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <section className="app-panel app-settings-section bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <h3 className="text-xl font-bold text-gray-700 mb-4 border-b pb-2">
             Limites da escola
           </h3>
@@ -214,7 +214,7 @@ export default function Config() {
         </section>
 
         {/* PROFESSORES */}
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <section className="app-panel app-settings-section bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <h3 className="text-xl font-bold text-gray-700 mb-4 border-b pb-2">
             Preferências dos professores
           </h3>
@@ -276,7 +276,7 @@ export default function Config() {
         </section>
 
         {/* ALUNOS */}
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <section className="app-panel app-settings-section bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <h3 className="text-xl font-bold text-gray-700 mb-4 border-b pb-2">
             Preferências das turmas
           </h3>
