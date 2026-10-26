@@ -611,15 +611,10 @@ export default function Turmas() {
   };
 
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2 mb-8">
-        <BookOpen className="w-8 h-8 text-indigo-600" />
-        Gestão Acadêmica
-      </h2>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="app-view app-view-classes p-8 max-w-7xl mx-auto">
+      <div className="app-academic-grid grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* CURSOS */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
+        <div className="app-panel app-panel-courses bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
           <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-700">
             <School className="w-5 h-5 text-blue-500" />
             Cursos
@@ -695,10 +690,6 @@ export default function Turmas() {
                       {course.name}
                     </span>
 
-                    <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
-                      ID: {course.id}
-                    </span>
-
                     <button
                       type="button"
                       onClick={() =>
@@ -734,7 +725,7 @@ export default function Turmas() {
         </div>
 
         {/* TURMAS */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
+        <div className="app-panel app-panel-classrooms bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
           <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-700">
             <Layers className="w-5 h-5 text-emerald-500" />
             Turmas
@@ -1214,7 +1205,7 @@ export default function Turmas() {
         </div>
 
         {/* DISCIPLINAS */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
+        <div className="app-panel app-panel-subjects bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
           <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-700">
             <BookOpen className="w-5 h-5 text-purple-500" />
             Disciplinas

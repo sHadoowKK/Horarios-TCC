@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
-import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer } from 'lucide-react';
+import { Calendar, Users, BookOpen, Settings, Moon, Sun, Download, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import Turmas from './pages/Turmas';
@@ -534,8 +534,8 @@ function App() {
 
   return (
     <Router>
-      <div className="app-shell flex h-screen bg-gray-50 text-gray-900 w-full text-left">
-        <aside className="app-sidebar w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
+      <div className="app-shell flex h-screen w-full text-left">
+        <aside className="app-sidebar flex flex-col shrink-0">
           <div className="app-brand p-6 border-b border-gray-200">
             <h1 className="app-brand-title text-xl font-bold text-indigo-600 flex items-center gap-2">
               <img
@@ -548,7 +548,6 @@ function App() {
           </div>
 
           <nav className="app-nav flex-1 p-4 space-y-2 flex flex-col">
-            <div className="app-nav-section-label">Áreas de trabalho</div>
             <NavLink
               to="/"
               title="Grade Horária"
@@ -577,7 +576,6 @@ function App() {
             </NavLink>
 
             <div className="flex-1" />
-            <div className="app-nav-section-label app-nav-system-label">Sistema</div>
 
             <button
               type="button"
@@ -624,32 +622,57 @@ function App() {
               path="/"
               element={
                 <div className="app-page p-8 max-w-7xl mx-auto">
-                  <header className="app-page-header flex justify-between items-center mb-8">
-                    <div className="app-heading-copy">
-                      <div className="app-section-kicker">PLANEJAMENTO ACADÊMICO <span>/</span> VISUALIZAÇÃO</div>
-                      <h2 className="text-3xl font-bold text-gray-800">Grade horária</h2>
-                      <p className="text-gray-500 mt-1">
-                        Organize e confira a distribuição semanal das aulas.
-                      </p>
+                  <div className="app-toolbar no-print">
+                    <div className="app-view-controls">
+                      <select
+                        aria-label="Visualizar por"
+                        className="app-toolbar-select"
+                        value={viewMode}
+                        onChange={event => {
+                          setViewMode(event.target.value as "turma" | "professor");
+                          setSelectedId("");
+                        }}
+                      >
+                        <option value="turma">Por turma</option>
+                        <option value="professor">Por professor</option>
+                      </select>
+
+                      <select
+                        aria-label={viewMode === "turma" ? "Selecionar turma" : "Selecionar professor"}
+                        className="app-toolbar-select app-toolbar-select-target"
+                        value={selectedId}
+                        onChange={event => setSelectedId(event.target.value === "" ? "" : Number(event.target.value))}
+                      >
+                        <option value="">Selecionar...</option>
+                        {viewMode === "turma" && classrooms.map(classroom => (
+                          <option key={classroom.id} value={classroom.id}>
+                            {classroom.name} ({classroom.shift}{classroom.has_groups ? " · Grupos A/B" : ""})
+                          </option>
+                        ))}
+                        {viewMode === "professor" && teachers.map(teacher => (
+                          <option key={teacher.id} value={teacher.id}>
+                            {teacher.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
-                    <div className="flex flex-wrap justify-end gap-2 no-print">
+                    <div className="app-toolbar-actions">
                       {schedule && schedule.length > 0 && (
                         <>
                           <button
                             type="button"
                             onClick={handleExportCsv}
-                            className="secondary-action-button px-4 py-3 rounded-lg font-bold flex items-center gap-2"
+                            className="app-action-secondary"
                             title="Exportar a grade completa em CSV"
                           >
                             <Download className="w-4 h-4" />
-                            Exportar CSV
+                            Exportar
                           </button>
-
                           <button
                             type="button"
                             onClick={handlePrint}
-                            className="secondary-action-button px-4 py-3 rounded-lg font-bold flex items-center gap-2"
+                            className="app-action-secondary"
                             title="Imprimir a visualização atual"
                           >
                             <Printer className="w-4 h-4" />
@@ -659,159 +682,67 @@ function App() {
                       )}
 
                       <button
+                        type="button"
                         onClick={handleGenerate}
                         disabled={loading}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className="app-action-primary disabled:opacity-50"
                       >
-                        {loading ? (
-                          <span className="animate-pulse">Gerando grade...</span>
-                        ) : (
-                          "Gerar Nova Grade"
-                        )}
+                        {loading ? <span>Gerando...</span> : "Gerar grade"}
                       </button>
                     </div>
-                  </header>
-
-                  <section className="app-overview-strip" aria-label="Resumo dos cadastros e da grade">
-                    <div className="app-overview-item">
-                      <span className="app-overview-label">Turmas cadastradas</span>
-                      <strong>{String(classrooms.length).padStart(2, "0")}</strong>
-                      <span className="app-overview-note">Grupos e turnos incluídos</span>
-                    </div>
-                    <div className="app-overview-item">
-                      <span className="app-overview-label">Professores</span>
-                      <strong>{String(teachers.length).padStart(2, "0")}</strong>
-                      <span className="app-overview-note">Disponíveis no cadastro</span>
-                    </div>
-                    <div className="app-overview-item">
-                      <span className="app-overview-label">Aulas na grade</span>
-                      <strong>{schedule ? String(schedule.length).padStart(2, "0") : "—"}</strong>
-                      <span className="app-overview-note">{schedule ? "Distribuição atual" : "Aguardando geração"}</span>
-                    </div>
-                    <div className={`app-overview-item ${schedule && unstaffedLessons > 0 ? "app-overview-warning" : ""}`}>
-                      <span className="app-overview-label">Sem professor</span>
-                      <strong>{schedule ? String(unstaffedLessons).padStart(2, "0") : "—"}</strong>
-                      <span className="app-overview-note">{schedule ? (unstaffedLessons ? "Exige revisão" : "Nenhuma pendência") : "Após gerar a grade"}</span>
-                    </div>
-                  </section>
+                  </div>
 
                   {error && (
-                    <div className="mb-6 p-4 bg-red-100 border border-red-200 text-red-700 rounded-lg font-medium">
+                    <div className="app-status-message app-status-error" role="alert">
                       {error}
                     </div>
                   )}
 
                   {loading && schedule && (
-                    <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium">
-                      <strong>Gerando nova grade.</strong>
-                      <span className="ml-1">
-                        Enquanto o cálculo não termina, a grade abaixo ainda é a última grade salva.
-                      </span>
+                    <div className="app-status-message app-status-info" role="status">
+                      <strong>Gerando uma nova grade.</strong>
+                      <span>A grade anterior continua disponível até o cálculo terminar.</span>
                     </div>
                   )}
 
                   {!error && generationSuccess && (
-                    <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm font-semibold">
+                    <div className="app-status-message app-status-success" role="status">
                       Grade gerada.
                     </div>
                   )}
 
                   {!error && unstaffedLessons > 0 && (
-                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg">
-                      <div>
-                        <strong>
-                          {unstaffedLessons} {unstaffedLessons === 1 ? "aula está" : "aulas estão"} sem professor.
-                        </strong>
-                        <span className="ml-1">
-                          A grade continua válida; esses horários ficam reservados até a escola atribuir um docente.
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {unstaffedSummary.map(item => {
-                          const groupLabel =
-                            item.studentGroup !== "Todos"
+                    <details className="app-pending-details">
+                      <summary>
+                        <span className="app-pending-marker" aria-hidden="true" />
+                        <strong>{unstaffedLessons}</strong>
+                        <span>{unstaffedLessons === 1 ? "aula sem professor" : "aulas sem professor"}</span>
+                        <span className="app-pending-toggle">Ver detalhes</span>
+                      </summary>
+                      <div className="app-pending-body">
+                        <p>Esses horários permanecem reservados até a escola atribuir um docente.</p>
+                        <ul>
+                          {unstaffedSummary.map(item => {
+                            const groupLabel = item.studentGroup !== "Todos"
                               ? ` · Grupo ${item.studentGroup}`
                               : "";
-
-                          return (
-                            <span
-                              key={`${item.classroomId}-${item.subjectId}-${item.studentGroup}`}
-                              className="text-xs px-2 py-1 rounded bg-white border border-amber-200"
-                            >
-                              {getClassroomName(item.classroomId)}
-                              {" · "}
-                              {getSubName(item.subjectId)}
-                              {groupLabel}
-                              {" — "}
-                              {item.lessons} {item.lessons === 1 ? "aula" : "aulas"}
-                            </span>
-                          );
-                        })}
+                            return (
+                              <li key={`${item.classroomId}-${item.subjectId}-${item.studentGroup}`}>
+                                <span>{getClassroomName(item.classroomId)} · {getSubName(item.subjectId)}{groupLabel}</span>
+                                <strong>{item.lessons} {item.lessons === 1 ? "aula" : "aulas"}</strong>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
-                    </div>
+                    </details>
                   )}
-
-                  <section className="app-controls-section" aria-label="Controles de visualização">
-                    <div className="app-controls-heading">
-                      <div>
-                        <span className="app-section-kicker">EXPLORAR GRADE</span>
-                        <h3>Escolha o recorte</h3>
-                      </div>
-                      <span className="app-controls-hint">Semana letiva · Segunda a sexta</span>
-                    </div>
-                    <div className="app-filter-bar mb-6 bg-white p-4 rounded-xl border border-gray-200 flex gap-4 items-center shadow-sm">
-                      <div className="app-filter-mode-label flex items-center gap-2 text-gray-700 font-semibold">
-                        <Filter className="w-5 h-5" />
-                        Exibir por
-                      </div>
-
-                    <select
-                      className="border border-gray-300 rounded-lg p-2 font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={viewMode}
-                      onChange={event => {
-                        setViewMode(event.target.value as "turma" | "professor");
-                        setSelectedId("");
-                      }}
-                    >
-                      <option value="turma">Visão por Turma</option>
-                      <option value="professor">Visão por Professor</option>
-                    </select>
-
-                    <select
-                      className="border border-gray-300 rounded-lg p-2 flex-1 focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={selectedId}
-                      onChange={event => setSelectedId(Number(event.target.value))}
-                    >
-                      <option value="">Selecione...</option>
-
-                      {viewMode === "turma" && classrooms.map(classroom => (
-                        <option key={classroom.id} value={classroom.id}>
-                          {classroom.name} ({classroom.shift}{classroom.has_groups ? " · Grupos A/B" : ""})
-                        </option>
-                      ))}
-
-                      {viewMode === "professor" && teachers.map(teacher => (
-                        <option key={teacher.id} value={teacher.id}>
-                          {teacher.name}
-                        </option>
-                      ))}
-                    </select>
-                    </div>
-                  </section>
-
                   <section className="app-schedule-workspace" aria-label="Grade semanal">
-                    <header className="app-schedule-workspace-header">
-                      <div>
-                        <span className="app-section-kicker">VISUALIZAÇÃO ATIVA</span>
-                        <h3>{selectedId ? (viewMode === "turma" ? getClassroomName(selectedId) : getProfName(selectedId)) : "Prévia da grade"}</h3>
-                        <p>{!schedule ? "Gere uma grade para ver a distribuição das aulas." : !selectedId ? "Selecione uma turma ou professor para consultar os horários." : viewMode === "turma" ? "Horários, matérias e docentes desta turma." : "Distribuição semanal das aulas deste professor."}</p>
-                      </div>
-                      <div className="app-schedule-legend">
-                        <span><i className="app-legend-dot app-legend-violet" />Turmas</span>
-                        <span><i className="app-legend-dot app-legend-green" />Professores</span>
-                      </div>
-                    </header>
+                    {schedule && selectedId !== "" && (
+                      <header className="app-schedule-workspace-header">
+                        <h2>{viewMode === "turma" ? getClassroomName(Number(selectedId)) : getProfName(Number(selectedId))}</h2>
+                      </header>
+                    )}
                     {renderScheduleGrid()}
                   </section>
                 </div>

@@ -479,15 +479,10 @@ export default function Professores() {
   };
 
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2 mb-8">
-        <Users className="w-8 h-8 text-indigo-600" />
-        Gestão de Professores
-      </h2>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="app-view app-view-teachers p-8 max-w-7xl mx-auto">
+      <div className="app-people-layout grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* FORMULÁRIO */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
+        <div className="app-panel app-panel-form bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
           <h3 className="text-xl font-semibold mb-4 text-gray-700">
             {editingTeacherId
               ? "Editar Professor"
@@ -884,7 +879,7 @@ export default function Professores() {
         </div>
 
         {/* LISTA DE PROFESSORES */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
+        <div className="app-panel app-panel-list bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
           <h3 className="text-xl font-semibold mb-4 text-gray-700 flex items-center justify-between">
             Professores Cadastrados
 
@@ -906,10 +901,6 @@ export default function Professores() {
                     </strong>
 
                     <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
-                        ID: {teacher.id}
-                      </span>
-
                       <span className="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded-full inline-flex items-center gap-1 font-bold">
                         <Star className="w-3 h-3" />
                         {teacher.score || 0} pts

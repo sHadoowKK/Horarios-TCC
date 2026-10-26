@@ -10,6 +10,7 @@ export default function Config() {
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -30,6 +31,7 @@ export default function Config() {
     field: string,
     value: any,
   ) => {
+    setSaveMessage(null);
     setConfig({
       ...config,
       [field]: value,
@@ -38,6 +40,7 @@ export default function Config() {
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveMessage(null);
 
     try {
       const payload = {
@@ -58,10 +61,10 @@ export default function Config() {
       );
 
       setConfig(response.data);
-      alert("Configurações salvas com sucesso!");
+      setSaveMessage({ kind: "success", text: "Preferências salvas." });
     } catch (error) {
       console.error(error);
-      alert("Erro ao salvar.");
+      setSaveMessage({ kind: "error", text: "Não foi possível salvar. Tente novamente." });
     } finally {
       setSaving(false);
     }
@@ -69,17 +72,13 @@ export default function Config() {
 
   if (loading) {
     return (
-      <div className="p-8">
-        Carregando...
-      </div>
+      <div className="app-page-state">Carregando...</div>
     );
   }
 
   if (!config) {
     return (
-      <div className="p-8">
-        Erro ao carregar configurações.
-      </div>
+      <div className="app-page-state" role="alert">Erro ao carregar configurações.</div>
     );
   }
 
@@ -103,35 +102,25 @@ export default function Config() {
   ];
 
   return (
-    <div className="p-8 max-w-5xl mx-auto pb-24">
-      <div className="flex justify-between items-start gap-6 mb-8">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-800">
-            Regras e Preferências
-          </h2>
-
-          <p className="text-gray-500 mt-1">
-            Regras obrigatórias ficam protegidas.
-            Aqui você ajusta apenas o que realmente
-            pode variar.
-          </p>
-        </div>
-
+    <div className="app-view app-view-settings p-8 max-w-5xl mx-auto pb-24">
+      <div className="app-settings-toolbar">
         <button
           onClick={handleSave}
           disabled={saving}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50"
+          className="app-action-primary disabled:opacity-50"
         >
-          <Save className="w-5 h-5" />
-          {saving
-            ? "Salvando..."
-            : "Salvar Preferências"}
+          <Save className="w-4 h-4" />
+          {saving ? "Salvando..." : "Salvar"}
         </button>
       </div>
-
-      <div className="space-y-8">
+      {saveMessage && (
+        <div className={`app-save-feedback app-save-${saveMessage.kind}`} role={saveMessage.kind === "error" ? "alert" : "status"}>
+          {saveMessage.text}
+        </div>
+      )}
+      <div className="app-settings-sections space-y-6">
         {/* REGRAS FIXAS */}
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <section className="app-panel app-settings-section bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-4">
             <ShieldCheck className="w-6 h-6 text-emerald-600" />
 
@@ -146,11 +135,11 @@ export default function Config() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="app-fixed-rules grid grid-cols-1 md:grid-cols-2 gap-3">
             {fixedRules.map(rule => (
               <div
                 key={rule.title}
-                className="p-4 rounded-lg border border-emerald-100 bg-emerald-50"
+                className="app-fixed-rule p-4 rounded-lg border border-emerald-100 bg-emerald-50"
               >
                 <div className="flex items-center gap-2 text-emerald-800 font-bold">
                   <CheckCircle2 className="w-4 h-4" />
