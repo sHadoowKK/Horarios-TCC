@@ -1788,3 +1788,44 @@ textarea {
     border-color: #aaaaaa !important;
   }
 }
+
+
+/* High-contrast mappings for utility colors that don't have their own semantic classes. */
+.app-main .text-slate-500 {
+  color: var(--an-muted) !important;
+}
+
+.app-main [class~="text-emerald-800/80"] {
+  color: var(--an-green) !important;
+  opacity: .88;
+}
+
+.app-main .text-red-400 {
+  color: var(--an-red) !important;
+}
+
+.app-main .text-emerald-500,
+.app-main .text-green-500 {
+  color: var(--an-green) !important;
+}
+
+.app-main .text-yellow-500,
+.app-main .text-amber-400 {
+  color: var(--an-amber) !important;
+}
+
+.app-main .text-blue-500 {
+  color: var(--an-blue) !important;
+}
+
+.app-main .text-purple-500 {
+  color: var(--an-accent-text) !important;
+}
+
+.app-sidebar .text-gray-500 {
+  color: var(--an-muted) !important;
+}
+
+.app-sidebar .text-amber-400 {
+  color: var(--an-amber) !important;
+}
