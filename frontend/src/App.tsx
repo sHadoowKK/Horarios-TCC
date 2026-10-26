@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from './api';
@@ -83,9 +83,7 @@ function getInitialTheme(): Theme {
     return savedTheme;
   }
 
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return "dark";
 }
 
 function App() {
@@ -348,8 +346,8 @@ function App() {
     }
 
     return (
-      <div className="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
-        <table className="w-full text-sm text-center">
+      <div className="app-schedule-frame overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
+        <table className="app-schedule-table w-full text-sm text-center">
           <thead className="bg-gray-100 text-gray-600 font-bold border-b">
             <tr>
               <th className="p-3 border-r w-28">Horário</th>
@@ -531,51 +529,63 @@ function App() {
 
   return (
     <Router>
-      <div className="flex h-screen bg-gray-50 text-gray-900 w-full text-left">
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
-          <div className="p-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
+      <div className="app-shell flex h-screen bg-gray-50 text-gray-900 w-full text-left">
+        <aside className="app-sidebar w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
+          <div className="app-brand p-6 border-b border-gray-200">
+            <h1 className="app-brand-title text-xl font-bold text-indigo-600 flex items-center gap-2">
               <img
                 src="/anatinus.svg"
                 alt=""
                 className="w-8 h-8"
               />
-              Anatinus
+              <span className="app-brand-name">Anatinus</span>
             </h1>
           </div>
 
-          <nav className="flex-1 p-4 space-y-2 flex flex-col">
-            <Link to="/" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+          <nav className="app-nav flex-1 p-4 space-y-2 flex flex-col">
+            <NavLink
+              to="/"
+              title="Grade Horária"
+              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+            >
               <Calendar className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">Grade Horária</span>
-            </Link>
+              <span className="app-nav-label font-medium">Grade Horária</span>
+            </NavLink>
 
-            <Link to="/professores" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+            <NavLink
+              to="/professores"
+              title="Professores"
+              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+            >
               <Users className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">Professores</span>
-            </Link>
+              <span className="app-nav-label font-medium">Professores</span>
+            </NavLink>
 
-            <Link to="/turmas" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+            <NavLink
+              to="/turmas"
+              title="Turmas e Matérias"
+              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+            >
               <BookOpen className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">Turmas e Matérias</span>
-            </Link>
+              <span className="app-nav-label font-medium">Turmas e Matérias</span>
+            </NavLink>
 
             <div className="flex-1" />
 
             <button
               type="button"
               onClick={toggleTheme}
-              className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors"
+              className="app-theme-toggle w-full flex items-center justify-between p-3 rounded-lg transition-colors"
               title={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
               aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
             >
-              <span className="flex items-center space-x-3">
+              <span className="app-theme-label-group flex items-center space-x-3">
                 {theme === "dark" ? (
                   <Sun className="w-5 h-5 text-amber-400" />
                 ) : (
                   <Moon className="w-5 h-5 text-gray-500" />
                 )}
-                <span className="font-medium">
+                <span className="app-nav-label font-medium">
                   {theme === "dark" ? "Tema claro" : "Tema escuro"}
                 </span>
               </span>
@@ -590,20 +600,24 @@ function App() {
               </span>
             </button>
 
-            <Link to="/config" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+            <NavLink
+              to="/config"
+              title="Regras e Leis"
+              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+            >
               <Settings className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">Regras e Leis</span>
-            </Link>
+              <span className="app-nav-label font-medium">Regras e Leis</span>
+            </NavLink>
           </nav>
         </aside>
 
-        <main className="flex-1 overflow-auto">
+        <main className="app-main flex-1 overflow-auto">
           <Routes>
             <Route
               path="/"
               element={
-                <div className="p-8 max-w-7xl mx-auto">
-                  <header className="flex justify-between items-center mb-8">
+                <div className="app-page p-8 max-w-7xl mx-auto">
+                  <header className="app-page-header flex justify-between items-center mb-8">
                     <div>
                       <h2 className="text-3xl font-bold text-gray-800">Grade Horária</h2>
                       <p className="text-gray-500 mt-1">
@@ -707,7 +721,7 @@ function App() {
                     </div>
                   )}
 
-                  <div className="mb-6 bg-white p-4 rounded-xl border border-gray-200 flex gap-4 items-center shadow-sm">
+                  <div className="app-filter-bar mb-6 bg-white p-4 rounded-xl border border-gray-200 flex gap-4 items-center shadow-sm">
                     <div className="flex items-center gap-2 text-gray-700 font-semibold">
                       <Filter className="w-5 h-5" />
                       Filtro de Visão:
