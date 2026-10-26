@@ -358,7 +358,7 @@
 }
 
 .dark-theme .app-main .text-gray-700 {
-  color: #dddd d7 !important;
+  color: #ddddd7 !important;
 }
 
 .dark-theme .app-main .text-gray-600 {
@@ -378,7 +378,7 @@
 .dark-theme .app-main textarea {
   background: #2a2a28 !important;
   border-color: #454540 !important;
-  color: #eded e7 !important;
+  color: #edede7 !important;
 }
 
 .dark-theme .app-main input::placeholder,
@@ -388,11 +388,11 @@
 
 .dark-theme .app-main select option {
   background: #232322;
-  color: #eded e7;
+  color: #edede7;
 }
 
-.dark-theme .app-main .hover\\:bg-gray-50:hover,
-.dark-theme .app-main .hover\\:bg-gray-100:hover {
+.dark-theme .app-main .hover\:bg-gray-50:hover,
+.dark-theme .app-main .hover\:bg-gray-100:hover {
   background-color: #30302e !important;
 }
 
@@ -507,14 +507,6 @@
 .dark-theme .app-main .text-yellow-700,
 .dark-theme .app-main .text-amber-800 {
   color: #f0dda9 !important;
-}
-
-.dark-theme .app-main .bg-indigo-600 {
-  background-color: #eeeeea !important;
-}
-
-.dark-theme .app-main .text-white {
-  color: #1c1c1b !important;
 }
 
 .dark-theme .app-main .border-dashed.border-gray-200 {
