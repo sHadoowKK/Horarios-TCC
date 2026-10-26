@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
-import { Calendar, Users, BookOpen, Settings, Moon, Sun, Download, Printer } from 'lucide-react';
+import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import Turmas from './pages/Turmas';
