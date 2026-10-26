@@ -324,9 +324,8 @@ function App() {
       return (
         <div className="app-empty-state">
           <div className="app-empty-icon"><Calendar className="w-6 h-6" /></div>
-          <span className="app-section-kicker">AINDA NÃO HÁ UMA GRADE</span>
-          <h3>Transforme os cadastros em horários.</h3>
-          <p>Gere uma nova grade para distribuir as aulas de acordo com as regras e disponibilidades cadastradas.</p>
+          <h3>Nenhuma grade gerada</h3>
+          <p>Use “Gerar grade” para criar os horários.</p>
         </div>
       );
     }
@@ -335,8 +334,7 @@ function App() {
       return (
         <div className="app-empty-state app-empty-state-compact">
           <div className="app-empty-icon"><Filter className="w-5 h-5" /></div>
-          <h3>Escolha uma visualização</h3>
-          <p>Selecione uma turma ou professor nos filtros acima para abrir a grade semanal.</p>
+          <h3>Selecione uma turma ou professor</h3>
         </div>
       );
     }
@@ -717,7 +715,8 @@ function App() {
                         <span className="app-pending-marker" aria-hidden="true" />
                         <strong>{unstaffedLessons}</strong>
                         <span>{unstaffedLessons === 1 ? "aula sem professor" : "aulas sem professor"}</span>
-                        <span className="app-pending-toggle">Ver detalhes</span>
+                        <span className="app-pending-toggle app-pending-toggle-closed">Ver detalhes</span>
+                        <span className="app-pending-toggle app-pending-toggle-open">Ocultar detalhes</span>
                       </summary>
                       <div className="app-pending-body">
                         <p>Esses horários permanecem reservados até a escola atribuir um docente.</p>

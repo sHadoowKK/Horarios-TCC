@@ -737,8 +737,16 @@ textarea {
   font-size: 10px;
 }
 
-.app-pending-details[open] .app-pending-toggle {
-  opacity: .7;
+.app-pending-toggle-open {
+  display: none;
+}
+
+.app-pending-details[open] .app-pending-toggle-closed {
+  display: none;
+}
+
+.app-pending-details[open] .app-pending-toggle-open {
+  display: inline;
 }
 
 .app-pending-body {
@@ -1066,8 +1074,9 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 9px !important;
-  max-height: calc(100vh - 160px);
-  padding-right: 3px;
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0;
 }
 
 .app-view-teachers .app-panel-list > ul > li {
@@ -1169,8 +1178,9 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 7px !important;
-  max-height: 410px;
-  padding-right: 3px;
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0;
 }
 
 .app-view-classes .app-panel-courses li,
@@ -1247,8 +1257,9 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: 8px !important;
-  max-height: 480px;
-  padding: 0 3px 0 0;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0;
 }
 
 .app-view-classes .app-panel-subjects > ul > li {
@@ -1299,9 +1310,9 @@ textarea {
 .app-settings-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin: 0 0 13px;
-  padding: 0 0 13px;
-  border-bottom: 1px solid var(--an-border);
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
 }
 
 .app-save-feedback {
@@ -1511,7 +1522,8 @@ textarea {
 
   .app-view-classes .app-panel-subjects > ul {
     grid-template-columns: minmax(0, 1fr);
-    max-height: none;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   .app-view-settings {
