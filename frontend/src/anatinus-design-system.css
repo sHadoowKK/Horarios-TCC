@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* Anatinus — sistema visual unificado.
    A folha substitui as duas camadas experimentais anteriores.
    O estado do tema é controlado pela classe html.dark-theme, definida pelo React. */
@@ -1184,10 +1186,6 @@ textarea {
   font-size: 10px !important;
 }
 
-.app-view-classes .app-panel-courses li .rounded-full {
-  display: none;
-}
-
 .app-view-classes .app-panel-classrooms form label {
   padding: 8px 10px !important;
   background: var(--an-surface) !important;
@@ -1704,6 +1702,11 @@ textarea {
   .app-view-settings .app-settings-section > .grid {
     grid-template-columns: minmax(0, 1fr) !important;
   }
+}
+
+@page {
+  size: landscape;
+  margin: 1cm;
 }
 
 @media print {
