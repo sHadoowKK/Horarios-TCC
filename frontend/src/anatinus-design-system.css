@@ -17,7 +17,7 @@
   --an-field: #ffffff;
   --an-text: #252936;
   --an-text-secondary: #515769;
-  --an-muted: #7d8395;
+  --an-muted: #656c7c;
   --an-border: #dfe2eb;
   --an-border-strong: #c8cdd9;
   --an-accent: #7058df;
@@ -49,8 +49,8 @@ html.dark-theme {
   --an-muted: #a0a2b5;
   --an-border: #3b3d4b;
   --an-border-strong: #4a4d5e;
-  --an-accent: #8271ea;
-  --an-accent-hover: #9384f3;
+  --an-accent: #6b59c8;
+  --an-accent-hover: #5e4bb7;
   --an-accent-soft: #34304d;
   --an-accent-text: #d1c8ff;
   --an-green: #8dd5b5;
@@ -383,8 +383,13 @@ textarea {
 }
 
 .app-main .text-gray-500,
-.app-main .text-gray-400 {
+.app-main .text-gray-400,
+.app-main .text-slate-500 {
   color: var(--an-muted) !important;
+}
+
+.app-main .border-slate-200 {
+  border-color: var(--an-border) !important;
 }
 
 .app-main .rounded-xl {
@@ -520,6 +525,24 @@ textarea {
   background-color: var(--an-surface-2) !important;
 }
 
+.app-main .hover\:bg-indigo-100:hover,
+.app-main .hover\:bg-purple-100:hover {
+  background-color: var(--an-accent-soft) !important;
+}
+
+.app-main .hover\:bg-green-100:hover,
+.app-main .hover\:bg-emerald-100:hover {
+  background-color: var(--an-green-soft) !important;
+}
+
+.app-main .hover\:bg-red-100:hover {
+  background-color: var(--an-red-soft) !important;
+}
+
+.app-main .hover\:bg-blue-100:hover {
+  background-color: var(--an-blue-soft) !important;
+}
+
 /* Semantic accents: subdued and consistent in both themes. */
 .app-main .bg-indigo-50,
 .app-main .bg-indigo-100 {
@@ -612,8 +635,21 @@ textarea {
 }
 
 .app-main .text-purple-700,
-.app-main .text-purple-600 {
+.app-main .text-purple-600,
+.app-main .text-purple-500 {
   color: var(--an-accent-text) !important;
+}
+
+.app-main .text-green-500,
+.app-main .text-green-600,
+.app-main .text-red-400 {
+  color: var(--an-text-secondary) !important;
+}
+
+.app-view-classes .app-panel > h3 svg.text-blue-500,
+.app-view-classes .app-panel > h3 svg.text-emerald-500,
+.app-view-classes .app-panel > h3 svg.text-purple-500 {
+  color: var(--an-accent) !important;
 }
 
 /* Main schedule view */
