@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+import os
 import time
 
 from ortools.sat.python import cp_model
@@ -1266,6 +1267,12 @@ def generate_schedule(
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 30.0
+    # Paraleliza a busca e limita o uso a 8 workers para evitar
+    # sobrecarga excessiva em máquinas com muitos núcleos.
+    solver.parameters.num_search_workers = max(
+        1,
+        min(8, os.cpu_count() or 1),
+    )
 
     started = time.perf_counter()
     status = solver.Solve(model)
