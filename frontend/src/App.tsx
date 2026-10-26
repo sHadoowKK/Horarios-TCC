@@ -322,16 +322,21 @@ function App() {
   const renderScheduleGrid = () => {
     if (!schedule) {
       return (
-        <div className="flex h-full items-center justify-center text-gray-500 mt-32">
-          Nenhuma grade gerada. Clique em "Gerar Nova Grade".
+        <div className="app-empty-state">
+          <div className="app-empty-icon"><Calendar className="w-6 h-6" /></div>
+          <span className="app-section-kicker">AINDA NÃO HÁ UMA GRADE</span>
+          <h3>Transforme os cadastros em horários.</h3>
+          <p>Gere uma nova grade para distribuir as aulas de acordo com as regras e disponibilidades cadastradas.</p>
         </div>
       );
     }
 
     if (!selectedId) {
       return (
-        <div className="flex h-full items-center justify-center text-gray-500 mt-32">
-          Selecione uma turma ou professor para visualizar.
+        <div className="app-empty-state app-empty-state-compact">
+          <div className="app-empty-icon"><Filter className="w-5 h-5" /></div>
+          <h3>Escolha uma visualização</h3>
+          <p>Selecione uma turma ou professor nos filtros acima para abrir a grade semanal.</p>
         </div>
       );
     }
@@ -543,6 +548,7 @@ function App() {
           </div>
 
           <nav className="app-nav flex-1 p-4 space-y-2 flex flex-col">
+            <div className="app-nav-section-label">Áreas de trabalho</div>
             <NavLink
               to="/"
               title="Grade Horária"
@@ -571,6 +577,7 @@ function App() {
             </NavLink>
 
             <div className="flex-1" />
+            <div className="app-nav-section-label app-nav-system-label">Sistema</div>
 
             <button
               type="button"
@@ -618,10 +625,11 @@ function App() {
               element={
                 <div className="app-page p-8 max-w-7xl mx-auto">
                   <header className="app-page-header flex justify-between items-center mb-8">
-                    <div>
-                      <h2 className="text-3xl font-bold text-gray-800">Grade Horária</h2>
+                    <div className="app-heading-copy">
+                      <div className="app-section-kicker">PLANEJAMENTO ACADÊMICO <span>/</span> VISUALIZAÇÃO</div>
+                      <h2 className="text-3xl font-bold text-gray-800">Grade horária</h2>
                       <p className="text-gray-500 mt-1">
-                        Visualize os horários gerados por turma ou professor.
+                        Organize e confira a distribuição semanal das aulas.
                       </p>
                     </div>
 
@@ -663,6 +671,29 @@ function App() {
                       </button>
                     </div>
                   </header>
+
+                  <section className="app-overview-strip" aria-label="Resumo dos cadastros e da grade">
+                    <div className="app-overview-item">
+                      <span className="app-overview-label">Turmas cadastradas</span>
+                      <strong>{String(classrooms.length).padStart(2, "0")}</strong>
+                      <span className="app-overview-note">Grupos e turnos incluídos</span>
+                    </div>
+                    <div className="app-overview-item">
+                      <span className="app-overview-label">Professores</span>
+                      <strong>{String(teachers.length).padStart(2, "0")}</strong>
+                      <span className="app-overview-note">Disponíveis no cadastro</span>
+                    </div>
+                    <div className="app-overview-item">
+                      <span className="app-overview-label">Aulas na grade</span>
+                      <strong>{schedule ? String(schedule.length).padStart(2, "0") : "—"}</strong>
+                      <span className="app-overview-note">{schedule ? "Distribuição atual" : "Aguardando geração"}</span>
+                    </div>
+                    <div className="app-overview-item app-overview-warning">
+                      <span className="app-overview-label">Sem professor</span>
+                      <strong>{schedule ? String(unstaffedLessons).padStart(2, "0") : "—"}</strong>
+                      <span className="app-overview-note">{schedule ? (unstaffedLessons ? "Exige revisão" : "Nenhuma pendência") : "Após gerar a grade"}</span>
+                    </div>
+                  </section>
 
                   {error && (
                     <div className="mb-6 p-4 bg-red-100 border border-red-200 text-red-700 rounded-lg font-medium">
@@ -721,11 +752,19 @@ function App() {
                     </div>
                   )}
 
-                  <div className="app-filter-bar mb-6 bg-white p-4 rounded-xl border border-gray-200 flex gap-4 items-center shadow-sm">
-                    <div className="flex items-center gap-2 text-gray-700 font-semibold">
-                      <Filter className="w-5 h-5" />
-                      Filtro de Visão:
+                  <section className="app-controls-section" aria-label="Controles de visualização">
+                    <div className="app-controls-heading">
+                      <div>
+                        <span className="app-section-kicker">EXPLORAR GRADE</span>
+                        <h3>Escolha o recorte</h3>
+                      </div>
+                      <span className="app-controls-hint">Semana letiva · Segunda a sexta</span>
                     </div>
+                    <div className="app-filter-bar mb-6 bg-white p-4 rounded-xl border border-gray-200 flex gap-4 items-center shadow-sm">
+                      <div className="app-filter-mode-label flex items-center gap-2 text-gray-700 font-semibold">
+                        <Filter className="w-5 h-5" />
+                        Exibir por
+                      </div>
 
                     <select
                       className="border border-gray-300 rounded-lg p-2 font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -758,9 +797,23 @@ function App() {
                         </option>
                       ))}
                     </select>
-                  </div>
+                    </div>
+                  </section>
 
-                  {renderScheduleGrid()}
+                  <section className="app-schedule-workspace" aria-label="Grade semanal">
+                    <header className="app-schedule-workspace-header">
+                      <div>
+                        <span className="app-section-kicker">VISUALIZAÇÃO ATIVA</span>
+                        <h3>{selectedId ? (viewMode === "turma" ? getClassroomName(selectedId) : getProfName(selectedId)) : "Prévia da grade"}</h3>
+                        <p>{!schedule ? "Gere uma grade para ver a distribuição das aulas." : !selectedId ? "Selecione uma turma ou professor para consultar os horários." : viewMode === "turma" ? "Horários, matérias e docentes desta turma." : "Distribuição semanal das aulas deste professor."}</p>
+                      </div>
+                      <div className="app-schedule-legend">
+                        <span><i className="app-legend-dot app-legend-violet" />Turmas</span>
+                        <span><i className="app-legend-dot app-legend-green" />Professores</span>
+                      </div>
+                    </header>
+                    {renderScheduleGrid()}
+                  </section>
                 </div>
               }
             />
