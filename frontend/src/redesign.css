@@ -762,3 +762,309 @@
     min-width: 0 !important;
   }
 }
+
+
+/* Refinamento de paleta inspirado nas novas referências:
+   grafite azulado + violeta funcional; vermelho fica reservado a alertas. */
+.dark-theme body,
+.dark-theme .app-shell {
+  background: #202127 !important;
+  color: #e9e8f1 !important;
+}
+
+.dark-theme .app-sidebar {
+  background: #252630 !important;
+  border-color: #363744 !important;
+}
+
+.dark-theme .app-brand {
+  border-color: #363744 !important;
+}
+
+.dark-theme .app-brand-title {
+  color: #f4f2fb !important;
+}
+
+.dark-theme .app-nav-link {
+  color: #a7a7b8 !important;
+}
+
+.dark-theme .app-nav-link:hover {
+  background: #343542 !important;
+  color: #f4f2fb !important;
+}
+
+.dark-theme .app-nav-link-active,
+.dark-theme .app-nav-link-active:hover {
+  background: #7968df !important;
+  color: #ffffff !important;
+  box-shadow: inset 3px 0 #bcb0ff;
+}
+
+.dark-theme .app-nav-link-active svg,
+.dark-theme .app-nav-link-active .text-gray-500 {
+  color: #ffffff !important;
+}
+
+.dark-theme .app-theme-toggle {
+  color: #a7a7b8 !important;
+}
+
+.dark-theme .app-theme-toggle:hover {
+  background: #343542 !important;
+  color: #f4f2fb !important;
+}
+
+.dark-theme .app-main {
+  background: #202127 !important;
+  color: #e9e8f1 !important;
+}
+
+.dark-theme .app-main h2 {
+  color: #f4f2fb !important;
+}
+
+.dark-theme .app-main .bg-white {
+  background-color: #292b35 !important;
+}
+
+.dark-theme .app-main .bg-gray-50 {
+  background-color: #22242d !important;
+}
+
+.dark-theme .app-main .bg-gray-100,
+.dark-theme .app-main .bg-slate-100 {
+  background-color: #2d303a !important;
+}
+
+.dark-theme .app-main .bg-gray-200 {
+  background-color: #363845 !important;
+}
+
+.dark-theme .app-main .border-gray-100 {
+  border-color: #333541 !important;
+}
+
+.dark-theme .app-main .border-gray-200 {
+  border-color: #3b3d4a !important;
+}
+
+.dark-theme .app-main .border-gray-300 {
+  border-color: #4a4c5b !important;
+}
+
+.dark-theme .app-main .text-gray-900,
+.dark-theme .app-main .text-gray-800 {
+  color: #f4f2fb !important;
+}
+
+.dark-theme .app-main .text-gray-700 {
+  color: #dcdbe8 !important;
+}
+
+.dark-theme .app-main .text-gray-600 {
+  color: #c0bfd0 !important;
+}
+
+.dark-theme .app-main .text-gray-500 {
+  color: #a0a0b3 !important;
+}
+
+.dark-theme .app-main .text-gray-400 {
+  color: #85869a !important;
+}
+
+.dark-theme .app-main input,
+.dark-theme .app-main select,
+.dark-theme .app-main textarea {
+  background: #2d303a !important;
+  border-color: #484a59 !important;
+  color: #f4f2fb !important;
+}
+
+.dark-theme .app-main input::placeholder,
+.dark-theme .app-main textarea::placeholder {
+  color: #9697aa !important;
+}
+
+.dark-theme .app-main select option {
+  background: #292b35;
+  color: #f4f2fb;
+}
+
+.dark-theme .app-main .hover\\:bg-gray-50:hover,
+.dark-theme .app-main .hover\\:bg-gray-100:hover {
+  background-color: #343542 !important;
+}
+
+.dark-theme .app-main .bg-indigo-50 {
+  background-color: #322e4b !important;
+}
+
+.dark-theme .app-main .bg-indigo-100 {
+  background-color: #403861 !important;
+}
+
+.dark-theme .app-main .border-indigo-100,
+.dark-theme .app-main .border-indigo-200 {
+  border-color: #514873 !important;
+}
+
+.dark-theme .app-main .text-indigo-900,
+.dark-theme .app-main .text-indigo-800 {
+  color: #eee8ff !important;
+}
+
+.dark-theme .app-main .text-indigo-700,
+.dark-theme .app-main .text-indigo-600,
+.dark-theme .app-main .text-indigo-500,
+.dark-theme .app-main .text-indigo-400 {
+  color: #c7baff !important;
+}
+
+.dark-theme .app-main button.bg-indigo-600 {
+  background: #7968df !important;
+  border: 1px solid #7968df !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgb(121 104 223 / 0.18) !important;
+}
+
+.dark-theme .app-main button.bg-indigo-600:hover {
+  background: #8979eb !important;
+  border-color: #8979eb !important;
+  color: #ffffff !important;
+}
+
+.dark-theme .app-main .bg-emerald-50,
+.dark-theme .app-main .bg-green-50 {
+  background-color: #233a34 !important;
+}
+
+.dark-theme .app-main .bg-emerald-100,
+.dark-theme .app-main .bg-green-100 {
+  background-color: #2d483a !important;
+}
+
+.dark-theme .app-main .border-emerald-100,
+.dark-theme .app-main .border-emerald-200,
+.dark-theme .app-main .border-green-200 {
+  border-color: #456853 !important;
+}
+
+.dark-theme .app-main .text-emerald-900,
+.dark-theme .app-main .text-emerald-800,
+.dark-theme .app-main .text-emerald-700,
+.dark-theme .app-main .text-green-700 {
+  color: #d1ead8 !important;
+}
+
+.dark-theme .app-main .bg-blue-50,
+.dark-theme .app-main .bg-blue-100 {
+  background-color: #283a43 !important;
+}
+
+.dark-theme .app-main .text-blue-700,
+.dark-theme .app-main .text-blue-600 {
+  color: #d0e8f4 !important;
+}
+
+.dark-theme .app-main .border-blue-200 {
+  border-color: #456777 !important;
+}
+
+.dark-theme .app-main .bg-purple-50,
+.dark-theme .app-main .bg-purple-100 {
+  background-color: #352e49 !important;
+}
+
+.dark-theme .app-main .text-purple-700,
+.dark-theme .app-main .text-purple-600 {
+  color: #e7d9ff !important;
+}
+
+.dark-theme .app-main .bg-red-50,
+.dark-theme .app-main .bg-red-100 {
+  background-color: #41282f !important;
+}
+
+.dark-theme .app-main .border-red-200 {
+  border-color: #78404c !important;
+}
+
+.dark-theme .app-main .text-red-700,
+.dark-theme .app-main .text-red-600 {
+  color: #ffc9d3 !important;
+}
+
+.dark-theme .app-main .bg-yellow-100,
+.dark-theme .app-main .bg-amber-50 {
+  background-color: #42351f !important;
+}
+
+.dark-theme .app-main .border-amber-200 {
+  border-color: #766032 !important;
+}
+
+.dark-theme .app-main .text-yellow-700,
+.dark-theme .app-main .text-amber-800 {
+  color: #ffe3a3 !important;
+}
+
+.dark-theme .app-main .border-dashed.border-gray-200 {
+  border-color: #41434f !important;
+  background-color: #22242d !important;
+}
+
+.dark-theme .app-schedule-frame {
+  border-color: #3b3d4a !important;
+}
+
+.dark-theme .app-schedule-table thead th {
+  background: #2d303a !important;
+  color: #b6b5c7 !important;
+  border-color: #3b3d4a !important;
+}
+
+.dark-theme .app-schedule-table tbody td {
+  border-color: #3b3d4a !important;
+}
+
+.dark-theme .app-schedule-table tbody td:first-child {
+  background: #272934 !important;
+  color: #dcdbe8 !important;
+}
+
+.dark-theme .app-schedule-table .bg-indigo-50 {
+  background: #322e4b !important;
+}
+
+.dark-theme .app-schedule-table .bg-emerald-50 {
+  background: #233a34 !important;
+}
+
+.dark-theme .app-schedule-table .border-indigo-100 {
+  border-color: #514873 !important;
+}
+
+.dark-theme .app-schedule-table .border-emerald-100 {
+  border-color: #456853 !important;
+}
+
+.dark-theme .app-schedule-table .border-dashed {
+  background: #22242d !important;
+  border-color: #41434f !important;
+}
+
+.dark-theme .app-main .secondary-action-button {
+  background: #30323d !important;
+  color: #e9e8f1 !important;
+  border-color: #484a59 !important;
+}
+
+.dark-theme .app-main .secondary-action-button:hover {
+  background: #393b48 !important;
+}
+
+.dark-theme * {
+  scrollbar-color: #505262 #252630;
+}
