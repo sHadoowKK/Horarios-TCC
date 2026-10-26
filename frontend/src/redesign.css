@@ -892,8 +892,8 @@
   color: #f4f2fb;
 }
 
-.dark-theme .app-main .hover\\:bg-gray-50:hover,
-.dark-theme .app-main .hover\\:bg-gray-100:hover {
+.dark-theme .app-main .hover\:bg-gray-50:hover,
+.dark-theme .app-main .hover\:bg-gray-100:hover {
   background-color: #343542 !important;
 }
 
