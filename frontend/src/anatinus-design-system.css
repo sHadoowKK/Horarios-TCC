@@ -641,9 +641,12 @@ textarea {
 }
 
 .app-main .text-green-500,
-.app-main .text-green-600,
+.app-main .text-green-600 {
+  color: var(--an-green) !important;
+}
+
 .app-main .text-red-400 {
-  color: var(--an-text-secondary) !important;
+  color: var(--an-red) !important;
 }
 
 .app-view-classes .app-panel > h3 svg.text-blue-500,
