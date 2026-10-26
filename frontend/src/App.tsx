@@ -688,7 +688,7 @@ function App() {
                       <strong>{schedule ? String(schedule.length).padStart(2, "0") : "—"}</strong>
                       <span className="app-overview-note">{schedule ? "Distribuição atual" : "Aguardando geração"}</span>
                     </div>
-                    <div className="app-overview-item app-overview-warning">
+                    <div className={`app-overview-item ${schedule && unstaffedLessons > 0 ? "app-overview-warning" : ""}`}>
                       <span className="app-overview-label">Sem professor</span>
                       <strong>{schedule ? String(unstaffedLessons).padStart(2, "0") : "—"}</strong>
                       <span className="app-overview-note">{schedule ? (unstaffedLessons ? "Exige revisão" : "Nenhuma pendência") : "Após gerar a grade"}</span>
