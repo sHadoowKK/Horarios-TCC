@@ -103,6 +103,7 @@ export default function Config() {
 
   return (
     <div className="app-view app-view-settings p-8 max-w-5xl mx-auto pb-24">
+      <h2 className="sr-only">Regras e preferências</h2>
       <div className="app-settings-toolbar">
         <button
           onClick={handleSave}

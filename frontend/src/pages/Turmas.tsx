@@ -612,6 +612,7 @@ export default function Turmas() {
 
   return (
     <div className="app-view app-view-classes p-8 max-w-7xl mx-auto">
+      <h2 className="sr-only">Cursos, turmas e disciplinas</h2>
       <div className="app-academic-grid grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* CURSOS */}
         <div className="app-panel app-panel-courses bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">

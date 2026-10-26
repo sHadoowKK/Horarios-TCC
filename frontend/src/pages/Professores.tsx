@@ -480,6 +480,7 @@ export default function Professores() {
 
   return (
     <div className="app-view app-view-teachers p-8 max-w-7xl mx-auto">
+      <h2 className="sr-only">Professores</h2>
       <div className="app-people-layout grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* FORMULÁRIO */}
         <div className="app-panel app-panel-form bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">

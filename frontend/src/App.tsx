@@ -620,6 +620,7 @@ function App() {
               path="/"
               element={
                 <div className="app-page p-8 max-w-7xl mx-auto">
+                  <h2 className="sr-only">Grade horária</h2>
                   <div className="app-toolbar no-print">
                     <div className="app-view-controls">
                       <select
