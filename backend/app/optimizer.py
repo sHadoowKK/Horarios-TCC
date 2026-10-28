@@ -812,6 +812,40 @@ def generate_schedule(
             )
             penalties.append(day_penalty)
 
+    # Preferência Soft: agrupar aulas da mesma disciplina em pares consecutivos.
+    # Só conta quando o período seguinte começa exatamente quando o anterior termina;
+    # intervalos e almoço nunca são considerados parte de um bloco duplo.
+    contiguous_period_pairs = [
+        (period, period + 1)
+        for period in range(min(num_periods - 1, len(PERIOD_START_MINUTES) - 1))
+        if PERIOD_END_MINUTES[period] == PERIOD_START_MINUTES[period + 1]
+    ]
+
+    for classroom, subject, target in units:
+        allowed_periods = set(
+            JOURNEY_PERIODS.get(
+                classroom.get("shift", "Manhã"),
+                JOURNEY_PERIODS["Manhã"],
+            )
+        )
+        for day in range(num_days):
+            for first_period, second_period in contiguous_period_pairs:
+                if first_period not in allowed_periods or second_period not in allowed_periods:
+                    continue
+                first_slot = sum(vars_for_unit_at(
+                    classroom, subject, target, day, first_period
+                ))
+                second_slot = sum(vars_for_unit_at(
+                    classroom, subject, target, day, second_period
+                ))
+                paired = model.NewBoolVar(
+                    f"double_lesson_c{classroom['id']}_s{subject['id']}_"
+                    f"g{target}_d{day}_p{first_period}"
+                )
+                model.Add(paired <= first_slot)
+                model.Add(paired <= second_slot)
+                model.Add(paired >= first_slot + second_slot - 1)
+                rewards.append(paired * 300)
     # Regra opcional legada de mesmo professor seguido.
     # Por padrão fica ignorada porque horários reais podem ter blocos longos.
     max_same_teacher = int(
