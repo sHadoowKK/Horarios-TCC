@@ -578,15 +578,15 @@ function App() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="app-theme-toggle w-full flex items-center justify-between p-3 rounded-lg transition-colors"
+              className="app-theme-toggle w-full flex items-center justify-start p-3 rounded-lg transition-colors"
               title={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
               aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
             >
               <span className="app-theme-label-group flex items-center space-x-3">
                 {theme === "dark" ? (
-                  <Sun className="w-5 h-5 text-amber-400" />
+                  <Sun className="w-5 h-5" />
                 ) : (
-                  <Moon className="w-5 h-5 text-gray-500" />
+                  <Moon className="w-5 h-5" />
                 )}
                 <span className="app-nav-label font-medium">
                   {theme === "dark" ? "Tema claro" : "Tema escuro"}
