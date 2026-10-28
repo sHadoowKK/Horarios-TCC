@@ -63,25 +63,26 @@ def main(only_informatica=False):
 
         db.flush()
 
-        # As cargas do 3º INFO são provisórias: somam 50 aulas semanais por grupo.
-        # No Integral, são 5 aulas antes e 5 depois do almoço, sem aula de 11:40 a 13:00.
+        # Cargas transcritas do quadro original do 3º INFO Integral.
+        # São 37 aulas por aluno/semana no recorte da grade de referência.
+        # Almoço: 11:40–13:00. Nenhuma aula do Integral é alocada nesse intervalo.
         info_subjects = [
-            ("UDA", 3, "Alta", "Técnica", True, "Erika"),
+            ("UDA", 2, "Alta", "Técnica", True, "Erika"),
             ("SW2", 3, "Media", "Técnica", True, "Marcel"),
-            ("CNW2", 3, "Media", "Técnica", True, "Célia"),
-            ("Filosofia", 2, "Baixa", "Ensino Médio", False, "M. Emília"),
-            ("Sociologia", 2, "Baixa", "Ensino Médio", False, "Célia"),
-            ("Espanhol", 2, "Baixa", "Ensino Médio", False, "Fabiane"),
+            ("CNW2", 2, "Media", "Técnica", True, "Erika"),
+            ("Filosofia", 1, "Baixa", "Ensino Médio", False, "M. Emília"),
+            ("Sociologia", 1, "Baixa", "Ensino Médio", False, "M. Emília"),
+            ("Espanhol", 2, "Baixa", "Ensino Médio", False, "Célia"),
             ("História", 2, "Baixa", "Ensino Médio", False, "M. Emília"),
-            ("DDM2", 3, "Alta", "Técnica", True, "Marcel"),
-            ("IRS", 3, "Media", "Técnica", True, "Joesley"),
-            ("Matemática", 4, "Alta", "Ensino Médio", False, "Kamila"),
-            ("Inglês", 3, "Baixa", "Ensino Médio", False, "Gustavo"),
-            ("EAMT", 3, "Media", "Técnica", True, "Fabiane"),
-            ("Português", 4, "Baixa", "Ensino Médio", False, "Marta"),
-            ("EACNT", 3, "Media", "Técnica", True, "Gustavo"),
-            ("PDTCC", 4, "Media", "Técnica", True, "Marcel"),
-            ("GCW", 4, "Media", "Técnica", True, "Higor"),
+            ("DDM2", 2, "Alta", "Técnica", True, "Marcel"),
+            ("IRS", 2, "Media", "Técnica", True, "Joesley"),
+            ("Matemática", 3, "Alta", "Ensino Médio", False, "Kamila"),
+            ("Inglês", 2, "Baixa", "Ensino Médio", False, "Marta"),
+            ("EAMT", 3, "Media", "Técnica", True, "Gustavo"),
+            ("Português", 3, "Baixa", "Ensino Médio", False, "Marta"),
+            ("EACNT", 3, "Media", "Técnica", True, "Fabiane"),
+            ("PDTCC", 2, "Media", "Técnica", True, "Marcel"),
+            ("GCW", 2, "Media", "Técnica", True, "Higor"),
             ("Geografia", 2, "Baixa", "Ensino Médio", False, "Thiago"),
         ]
 
@@ -116,6 +117,14 @@ def main(only_informatica=False):
                 "split": split,
             })
             info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
+
+        # SW2 e CNW2 aparecem com professores diferentes entre os grupos A/B.
+        info_teacher_assignments.setdefault("Higor", []).append(
+            subject_by_name["SW2"].id
+        )
+        info_teacher_assignments.setdefault("Marcel", []).append(
+            subject_by_name["CNW2"].id
+        )
 
         night_settings = []
         if not only_informatica:
@@ -180,6 +189,10 @@ def main(only_informatica=False):
                 course_id=info_course.id,
                 has_groups=True,
                 subject_settings=info_settings,
+                preferred_subject_sequences=[[
+                    subject_by_name["Filosofia"].id,
+                    subject_by_name["Sociologia"].id,
+                ]],
                 split_subject_ids=[],
             ),
         ]
@@ -265,7 +278,7 @@ def main(only_informatica=False):
         info_total = sum(item[1] for item in info_subjects)
         night_total = sum(item[1] for item in ti_subjects)
         agro_total_per_group = sum(item[1] for item in agro_subject_specs) if not only_informatica else 0
-        if info_total != 50:
+        if info_total != 37:
             raise RuntimeError(f"Carga semanal inesperada no 3º INFO: {info_total}")
         if not only_informatica and (night_total != 25 or agro_total_per_group != 4):
             raise RuntimeError(
@@ -279,9 +292,11 @@ def main(only_informatica=False):
         print(f"Disciplinas: {db.query(models.Subject).count()}")
         print(f"Professores: {db.query(models.Teacher).count()}")
         print("Turma de referência: 3º INFO Integral, com A/B.")
+        print("Cargas do quadro do 3º INFO: 37 aulas semanais por aluno.")
         print("Matérias técnicas separadas por grupo; matérias do Ensino Médio compartilhadas.")
-        print("Professores e disciplinas do 3º INFO usam os nomes recuperados da grade.")
-        print("Cargas semanais e disponibilidades docentes sem confirmação completa continuam provisórias.")
+        print("Preferência cadastrada: Filosofia seguida de Sociologia.")
+        print("SW2 e CNW2 permitem os professores vistos nos grupos A/B.")
+        print("Disponibilidades docentes oficiais não constam no quadro; permanecem provisórias.")
         if not only_informatica:
             print("Turmas adicionais: TI Noite + seis turmas Agro.")
     finally:
