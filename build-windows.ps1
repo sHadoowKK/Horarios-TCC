@@ -41,8 +41,19 @@ try {
     }
     if ($LASTEXITCODE -ne 0) { throw "npm falhou ao instalar as dependências." }
 
-    npm run build
-    if ($LASTEXITCODE -ne 0) { throw "O build do frontend falhou." }
+    # Garante que o pacote usa a API na mesma origem, mesmo se existir um .env local de desenvolvimento.
+    $previousApiUrl = $env:VITE_API_URL
+    $env:VITE_API_URL = ""
+    try {
+        npm run build
+        if ($LASTEXITCODE -ne 0) { throw "O build do frontend falhou." }
+    } finally {
+        if ($null -eq $previousApiUrl) {
+            Remove-Item Env:VITE_API_URL -ErrorAction SilentlyContinue
+        } else {
+            $env:VITE_API_URL = $previousApiUrl
+        }
+    }
 } finally {
     Pop-Location
 }
