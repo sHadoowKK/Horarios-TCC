@@ -69,7 +69,7 @@ Evite dizer que o sistema usa "inteligência artificial" apenas por gerar horár
 12. Ajustar preferências configuráveis.
 13. Gerar a grade.
 14. Visualizar por turma ou professor.
-15. Exportar CSV ou imprimir a visualização.
+15. Exportar a grade completa para Excel (`.xlsx`) ou imprimir a grade da turma/professor em uma página A4 horizontal.
 
 ---
 
