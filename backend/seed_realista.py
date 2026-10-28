@@ -118,6 +118,12 @@ def main(only_informatica=False):
             })
             info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
 
+        # O quadro mostra SW2 com 3 aulas no grupo A e 2 no grupo B.
+        for setting in info_settings:
+            if setting["subject_id"] == subject_by_name["SW2"].id:
+                setting["workload_a"] = 3
+                setting["workload_b"] = 2
+
         # SW2 e CNW2 aparecem com professores diferentes entre os grupos A/B.
         info_teacher_assignments.setdefault("Higor", []).append(
             subject_by_name["SW2"].id
@@ -276,10 +282,23 @@ def main(only_informatica=False):
         db.commit()
 
         info_total = sum(item[1] for item in info_subjects)
+        info_total_a = sum(
+            int(setting.get("workload_a") or setting["workload"])
+            if setting.get("split") else setting["workload"]
+            for setting in info_settings
+        )
+        info_total_b = sum(
+            int(setting.get("workload_b") or setting["workload"])
+            if setting.get("split") else setting["workload"]
+            for setting in info_settings
+        )
         night_total = sum(item[1] for item in ti_subjects)
         agro_total_per_group = sum(item[1] for item in agro_subject_specs) if not only_informatica else 0
-        if info_total != 37:
-            raise RuntimeError(f"Carga semanal inesperada no 3º INFO: {info_total}")
+        if info_total != 37 or (info_total_a, info_total_b) != (37, 36):
+            raise RuntimeError(
+                f"Cargas inesperadas no 3º INFO: padrão={info_total}, "
+                f"grupo A={info_total_a}, grupo B={info_total_b}"
+            )
         if not only_informatica and (night_total != 25 or agro_total_per_group != 4):
             raise RuntimeError(
                 f"Cargas inesperadas: TI noite={night_total}, Agro={agro_total_per_group}"
@@ -292,7 +311,7 @@ def main(only_informatica=False):
         print(f"Disciplinas: {db.query(models.Subject).count()}")
         print(f"Professores: {db.query(models.Teacher).count()}")
         print("Turma de referência: 3º INFO Integral, com A/B.")
-        print("Cargas do quadro do 3º INFO: 37 aulas semanais por aluno.")
+        print(f"Cargas do quadro do 3º INFO: grupo A={info_total_a}, grupo B={info_total_b} aulas/semana.")
         print("Matérias técnicas separadas por grupo; matérias do Ensino Médio compartilhadas.")
         print("Preferência cadastrada: Filosofia seguida de Sociologia.")
         print("SW2 e CNW2 permitem os professores vistos nos grupos A/B.")
