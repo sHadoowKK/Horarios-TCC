@@ -12,6 +12,7 @@ semanais anotadas na conversa e totaliza 25. O recorte Agro inclui seis turmas
 com nomes reais, mas os dois componentes conhecidos só são cargas provisórias.
 """
 
+import argparse
 import os
 from pathlib import Path
 
@@ -42,7 +43,7 @@ def make_availability(shifts, available_days=range(5)):
     }
 
 
-def main():
+def main(only_informatica=False):
     print("Preparando banco DEMO independente...")
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -51,9 +52,15 @@ def main():
     db = SessionLocal()
     try:
         info_course = models.Course(name="Informática")
-        night_course = models.Course(name="TI — curso noturno")
-        agro_course = models.Course(name="Agropecuária")
-        db.add_all([info_course, night_course, agro_course])
+        night_course = None
+        agro_course = None
+        db.add(info_course)
+
+        if not only_informatica:
+            night_course = models.Course(name="TI — curso noturno")
+            agro_course = models.Course(name="Agropecuária")
+            db.add_all([night_course, agro_course])
+
         db.flush()
 
         # As cargas do 3º INFO são provisórias: somam 50 por grupo.
@@ -111,59 +118,60 @@ def main():
             info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
 
         night_settings = []
-        for name, workload, complexity, teacher_name in ti_subjects:
-            subject = models.Subject(
-                name=name,
-                workload=workload,
-                complexity=complexity,
-                category="Técnica",
-                course_ids=[night_course.id],
-            )
-            db.add(subject)
-            db.flush()
-            subject_by_name[name] = subject
-            night_settings.append({
-                "subject_id": subject.id,
-                "workload": workload,
-                "split": False,
-            })
-            info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
+        if not only_informatica:
+            for name, workload, complexity, teacher_name in ti_subjects:
+                subject = models.Subject(
+                    name=name,
+                    workload=workload,
+                    complexity=complexity,
+                    category="Técnica",
+                    course_ids=[night_course.id],
+                )
+                db.add(subject)
+                db.flush()
+                subject_by_name[name] = subject
+                night_settings.append({
+                    "subject_id": subject.id,
+                    "workload": workload,
+                    "split": False,
+                })
+                info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
 
         agro_settings = []
-        agro_subject_specs = [
-            ("M.R.N", 2, "Media", "Gilson"),
-            ("P.T.I.C", 2, "Media", "Joesley"),
-        ]
-        for name, workload, complexity, teacher_name in agro_subject_specs:
-            subject = models.Subject(
-                name=name,
-                workload=workload,
-                complexity=complexity,
-                category="Técnica",
-                course_ids=[agro_course.id],
-            )
-            db.add(subject)
-            db.flush()
-            subject_by_name[name] = subject
-            agro_settings.append({
-                "subject_id": subject.id,
-                "workload": workload,
-                "split": True,
-            })
-            info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
+        agro_class_names = []
 
-        # Foram confirmadas seis turmas Agro com divisão interna A/B.
-        # Só M.R.N e P.T.I.C ficaram identificadas no recorte extraído;
-        # as cargas 2+2 abaixo são provisórias e não devem ser tratadas como
-        # carga oficial completa dos cursos. Aulas/salas físicas ficam fora do sistema.
-        agro_class_names = [
-            "1º PI AGRO A",
-            "1º PI AGRO B",
-            "2º PI AGRO A",
-            "2º PI AGRO B",
-            "3º PI AGRO A",
-            "3º PI AGRO B",
-        ]
+        if not only_informatica:
+            agro_subject_specs = [
+                ("M.R.N", 2, "Media", "Gilson"),
+                ("P.T.I.C", 2, "Media", "Joesley"),
+            ]
+            for name, workload, complexity, teacher_name in agro_subject_specs:
+                subject = models.Subject(
+                    name=name,
+                    workload=workload,
+                    complexity=complexity,
+                    category="Técnica",
+                    course_ids=[agro_course.id],
+                )
+                db.add(subject)
+                db.flush()
+                subject_by_name[name] = subject
+                agro_settings.append({
+                    "subject_id": subject.id,
+                    "workload": workload,
+                    "split": True,
+                })
+                info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
+
+            # Seis turmas Agro confirmadas na referência; matriz parcial é provisória.
+            agro_class_names = [
+                "1º PI AGRO A",
+                "1º PI AGRO B",
+                "2º PI AGRO A",
+                "2º PI AGRO B",
+                "3º PI AGRO A",
+                "3º PI AGRO B",
+            ]
 
         classrooms = [
             models.Classroom(
@@ -174,26 +182,27 @@ def main():
                 subject_settings=info_settings,
                 split_subject_ids=[],
             ),
-            models.Classroom(
+        ]
+        if not only_informatica:
+            classrooms.append(models.Classroom(
                 name="TI — Noite",
                 shift="Noite",
                 course_id=night_course.id,
                 has_groups=False,
                 subject_settings=night_settings,
                 split_subject_ids=[],
-            ),
-        ]
-        classrooms.extend(
-            models.Classroom(
-                name=name,
-                shift="Integral",
-                course_id=agro_course.id,
-                has_groups=True,
-                subject_settings=agro_settings,
-                split_subject_ids=[],
+            ))
+            classrooms.extend(
+                models.Classroom(
+                    name=name,
+                    shift="Integral",
+                    course_id=agro_course.id,
+                    has_groups=True,
+                    subject_settings=agro_settings,
+                    split_subject_ids=[],
+                )
+                for name in agro_class_names
             )
-            for name in agro_class_names
-        )
         db.add_all(classrooms)
 
         # Nomes mantidos conforme os exemplos da imagem/conversa.
@@ -245,24 +254,38 @@ def main():
 
         info_total = sum(item[1] for item in info_subjects)
         night_total = sum(item[1] for item in ti_subjects)
-        agro_total_per_group = sum(item[1] for item in agro_subject_specs)
-        if info_total != 50 or night_total != 25 or agro_total_per_group != 4:
+        agro_total_per_group = sum(item[1] for item in agro_subject_specs) if not only_informatica else 0
+        if info_total != 50:
+            raise RuntimeError(f"Carga semanal inesperada no 3º INFO: {info_total}")
+        if not only_informatica and (night_total != 25 or agro_total_per_group != 4):
             raise RuntimeError(
-                f"Cargas inesperadas: 3º INFO={info_total}, TI noite={night_total}"
+                f"Cargas inesperadas: TI noite={night_total}, Agro={agro_total_per_group}"
             )
 
-        print("Base realista criada com sucesso.")
+        print("Base de demonstração criada com sucesso.")
         print(f"Banco: {DATABASE_PATH}")
-        print(f"Cursos: {db.query(models.Course).count()} (Informática, TI e Agropecuária)")
-        print(f"Turmas: {db.query(models.Classroom).count()} (3º INFO, TI Noite e seis Agro)")
-        print(f"Disciplinas: {db.query(models.Subject).count()} (17 INFO + 7 TI + 2 Agro)")
+        print(f"Cursos: {db.query(models.Course).count()}")
+        print(f"Turmas: {db.query(models.Classroom).count()}")
+        print(f"Disciplinas: {db.query(models.Subject).count()}")
         print(f"Professores: {db.query(models.Teacher).count()}")
-        print("Carga anotada: 25 períodos semanais na TI Noite.")
-        print("Cargas provisórias: distribuição do 3º INFO e 2 componentes Agro por turma.")
-        print("Disponibilidades docentes também são estimativas para teste.")
+        print("Turma de referência: 3º INFO Integral, com A/B.")
+        print("Matérias técnicas separadas por grupo; matérias do Ensino Médio compartilhadas.")
+        print("Professores e disciplinas do 3º INFO usam os nomes recuperados da grade.")
+        print("Cargas semanais e disponibilidades docentes sem confirmação completa continuam provisórias.")
+        if not only_informatica:
+            print("Turmas adicionais: TI Noite + seis turmas Agro.")
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Cria uma base de demonstração isolada do Anatinus."
+    )
+    parser.add_argument(
+        "--informatica-only",
+        action="store_true",
+        help="cria somente a turma de referência 3º INFO e seus professores/matérias",
+    )
+    arguments = parser.parse_args()
+    main(only_informatica=arguments.informatica_only)
