@@ -537,9 +537,16 @@ function App() {
           <div className="app-brand p-6 border-b border-gray-200">
             <h1 className="app-brand-title text-xl font-bold text-indigo-600 flex items-center gap-2">
               <img
-                src="/anatinus.svg"
+                src="/Anatinus%20final%201.png"
                 alt=""
-                className="w-8 h-8"
+                aria-hidden="true"
+                className="app-logo-light w-8 h-8"
+              />
+              <img
+                src="/anatinus%20final%201%20branco.png"
+                alt=""
+                aria-hidden="true"
+                className="app-logo-dark w-8 h-8"
               />
               <span className="app-brand-name">Anatinus</span>
             </h1>
