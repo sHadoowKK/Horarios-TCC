@@ -23,7 +23,7 @@ from app.database import Base, SessionLocal, engine, ensure_database_compatibili
 
 
 # Índices de períodos da ETEC; intervalos/almoço não são aulas.
-INTEGRAL_PERIODS = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+INTEGRAL_PERIODS = (0, 1, 2, 3, 4, 6, 7, 8, 9, 10)
 NIGHT_PERIODS = (11, 12, 13, 14, 15)
 
 
