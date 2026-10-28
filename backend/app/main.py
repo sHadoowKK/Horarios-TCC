@@ -644,46 +644,57 @@ def generate_timetable(db: Session = Depends(get_db)):
             [],
         ) or []
 
-        total_workload = sum(
-            int(setting.get("workload", 0) or 0)
-            for setting in settings
-        )
-
-        if total_workload > weekly_capacity:
-            preflight_errors.append(
-                f"{classroom['name']}: "
-                f"{total_workload} aulas semanais para "
-                f"{weekly_capacity} períodos disponíveis."
-            )
-
-        high_workload = 0
+        has_groups = bool(classroom.get("has_groups"))
+        workload_by_group = {"A": 0, "B": 0}
+        high_workload_by_group = {"A": 0, "B": 0}
 
         for setting in settings:
-            subject = subject_by_id.get(
-                setting.get("subject_id")
+            base = int(setting.get("workload", 0) or 0)
+            split = has_groups and bool(setting.get("split"))
+            workload_a = int(setting.get("workload_a") or base)
+            workload_b = int(setting.get("workload_b") or base)
+
+            if split:
+                workload_by_group["A"] += workload_a
+                workload_by_group["B"] += workload_b
+            else:
+                workload_by_group["A"] += base
+                workload_by_group["B"] += base
+
+            subject = subject_by_id.get(setting.get("subject_id"))
+            if subject and subject.get("complexity") == "Alta":
+                if split:
+                    high_workload_by_group["A"] += workload_a
+                    high_workload_by_group["B"] += workload_b
+                else:
+                    high_workload_by_group["A"] += base
+                    high_workload_by_group["B"] += base
+
+        max_group = max(workload_by_group, key=workload_by_group.get)
+        total_workload = workload_by_group[max_group]
+        if total_workload > weekly_capacity:
+            workload_detail = (
+                f"A={workload_by_group['A']}, B={workload_by_group['B']}"
+                if has_groups
+                else str(total_workload)
             )
-
-            if (
-                subject
-                and subject.get("complexity") == "Alta"
-            ):
-                high_workload += int(
-                    setting.get("workload", 0) or 0
-                )
-
-        high_capacity = (
-            int(
-                config.max_high_complexity_per_day
-            )
-            * 5
-        )
-
-        if high_workload > high_capacity:
             preflight_errors.append(
-                f"{classroom['name']}: "
-                f"{high_workload} aulas de alta complexidade, "
-                f"mas o limite atual permite no máximo "
-                f"{high_capacity} por semana."
+                f"{classroom['name']}: carga semanal {workload_detail}, "
+                f"mas cada grupo dispõe de no máximo {weekly_capacity} períodos."
+            )
+
+        high_capacity = int(config.max_high_complexity_per_day) * 5
+        max_high_group = max(high_workload_by_group, key=high_workload_by_group.get)
+        high_workload = high_workload_by_group[max_high_group]
+        if high_workload > high_capacity:
+            high_detail = (
+                f"A={high_workload_by_group['A']}, B={high_workload_by_group['B']}"
+                if has_groups
+                else str(high_workload)
+            )
+            preflight_errors.append(
+                f"{classroom['name']}: aulas de alta complexidade {high_detail}, "
+                f"mas o limite atual permite no máximo {high_capacity} por semana."
             )
 
     if preflight_errors:
