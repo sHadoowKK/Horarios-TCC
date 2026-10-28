@@ -226,6 +226,30 @@ def update_classroom(
         if subject_id in valid_subject_ids
     ]
 
+    selected_settings = {
+        setting["subject_id"]: setting
+        for setting in values["subject_settings"]
+    }
+    sequences = []
+    for pair in values.get("preferred_subject_sequences", []) or []:
+        if len(pair) != 2:
+            continue
+        first_id, second_id = pair
+        if (
+            first_id == second_id
+            or first_id not in selected_settings
+            or second_id not in selected_settings
+        ):
+            continue
+        if bool(selected_settings[first_id].get("split")) != bool(
+            selected_settings[second_id].get("split")
+        ):
+            continue
+        normalized_pair = [int(first_id), int(second_id)]
+        if normalized_pair not in sequences:
+            sequences.append(normalized_pair)
+    values["preferred_subject_sequences"] = sequences
+
     for key, value in values.items():
         setattr(item, key, value)
 
@@ -559,6 +583,9 @@ def generate_timetable(db: Session = Depends(get_db)):
             "shift": classroom.shift,
             "has_groups": classroom.has_groups,
             "subject_settings": classroom.subject_settings or [],
+            "preferred_subject_sequences": (
+                classroom.preferred_subject_sequences or []
+            ),
         }
         for classroom in classroom_rows
     ]
