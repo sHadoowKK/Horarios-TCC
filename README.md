@@ -101,6 +101,22 @@ O seed pequeno não deve ser executado repetidamente no mesmo banco, pois ele cr
 
 ### Base realista inspirada nas grades da ETEC
 
+### Testar somente a turma de Informática
+
+Para comparar o gerador com a matriz conhecida do 3º INFO sem interferência das outras turmas, recrie a base DEMO com somente Informática:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe seed_realista.py --informatica-only
+cd ..
+.\start-demo.ps1
+```
+
+Isso mantém o 3º INFO, os 17 componentes e a associação de professores recuperada da referência: UDA/Erika, SW2/Marcel, CNW2/Célia, Filosofia e História/M. Emília, Sociologia/Célia, Espanhol/Fabiane, DDM2/Marcel, IRS/Joesley, Matemática/Kamila, Inglês/Gustavo, EAMT/Fabiane, Português/Marta, EACNT/Gustavo, PDTCC/Marcel, GCW/Higor e Geografia/Thiago.
+
+O modo isolado usa o mesmo banco de demonstração e substitui os dados DEMO nele; não altera `backend/school_schedule.db`. As cargas semanais e disponibilidades que não conseguimos confirmar continuam provisórias. O otimizador vai reorganizar os períodos, não copiar uma posição aula a aula; isso permite testar o agrupamento de duas aulas consecutivas com os mesmos dados de matéria/professor.
+
+
 Para testar turmas, grupos e professores com um conjunto maior, há um segundo script. Ele cria **um banco separado**, `backend/school_schedule_demo.db`, e nunca apaga `school_schedule.db`.
 
 Feche as janelas do Anatinus antes de recriar essa base e execute, na raiz do projeto:
