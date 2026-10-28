@@ -187,6 +187,16 @@ Antes das duas otimizações estruturais:
 
 Esse benchmark precisa ser repetido na mesma máquina para medir o ganho real da versão atual.
 
+## Matriz de referência — 3º INFO
+
+O seed `backend/seed_realista.py --informatica-only` transcreve as matérias e cargas legíveis da imagem original de 3º INFO integral:
+
+- Matemática: 3; Português: 3 no quadro transcrito; UDA: 2; SW2: A=3/B=2; CNW2: 2; DDM2: 2; IRS: 2; EAMT: 3; EACNT: 3; PDTCC: 2; GCW: 2; Filosofia: 1; Sociologia: 1; Espanhol: 2; História: 2; Inglês: 2; Geografia: 2.
+- Professores elegíveis transcritos do quadro: UDA/Erika; SW2/Higor (A) e Marcel (B); CNW2/Erika (A) e Marcel (B); Filosofia e Sociologia/M. Emília; Espanhol/Célia; História/M. Emília; DDM2/Marcel; IRS/Joesley; Matemática/Kamila; Inglês e Português/Marta; EAMT/Gustavo; EACNT/Fabiane; PDTCC/Marcel; GCW/Higor; Geografia/Thiago.
+- O 3º INFO guarda uma preferência Soft Filosofia → Sociologia. A interface permite configurar outras sequências entre matérias, sem codificar nomes específicos no otimizador.
+- SW2 é o exemplo confirmado de cargas diferentes: 3 aulas para A e 2 para B. A validação do gerador calcula a capacidade de cada grupo de forma independente.
+- As disponibilidades docentes da imagem não são suficientes para reconstruir a disponibilidade individual de toda a semana; para o teste isolado de Informática, os professores estão liberados em todos os dias/períodos do Integral de segunda a sexta. Isso é uma hipótese de teste, não disponibilidade oficial.
+
 ## Empacotamento desktop Windows
 
 A branch de trabalho visual/empacotamento é `design/anatinus-dark-workspace`.
