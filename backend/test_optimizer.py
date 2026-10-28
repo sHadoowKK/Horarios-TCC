@@ -1213,6 +1213,40 @@ class OptimizerTests(unittest.TestCase):
             self.assertEqual(len(periods), 2)
             self.assertIn(tuple(sorted(periods)), contiguous_pairs)
 
+    def test_configured_subject_sequence_prefers_adjacent_order(self):
+        classrooms = [
+            classroom(
+                1,
+                "3º INFO",
+                "Integral",
+                [
+                    {"subject_id": 1, "workload": 1, "split": False},
+                    {"subject_id": 2, "workload": 1, "split": False},
+                ],
+            )
+        ]
+        classrooms[0]["preferred_subject_sequences"] = [[1, 2]]
+
+        result = generate_schedule(
+            classrooms,
+            [
+                subject(1, "Filosofia", workload=1),
+                subject(2, "Sociologia", workload=1),
+            ],
+            [teacher(1, [1, 2], score=100)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        philosophy = next(
+            item for item in result["schedule"] if item["subject_id"] == 1
+        )
+        sociology = next(
+            item for item in result["schedule"] if item["subject_id"] == 2
+        )
+        self.assertEqual(philosophy["day"], sociology["day"])
+        self.assertEqual(philosophy["period"] + 1, sociology["period"])
+
     def test_daytime_workload_three_prefers_two_plus_one(self):
         classrooms = [
             classroom(
