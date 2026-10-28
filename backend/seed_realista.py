@@ -23,7 +23,7 @@ from app.database import Base, SessionLocal, engine, ensure_database_compatibili
 
 
 # Índices de períodos da ETEC; intervalos/almoço não são aulas.
-INTEGRAL_PERIODS = (0, 1, 2, 3, 4, 6, 7, 8, 9, 10)
+INTEGRAL_PERIODS = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 NIGHT_PERIODS = (11, 12, 13, 14, 15)
 
 
@@ -56,8 +56,8 @@ def main():
         db.add_all([info_course, night_course, agro_course])
         db.flush()
 
-        # As cargas do 3º INFO são provisórias: somam 50 por grupo,
-        # ocupando os 10 períodos diários de segunda a sexta no Integral.
+        # As cargas do 3º INFO são provisórias: somam 50 por grupo.
+        # O Integral dispõe de 55 períodos semanais (11 por dia), com almoço após 12:30.
         info_subjects = [
             ("UDA", 3, "Alta", "Técnica", True, "Erika"),
             ("SW2", 3, "Media", "Técnica", True, "Marcel"),
