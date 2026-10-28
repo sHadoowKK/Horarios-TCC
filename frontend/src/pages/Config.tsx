@@ -135,13 +135,13 @@ export default function Config() {
             {fixedRules.map(rule => (
               <div
                 key={rule.title}
-                className="app-fixed-rule p-4 rounded-lg border border-emerald-100 bg-emerald-50"
+                className="app-fixed-rule p-4 rounded-lg border"
               >
-                <div className="flex items-center gap-2 text-emerald-800 font-bold">
+                <div className="app-fixed-rule-title flex items-center gap-2 font-bold">
                   {rule.title}
                 </div>
 
-                <p className="text-xs text-emerald-800/80 mt-2 leading-relaxed">
+                <p className="app-fixed-rule-description text-xs mt-2 leading-relaxed">
                   {rule.text}
                 </p>
               </div>
