@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -29,6 +30,17 @@ def _database_url() -> str:
         database_directory = base_directory / "Anatinus"
         database_directory.mkdir(parents=True, exist_ok=True)
         database_path = database_directory / "school_schedule.db"
+
+        # Na primeira execução, instala uma cópia independente da base de demonstração.
+        # Se o banco já existir, nunca o substitui: cadastros do usuário são preservados.
+        if not database_path.exists():
+            bundle_root = Path(
+                getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent)
+            )
+            demo_database = bundle_root / "demo_seed" / "school_schedule_demo.db"
+            if demo_database.is_file():
+                shutil.copy2(demo_database, database_path)
+
         return f"sqlite:///{database_path.as_posix()}"
 
     return "sqlite:///./school_schedule.db"
