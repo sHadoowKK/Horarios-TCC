@@ -88,13 +88,16 @@ def main() -> None:
     owns_server = False
 
     if _is_port_open():
-        if not _is_anatinus_running():
+        if _is_anatinus_running():
+            _show_error(
+                "O Anatinus já está aberto. Verifique as janelas em execução."
+            )
+        else:
             _show_error(
                 "A porta local necessária pelo Anatinus já está ocupada. "
                 "Feche o programa que está usando essa porta e tente novamente."
             )
-            return
-        logging.info("Foi encontrada uma instância local já em execução.")
+        return
     else:
         config = uvicorn.Config(
             app,
