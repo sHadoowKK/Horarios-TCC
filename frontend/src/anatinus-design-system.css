@@ -8,57 +8,57 @@
   color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --an-bg: #f2f3f7;
-  --an-sidebar: #fafaff;
+  --an-bg: #f5f5f2;
+  --an-sidebar: #fbfbf9;
   --an-panel: #ffffff;
-  --an-surface: #f7f8fb;
-  --an-surface-2: #eceef4;
+  --an-surface: #f7f7f4;
+  --an-surface-2: #edeee8;
   --an-field: #ffffff;
-  --an-text: #252936;
-  --an-text-secondary: #515769;
-  --an-muted: #656c7c;
-  --an-border: #dfe2eb;
-  --an-border-strong: #c8cdd9;
-  --an-accent: #7058df;
-  --an-accent-hover: #5e47ce;
-  --an-accent-soft: #efecff;
-  --an-accent-text: #5541b8;
+  --an-text: #20211e;
+  --an-text-secondary: #454740;
+  --an-muted: #6d7067;
+  --an-border: #dedfd7;
+  --an-border-strong: #bfc2b6;
+  --an-accent: #e4f222;
+  --an-accent-hover: #d6e51a;
+  --an-accent-soft: #f2f5d4;
+  --an-accent-text: #35391a;
   --an-green: #287c5d;
   --an-green-soft: #eaf6ef;
-  --an-red: #b44652;
+  --an-red: #a63c47;
   --an-red-soft: #fff0f1;
-  --an-amber: #936220;
+  --an-amber: #81591c;
   --an-amber-soft: #fff5df;
-  --an-blue: #426b9d;
+  --an-blue: #365d87;
   --an-blue-soft: #edf4ff;
-  --an-shadow: 0 1px 2px rgb(26 32 49 / 0.035);
+  --an-shadow: none;
 }
 
 html.dark-theme {
   color-scheme: dark;
-  --an-bg: #202127;
-  --an-sidebar: #252630;
-  --an-panel: #292b35;
-  --an-surface: #252731;
-  --an-surface-2: #30323d;
-  --an-field: #22242d;
-  --an-text: #f0eff7;
-  --an-text-secondary: #d0cedf;
-  --an-muted: #a0a2b5;
-  --an-border: #3b3d4b;
-  --an-border-strong: #4a4d5e;
-  --an-accent: #6b59c8;
-  --an-accent-hover: #5e4bb7;
-  --an-accent-soft: #34304d;
-  --an-accent-text: #d1c8ff;
+  --an-bg: #08090a;
+  --an-sidebar: #0f1011;
+  --an-panel: #111213;
+  --an-surface: #151617;
+  --an-surface-2: #1c1e20;
+  --an-field: #0d0e0f;
+  --an-text: #e5e5e6;
+  --an-text-secondary: #c0c2c4;
+  --an-muted: #8a8f98;
+  --an-border: #292b2e;
+  --an-border-strong: #383b3f;
+  --an-accent: #e4f222;
+  --an-accent-hover: #d6e51a;
+  --an-accent-soft: #292d12;
+  --an-accent-text: #e4f222;
   --an-green: #8dd5b5;
-  --an-green-soft: #243d35;
-  --an-red: #ffc0ca;
-  --an-red-soft: #422b33;
+  --an-green-soft: #1d3028;
+  --an-red: #ff9da7;
+  --an-red-soft: #352024;
   --an-amber: #f3d092;
-  --an-amber-soft: #3b3327;
-  --an-blue: #c3d9ff;
-  --an-blue-soft: #283440;
+  --an-amber-soft: #30281b;
+  --an-blue: #b8d4ff;
+  --an-blue-soft: #1c2937;
   --an-shadow: none;
 }
 
@@ -152,7 +152,7 @@ textarea {
   margin: 0;
   color: var(--an-text) !important;
   font-size: 20px !important;
-  font-weight: 750 !important;
+  font-weight: 590 !important;
   letter-spacing: -0.055em;
   line-height: 1;
 }
@@ -211,7 +211,7 @@ textarea {
 .app-nav-link-active:hover {
   background: var(--an-accent) !important;
   border-color: transparent !important;
-  color: #ffffff !important;
+  color: #08090a !important;
 }
 
 .app-theme-toggle {
@@ -312,7 +312,7 @@ textarea {
 
 .app-main h2 {
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 590;
   line-height: 1.2;
 }
 
@@ -344,7 +344,7 @@ textarea {
   margin: 0 0 17px !important;
   color: var(--an-text) !important;
   font-size: 15px !important;
-  font-weight: 680 !important;
+  font-weight: 590 !important;
   letter-spacing: -0.025em;
 }
 
@@ -416,10 +416,10 @@ textarea {
   border: 1px solid var(--an-accent) !important;
   border-radius: 7px !important;
   background: var(--an-accent) !important;
-  color: #ffffff !important;
+  color: #08090a !important;
   box-shadow: none !important;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 590;
 }
 
 .app-main button.bg-indigo-600:hover,
@@ -428,7 +428,7 @@ textarea {
 .app-main button.bg-purple-600:hover {
   border-color: var(--an-accent-hover) !important;
   background: var(--an-accent-hover) !important;
-  color: #ffffff !important;
+  color: #08090a !important;
 }
 
 .app-action-primary,
@@ -450,7 +450,7 @@ textarea {
 .app-action-primary {
   border-color: var(--an-accent) !important;
   background: var(--an-accent) !important;
-  color: #ffffff !important;
+  color: #08090a !important;
 }
 
 .app-action-primary:hover:not(:disabled) {
@@ -843,7 +843,7 @@ textarea {
 .app-schedule-workspace-header h2 {
   margin: 0 !important;
   font-size: 15px !important;
-  font-weight: 700 !important;
+  font-weight: 590 !important;
   letter-spacing: -.02em;
 }
 
@@ -905,7 +905,7 @@ textarea {
   background: var(--an-surface) !important;
   color: var(--an-text-secondary) !important;
   font-size: 10px;
-  font-weight: 650 !important;
+  font-weight: 590 !important;
   text-align: left;
   white-space: nowrap;
 }
