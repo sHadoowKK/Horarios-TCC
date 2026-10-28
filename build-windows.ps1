@@ -70,6 +70,8 @@ try {
         "--collect-all", "ortools",
         "--collect-all", "webview",
         "--collect-all", "pythonnet",
+        "--collect-all", "clr_loader",
+        "--hidden-import", "webview.platforms.edgechromium",
         "--hidden-import", "uvicorn.logging",
         "--hidden-import", "uvicorn.loops.auto",
         "--hidden-import", "uvicorn.protocols.http.auto",
