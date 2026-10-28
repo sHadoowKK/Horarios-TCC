@@ -1287,6 +1287,7 @@ class OptimizerTests(unittest.TestCase):
                     "subject_id": 1,
                     "workload": 3,
                     "split": False,
+                    "prefer_triple_block": False,
                 }],
             )
         ]
@@ -1308,6 +1309,38 @@ class OptimizerTests(unittest.TestCase):
 
         active_counts = sorted(counts_by_day.values())
         self.assertEqual(active_counts, [1, 2])
+
+    def test_daytime_workload_three_prefers_full_triple_when_enabled(self):
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [{
+                    "subject_id": 1,
+                    "workload": 3,
+                    "split": False,
+                    "prefer_triple_block": True,
+                }],
+            )
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            [subject(1, "Programação")],
+            [teacher(1, [1], score=100)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        periods_by_day = {}
+        for item in result["schedule"]:
+            periods_by_day.setdefault(item["day"], []).append(item["period"])
+
+        self.assertEqual(len(periods_by_day), 1)
+        periods = next(iter(periods_by_day.values()))
+        self.assertEqual(len(periods), 3)
+        self.assertEqual(sorted(periods), list(range(min(periods), min(periods) + 3)))
 
     def test_night_workload_three_can_form_triple_block(self):
         classrooms = [
