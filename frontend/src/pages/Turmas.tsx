@@ -23,6 +23,7 @@ interface ClassroomSubjectSetting {
   workload: number;
   workload_a?: number | null;
   workload_b?: number | null;
+  joint_workload?: number | null;
   split: boolean;
   prefer_triple_block?: boolean | null;
 }
@@ -448,7 +449,7 @@ export default function Turmas() {
             subject_id: subject.id,
             workload: subject.workload,
             split: false,
-            prefer_triple_block: subject.workload === 3,
+            prefer_triple_block: subject.workload === 3 ? true : undefined,
           },
         ];
 
@@ -555,7 +556,7 @@ export default function Turmas() {
           subject_id: subject.id,
           workload: subject.workload,
           split: false,
-          prefer_triple_block: subject.workload === 3,
+          prefer_triple_block: subject.workload === 3 ? true : undefined,
         }
       );
     });
