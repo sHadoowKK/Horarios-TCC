@@ -56,6 +56,17 @@
 - [ ] levar projeto em pendrive/backup
 - [ ] confirmar que Python/Node/dependências estarão disponíveis
 
+## Aplicativo desktop Windows
+
+- [ ] Executar o workflow `Build Windows` e confirmar que o pacote foi gerado.
+- [ ] Baixar e extrair o ZIP completo em uma pasta limpa.
+- [ ] Abrir `Anatinus.exe` sem iniciar manualmente Python ou Node.js.
+- [ ] Conferir navegação pelas quatro telas, cadastro e geração de grade.
+- [ ] Fechar e reabrir o aplicativo e confirmar que os dados continuam salvos.
+- [ ] Conferir o banco em `%LOCALAPPDATA%\\Anatinus\\school_schedule.db`.
+- [ ] Testar backup e restauração do banco antes de entregar a versão.
+- [ ] Verificar o aplicativo no computador que será usado na apresentação.
+
 ## Validação final
 
 - [ ] solicitar que alguém da escola que conhece a montagem de horários avalie uma grade
