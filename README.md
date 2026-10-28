@@ -280,6 +280,13 @@ Criar uma cópia local do banco antes de testes ou cadastro em massa:
 .\backup-db.ps1
 ```
 
+Por padrão, se o banco do aplicativo desktop existir, ele será copiado; caso contrário, o script usa o banco de desenvolvimento. Para escolher manualmente:
+
+```powershell
+.\backup-db.ps1 -Source Desktop
+.\backup-db.ps1 -Source Development
+```
+
 Os backups ficam em `backups/` com data e hora no nome e não são enviados ao GitHub.
 
 ## Aplicativo Windows (.exe)
