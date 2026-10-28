@@ -593,14 +593,7 @@ function App() {
                 </span>
               </span>
 
-              <span
-                className={`theme-switch ${
-                  theme === "dark" ? "theme-switch-on" : ""
-                }`}
-                aria-hidden="true"
-              >
-                <span className="theme-switch-knob" />
-              </span>
+
             </button>
 
             <NavLink
