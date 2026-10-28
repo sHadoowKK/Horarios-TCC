@@ -47,10 +47,10 @@ html.dark-theme {
   --an-muted: #8a8f98;
   --an-border: #292b2e;
   --an-border-strong: #383b3f;
-  --an-accent: #b20000;
-  --an-accent-hover: #930000;
-  --an-accent-soft: #351a1a;
-  --an-accent-text: #ffb0b0;
+  --an-accent: #356fa8;
+  --an-accent-hover: #285987;
+  --an-accent-soft: #1c2937;
+  --an-accent-text: #b8d4ff;
   --an-green: #8dd5b5;
   --an-green-soft: #1d3028;
   --an-red: #ff9da7;
@@ -1887,4 +1887,40 @@ html.dark-theme .app-brand-title .app-logo-light {
 
 .app-sidebar .text-amber-400 {
   color: var(--an-amber) !important;
+}
+
+/* Cores de destaque por tema: CPS vermelho no claro e azul no escuro. */
+html:not(.dark-theme) {
+  --an-accent: #b20000;
+  --an-accent-hover: #930000;
+  --an-accent-soft: #f9eaea;
+  --an-accent-text: #8f0000;
+  --an-blue: #8f0000;
+  --an-blue-soft: #f9eaea;
+}
+
+html.dark-theme {
+  --an-accent: #356fa8;
+  --an-accent-hover: #285987;
+  --an-accent-soft: #1c2937;
+  --an-accent-text: #b8d4ff;
+  --an-blue: #b8d4ff;
+  --an-blue-soft: #1c2937;
+}
+
+/* Mantém ícone e texto do item de navegação rigorosamente na mesma cor. */
+.app-sidebar .app-nav-link > svg {
+  color: currentColor !important;
+  stroke: currentColor !important;
+}
+
+.app-sidebar .app-nav-link-active,
+.app-sidebar .app-nav-link-active:hover,
+.app-sidebar .app-nav-link-active > span,
+.app-sidebar .app-nav-link-active > svg {
+  color: #ffffff !important;
+}
+
+.app-settings-section .app-fixed-rules-heading-icon {
+  color: var(--an-accent) !important;
 }
