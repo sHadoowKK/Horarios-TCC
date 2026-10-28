@@ -63,8 +63,8 @@ def main(only_informatica=False):
 
         db.flush()
 
-        # As cargas do 3º INFO são provisórias: somam 50 por grupo.
-        # O Integral dispõe de 55 períodos semanais (11 por dia), com almoço após 12:30.
+        # As cargas do 3º INFO são provisórias: somam 50 aulas semanais por grupo.
+        # No Integral, são 5 aulas antes e 5 depois do almoço, sem aula de 11:40 a 13:00.
         info_subjects = [
             ("UDA", 3, "Alta", "Técnica", True, "Erika"),
             ("SW2", 3, "Media", "Técnica", True, "Marcel"),
