@@ -31,6 +31,7 @@ interface Classroom {
   course_id: number;
   has_groups: boolean;
   subject_settings: ClassroomSubjectSetting[];
+  preferred_subject_sequences?: number[][];
   split_subject_ids?: number[];
 }
 
@@ -51,6 +52,8 @@ export default function Turmas() {
     useState<Set<number>>(new Set());
   const [copySourceByClassroom, setCopySourceByClassroom] =
     useState<Record<number, string>>({});
+  const [sequenceDraftByClassroom, setSequenceDraftByClassroom] =
+    useState<Record<number, { first: string; second: string }>>({});
 
   const [newCourseName, setNewCourseName] = useState("");
   const [editingCourseId, setEditingCourseId] =
@@ -372,6 +375,10 @@ export default function Turmas() {
           changes.split_subject_ids
           ?? classroom.split_subject_ids
           ?? [],
+        preferred_subject_sequences:
+          changes.preferred_subject_sequences
+          ?? classroom.preferred_subject_sequences
+          ?? [],
       },
     );
 
@@ -531,6 +538,49 @@ export default function Turmas() {
     });
   };
 
+  const handleAddPreferredSequence = async (
+    classroom: Classroom,
+  ) => {
+    const draft = sequenceDraftByClassroom[classroom.id] || {
+      first: "",
+      second: "",
+    };
+    const firstId = Number(draft.first);
+    const secondId = Number(draft.second);
+    if (!firstId || !secondId || firstId === secondId) return;
+
+    const firstSetting = settingFor(classroom, firstId);
+    const secondSetting = settingFor(classroom, secondId);
+    if (!firstSetting || !secondSetting) return;
+    if (firstSetting.split !== secondSetting.split) {
+      alert("Escolha matérias da mesma organização: ambas de turma inteira ou ambas separadas A/B.");
+      return;
+    }
+
+    const current = classroom.preferred_subject_sequences || [];
+    if (current.some(pair => pair[0] === firstId && pair[1] === secondId)) {
+      return;
+    }
+
+    await saveClassroom(classroom, {
+      preferred_subject_sequences: [...current, [firstId, secondId]],
+    });
+    setSequenceDraftByClassroom(currentDrafts => ({
+      ...currentDrafts,
+      [classroom.id]: { first: "", second: "" },
+    }));
+  };
+
+  const handleRemovePreferredSequence = async (
+    classroom: Classroom,
+    index: number,
+  ) => {
+    const current = classroom.preferred_subject_sequences || [];
+    await saveClassroom(classroom, {
+      preferred_subject_sequences: current.filter((_, pairIndex) => pairIndex !== index),
+    });
+  };
+
   const handleCopySubjects = async (
     targetClassroom: Classroom,
   ) => {
@@ -575,6 +625,8 @@ export default function Turmas() {
 
     await saveClassroom(targetClassroom, {
       subject_settings: copiedSettings,
+      preferred_subject_sequences:
+        sourceClassroom.preferred_subject_sequences || [],
     });
 
     setCopySourceByClassroom(current => ({
@@ -1183,6 +1235,114 @@ export default function Turmas() {
                             </div>
                           );
                         })}
+
+                        {(classroom.subject_settings || []).length >= 2 && (
+                          <section className="mt-3 border-t border-gray-200 pt-3 space-y-2">
+                            <div className="text-xs font-semibold text-gray-700">
+                              Preferir matérias em sequência
+                            </div>
+                            <p className="text-[11px] leading-relaxed text-gray-500">
+                              O gerador tenta colocar a primeira matéria imediatamente antes da segunda. É uma preferência, não uma regra obrigatória.
+                            </p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
+                              <select
+                                aria-label="Primeira matéria da sequência"
+                                value={sequenceDraftByClassroom[classroom.id]?.first || ""}
+                                onChange={event =>
+                                  setSequenceDraftByClassroom(current => ({
+                                    ...current,
+                                    [classroom.id]: {
+                                      first: event.target.value,
+                                      second: "",
+                                    },
+                                  }))
+                                }
+                                className="min-w-0 border border-gray-300 rounded p-1.5 bg-white text-[11px]"
+                              >
+                                <option value="">Primeira matéria</option>
+                                {(classroom.subject_settings || []).map(setting => {
+                                  const subject = candidates.find(item => item.id === setting.subject_id);
+                                  return subject ? (
+                                    <option key={subject.id} value={subject.id}>
+                                      {subject.name}
+                                    </option>
+                                  ) : null;
+                                })}
+                              </select>
+
+                              <span className="text-center text-[11px] text-gray-400">antes de</span>
+
+                              <select
+                                aria-label="Segunda matéria da sequência"
+                                value={sequenceDraftByClassroom[classroom.id]?.second || ""}
+                                disabled={!sequenceDraftByClassroom[classroom.id]?.first}
+                                onChange={event =>
+                                  setSequenceDraftByClassroom(current => ({
+                                    ...current,
+                                    [classroom.id]: {
+                                      ...(current[classroom.id] || { first: "", second: "" }),
+                                      second: event.target.value,
+                                    },
+                                  }))
+                                }
+                                className="min-w-0 border border-gray-300 rounded p-1.5 bg-white text-[11px] disabled:opacity-50"
+                              >
+                                <option value="">Segunda matéria</option>
+                                {(classroom.subject_settings || [])
+                                  .filter(setting => {
+                                    const draft = sequenceDraftByClassroom[classroom.id];
+                                    const firstSetting = settingFor(classroom, Number(draft?.first));
+                                    return setting.subject_id !== Number(draft?.first)
+                                      && firstSetting
+                                      && setting.split === firstSetting.split;
+                                  })
+                                  .map(setting => {
+                                    const subject = candidates.find(item => item.id === setting.subject_id);
+                                    return subject ? (
+                                      <option key={subject.id} value={subject.id}>
+                                        {subject.name}
+                                      </option>
+                                    ) : null;
+                                  })}
+                              </select>
+
+                              <button
+                                type="button"
+                                disabled={
+                                  !sequenceDraftByClassroom[classroom.id]?.first
+                                  || !sequenceDraftByClassroom[classroom.id]?.second
+                                }
+                                onClick={() => handleAddPreferredSequence(classroom)}
+                                className="text-[11px] px-2 py-1.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                Adicionar
+                              </button>
+                            </div>
+
+                            {(classroom.preferred_subject_sequences || []).map((pair, index) => (
+                              <div
+                                key={pair.join("-") + "-" + index}
+                                className="flex items-center justify-between gap-2 rounded border border-gray-200 bg-white px-2 py-1.5"
+                              >
+                                <span className="text-[11px] text-gray-700">
+                                  {candidates.find(item => item.id === pair[0])?.name || pair[0]}
+                                  <span className="mx-2 text-gray-400">→</span>
+                                  {candidates.find(item => item.id === pair[1])?.name || pair[1]}
+                                </span>
+                                <button
+                                  type="button"
+                                  title="Remover sequência preferida"
+                                  aria-label="Remover sequência preferida"
+                                  onClick={() => handleRemovePreferredSequence(classroom, index)}
+                                  className="p-1 text-gray-400 hover:text-red-600"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </section>
+                        )}
 
                         {candidates.length === 0 && (
                           <p className="text-xs text-gray-400">
