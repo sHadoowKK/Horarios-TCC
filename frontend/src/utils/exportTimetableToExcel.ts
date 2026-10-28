@@ -1,4 +1,5 @@
 type ZipSourceFile = { path: string; content: string };
+type ExcelWorksheet = { name: string; headers: string[]; rows: string[][] };
 
 const utf8 = new TextEncoder();
 
@@ -170,18 +171,23 @@ function createWorksheet(headers: string[], rows: string[][]): string {
   ].join("\n");
 }
 
-const CONTENT_TYPES = [
-  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-  '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
-  '  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
-  '  <Default Extension="xml" ContentType="application/xml"/>',
-  '  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
-  '  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
-  '  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>',
-  '  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>',
-  '  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>',
-  '</Types>',
-].join("\n");
+function createContentTypes(sheetCount: number): string {
+  const worksheetOverrides = Array.from({ length: sheetCount }, (_, index) =>
+    '  <Override PartName="/xl/worksheets/sheet' + (index + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+  ).join("\n");
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+    '  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+    '  <Default Extension="xml" ContentType="application/xml"/>',
+    '  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
+    worksheetOverrides,
+    '  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>',
+    '  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>',
+    '  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>',
+    '</Types>',
+  ].join("\n");
+}
 
 const ROOT_RELS = [
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
@@ -192,22 +198,51 @@ const ROOT_RELS = [
   '</Relationships>',
 ].join("\n");
 
-const WORKBOOK = [
-  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-  '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
-  '  <bookViews><workbookView xWindow="0" yWindow="0" windowWidth="24000" windowHeight="12000"/></bookViews>',
-  '  <sheets><sheet name="Grade completa" sheetId="1" r:id="rId1"/></sheets>',
-  '  <calcPr calcId="191029"/>',
-  '</workbook>',
-].join("\n");
+function createWorkbook(sheetNames: string[]): string {
+  const worksheets = sheetNames.map((name, index) =>
+    '    <sheet name="' + xmlEscape(name) + '" sheetId="' + (index + 1) + '" r:id="rId' + (index + 1) + '"/>',
+  ).join("\n");
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+    '  <bookViews><workbookView xWindow="0" yWindow="0" windowWidth="24000" windowHeight="12000"/></bookViews>',
+    '  <sheets>',
+    worksheets,
+    '  </sheets>',
+    '  <calcPr calcId="191029"/>',
+    '</workbook>',
+  ].join("\n");
+}
 
-const WORKBOOK_RELS = [
-  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-  '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
-  '  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>',
-  '  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
-  '</Relationships>',
-].join("\n");
+function createWorkbookRelationships(sheetCount: number): string {
+  const worksheetRelationships = Array.from({ length: sheetCount }, (_, index) =>
+    '  <Relationship Id="rId' + (index + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (index + 1) + '.xml"/>',
+  ).join("\n");
+  const stylesRelationshipId = sheetCount + 1;
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+    worksheetRelationships,
+    '  <Relationship Id="rId' + stylesRelationshipId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
+    '</Relationships>',
+  ].join("\n");
+}
+
+function uniqueSheetNames(sheets: ExcelWorksheet[]): string[] {
+  const used = new Set<string>();
+  return sheets.map((sheet, index) => {
+    const base = sheet.name.replace(/[\\\\\/?*:[\]]/g, " ").trim().slice(0, 31) || "Grade " + (index + 1);
+    let candidate = base;
+    let suffix = 2;
+    while (used.has(candidate.toLocaleLowerCase())) {
+      const ending = " (" + suffix + ")";
+      candidate = base.slice(0, 31 - ending.length) + ending;
+      suffix += 1;
+    }
+    used.add(candidate.toLocaleLowerCase());
+    return candidate;
+  });
+}
 
 const STYLES = [
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
@@ -235,27 +270,37 @@ const APP_PROPERTIES = [
   '</Properties>',
 ].join("\n");
 
-/** Downloads a genuine .xlsx workbook with widths, filters, frozen header and alternating rows. */
+/** Downloads an Excel workbook with one visual weekly timetable per class or teacher. */
 export function exportTimetableToExcel(
-  headers: string[],
-  rows: string[][],
+  sheets: ExcelWorksheet[],
   fileName = "anatinus-grade.xlsx",
 ): void {
-  if (headers.length === 0) {
-    throw new Error("A exportação precisa de cabeçalhos.");
+  if (sheets.length === 0) {
+    throw new Error("A exportação precisa de pelo menos uma grade.");
+  }
+  if (sheets.some(sheet => sheet.headers.length === 0)) {
+    throw new Error("Cada grade precisa ter cabeçalhos.");
   }
 
-  const archive = makeZip([
-    { path: "[Content_Types].xml", content: CONTENT_TYPES },
+  const sheetNames = uniqueSheetNames(sheets);
+  const packageFiles: ZipSourceFile[] = [
+    { path: "[Content_Types].xml", content: createContentTypes(sheets.length) },
     { path: "_rels/.rels", content: ROOT_RELS },
-    { path: "xl/workbook.xml", content: WORKBOOK },
-    { path: "xl/_rels/workbook.xml.rels", content: WORKBOOK_RELS },
-    { path: "xl/worksheets/sheet1.xml", content: createWorksheet(headers, rows) },
+    { path: "xl/workbook.xml", content: createWorkbook(sheetNames) },
+    { path: "xl/_rels/workbook.xml.rels", content: createWorkbookRelationships(sheets.length) },
     { path: "xl/styles.xml", content: STYLES },
     { path: "docProps/core.xml", content: CORE_PROPERTIES },
     { path: "docProps/app.xml", content: APP_PROPERTIES },
-  ]);
+  ];
 
+  sheets.forEach((sheet, index) => {
+    packageFiles.push({
+      path: "xl/worksheets/sheet" + (index + 1) + ".xml",
+      content: createWorksheet(sheet.headers, sheet.rows),
+    });
+  });
+
+  const archive = makeZip(packageFiles);
   const blob = new Blob(
     [archive.buffer as ArrayBuffer],
     { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
