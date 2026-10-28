@@ -44,8 +44,8 @@ const JOURNEY_ROWS: Record<string, DisplayRow[]> = {
   "Integral": [
     lesson(0), lesson(1), lesson(2),
     pause("09:40 - 10:00", "Intervalo"),
-    lesson(3), lesson(4), lesson(5),
-    pause("12:30 - 13:00", "Almoço"),
+    lesson(3), lesson(4),
+    pause("11:40 - 13:00", "Almoço"),
     lesson(6), lesson(7),
     pause("14:40 - 14:50", "Intervalo"),
     lesson(8), lesson(9), lesson(10),
