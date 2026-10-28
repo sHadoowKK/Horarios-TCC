@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-do
 import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from './api';
+import { exportTimetableToExcel } from './utils/exportTimetableToExcel';
 import Turmas from './pages/Turmas';
 import Professores from './pages/Professores';
 import Config from './pages/Config';
@@ -43,8 +44,8 @@ const JOURNEY_ROWS: Record<string, DisplayRow[]> = {
   "Integral": [
     lesson(0), lesson(1), lesson(2),
     pause("09:40 - 10:00", "Intervalo"),
-    lesson(3), lesson(4),
-    pause("11:40 - 13:00", "Almoço"),
+    lesson(3), lesson(4), lesson(5),
+    pause("12:30 - 13:00", "Almoço"),
     lesson(6), lesson(7),
     pause("14:40 - 14:50", "Intervalo"),
     lesson(8), lesson(9), lesson(10),
@@ -218,59 +219,36 @@ function App() {
     }
   };
 
-  const handleExportCsv = () => {
+  const handleExportExcel = () => {
     if (!schedule || schedule.length === 0) {
       return;
     }
 
-    const escapeCsv = (value: unknown) => {
-      const text = String(value ?? "");
-      return `"${text.replaceAll('"', '""')}"`;
-    };
+    const groupOrder = (group: string | null | undefined) =>
+      group === "Todos" ? 0 : group === "A" ? 1 : 2;
 
-    const rows = [
-      [
-        "Dia",
-        "Horário",
-        "Turma",
-        "Grupo",
-        "Disciplina",
-        "Professor",
-      ],
-      ...[...schedule]
-        .sort(
-          (a, b) =>
-            a.day - b.day
-            || a.period - b.period
-            || a.classroom_id - b.classroom_id,
-        )
-        .map(item => [
-          DAYS[item.day] || item.day,
-          PERIOD_NAMES[item.period] || item.period,
-          getClassroomName(item.classroom_id),
-          item.student_group || "Todos",
-          getSubName(item.subject_id),
-          getProfName(item.teacher_id),
-        ]),
-    ];
+    const rows = [...schedule]
+      .sort(
+        (a, b) =>
+          a.day - b.day
+          || a.period - b.period
+          || a.classroom_id - b.classroom_id
+          || groupOrder(a.student_group) - groupOrder(b.student_group)
+          || getSubName(a.subject_id).localeCompare(getSubName(b.subject_id), "pt-BR"),
+      )
+      .map(item => [
+        String(DAYS[item.day] || item.day),
+        String(PERIOD_NAMES[item.period] || item.period),
+        getClassroomName(item.classroom_id),
+        item.student_group || "Todos",
+        getSubName(item.subject_id),
+        getProfName(item.teacher_id),
+      ]);
 
-    const csv = rows
-      .map(row => row.map(escapeCsv).join(";"))
-      .join("\r\n");
-
-    const blob = new Blob(
-      ["\ufeff", csv],
-      { type: "text/csv;charset=utf-8;" },
+    exportTimetableToExcel(
+      ["Dia", "Horário", "Turma", "Grupo", "Disciplina", "Professor"],
+      rows,
     );
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = "anatinus-grade.csv";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
   };
 
   const handlePrint = () => {
@@ -672,9 +650,9 @@ function App() {
                         <>
                           <button
                             type="button"
-                            onClick={handleExportCsv}
+                            onClick={handleExportExcel}
                             className="app-action-secondary"
-                            title="Exportar a grade completa em CSV"
+                            title="Baixar a grade completa em Excel (.xlsx)"
                           >
                             <Download className="w-4 h-4" />
                             Exportar
