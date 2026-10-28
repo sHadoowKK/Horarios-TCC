@@ -1780,8 +1780,8 @@ html.dark-theme .app-brand-title .app-logo-light {
 }
 
 @page {
-  size: landscape;
-  margin: 1cm;
+  size: A4 landscape;
+  margin: 5mm;
 }
 
 @media print {
@@ -1830,10 +1830,117 @@ html.dark-theme .app-brand-title .app-logo-light {
     border: 0 !important;
   }
 
+  .app-schedule-workspace-header {
+    min-height: 0 !important;
+    padding: 0 0 3mm !important;
+    border: 0 !important;
+  }
+
+  .app-schedule-workspace-header h2 {
+    font-size: 12pt !important;
+  }
+
+  .app-schedule-frame {
+    width: 100% !important;
+    margin: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+  }
+
   .app-schedule-table {
     width: 100% !important;
     min-width: 0 !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
     background: #ffffff !important;
+    font-size: 7pt !important;
+  }
+
+  .app-schedule-table thead {
+    display: table-header-group !important;
+  }
+
+  .app-schedule-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .app-schedule-table thead th {
+    height: auto !important;
+    padding: 2mm 1mm !important;
+    font-size: 7pt !important;
+    letter-spacing: 0 !important;
+  }
+
+  .app-schedule-table thead th:first-child {
+    width: 24mm !important;
+  }
+
+  .app-schedule-table tbody td,
+  .app-schedule-table tbody td:first-child {
+    height: 8mm !important;
+    min-height: 0 !important;
+    padding: 1mm !important;
+    vertical-align: middle !important;
+    font-size: 6.5pt !important;
+  }
+
+  .app-schedule-table tbody td:first-child {
+    width: 24mm !important;
+    white-space: nowrap !important;
+  }
+
+  .app-schedule-table tbody tr:has(td[colspan="5"]) td {
+    height: 5mm !important;
+    padding: 1mm !important;
+    font-size: 6pt !important;
+    letter-spacing: .08em !important;
+  }
+
+  .app-schedule-table .bg-indigo-50,
+  .app-schedule-table .bg-indigo-100,
+  .app-schedule-table .bg-emerald-50 {
+    box-sizing: border-box !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    padding: 1mm !important;
+    border: 0.3mm solid #c9c9c9 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  .app-schedule-table .text-indigo-900,
+  .app-schedule-table .text-indigo-800,
+  .app-schedule-table .text-indigo-600,
+  .app-schedule-table .text-indigo-500,
+  .app-schedule-table .text-indigo-400,
+  .app-schedule-table .text-emerald-900,
+  .app-schedule-table .text-emerald-800,
+  .app-schedule-table .text-emerald-700 {
+    color: #111111 !important;
+    font-size: 6.5pt !important;
+    line-height: 1.08 !important;
+  }
+
+  .app-schedule-table .text-red-600 {
+    color: #111111 !important;
+  }
+
+  .app-schedule-table .min-h-16 {
+    min-height: 0 !important;
+  }
+
+  .app-schedule-table .grid {
+    gap: 0.5mm !important;
+  }
+
+  .app-page,
+  .app-schedule-workspace,
+  .app-schedule-frame,
+  .app-schedule-table {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .app-schedule-table th,
@@ -1842,13 +1949,6 @@ html.dark-theme .app-brand-title .app-logo-light {
     background: #ffffff !important;
     color: #111111 !important;
     border-color: #999999 !important;
-  }
-
-  .app-schedule-table .bg-indigo-50,
-  .app-schedule-table .bg-emerald-50 {
-    background: #f4f4f4 !important;
-    color: #111111 !important;
-    border-color: #aaaaaa !important;
   }
 }
 
