@@ -16,6 +16,7 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 - cadastra cursos, turmas e disciplinas, incluindo turmas com divisão em grupos A/B;
 - permite escolher, em cada turma, quais disciplinas existem, a carga semanal geral ou separada para A/B, e se ficam juntas ou divididas;
 - permite configurar preferências de sequência entre matérias distintas, como uma disciplina seguida de outra, sem torná-la obrigatória;
+- permite, por disciplina da turma, preferir três aulas consecutivas quando a carga semanal é 3; essa preferência é ajustável e não obrigatória;
 - cadastra, edita e remove professores;
 - registra disponibilidade de professores em 16 períodos de aula possíveis ao longo do dia;
 - atribui disciplinas aos professores habilitados;
