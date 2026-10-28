@@ -114,7 +114,7 @@ O atalho recria o banco DEMO isolado com somente o 3º INFO A/B e abre o aplicat
 
 Isso mantém o 3º INFO, os 17 componentes e a associação de professores recuperada da referência: UDA/Erika, SW2/Marcel, CNW2/Célia, Filosofia e História/M. Emília, Sociologia/Célia, Espanhol/Fabiane, DDM2/Marcel, IRS/Joesley, Matemática/Kamila, Inglês/Gustavo, EAMT/Fabiane, Português/Marta, EACNT/Gustavo, PDTCC/Marcel, GCW/Higor e Geografia/Thiago.
 
-O modo isolado usa o mesmo banco de demonstração e substitui os dados DEMO nele; não altera `backend/school_schedule.db`. As cargas semanais e disponibilidades que não conseguimos confirmar continuam provisórias. O otimizador vai reorganizar os períodos, não copiar uma posição aula a aula; isso permite testar o agrupamento de duas aulas consecutivas com os mesmos dados de matéria/professor.
+O modo isolado usa o mesmo banco de demonstração e substitui os dados DEMO nele; não altera `backend/school_schedule.db`. As cargas semanais continuam provisórias. Como a disponibilidade oficial individual dos professores não ficou preservada, no teste só de Informática todos ficam disponíveis de segunda a sexta nos períodos do Integral; isso evita inventar dias bloqueados e deixa o teste concentrado em matérias, professores e blocos duplos. O otimizador vai reorganizar os períodos, não copiar uma posição aula a aula; isso permite testar o agrupamento de duas aulas consecutivas com os mesmos dados de matéria/professor.
 
 
 Para testar turmas, grupos e professores com um conjunto maior, há um segundo script. Ele cria **um banco separado**, `backend/school_schedule_demo.db`, e nunca apaga `school_schedule.db`.
