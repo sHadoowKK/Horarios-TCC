@@ -62,7 +62,7 @@ const SHIFTS = [
     count: 6,
   },
   {
-    name: "Tarde (Integral)",
+    name: "Tarde",
     startIndex: 6,
     count: 5,
   },
