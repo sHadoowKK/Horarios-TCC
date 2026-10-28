@@ -64,6 +64,10 @@ try {
     & $venvPython -m unittest discover -p "test_*.py"
     if ($LASTEXITCODE -ne 0) { throw "Os testes do backend falharam; o EXE não será empacotado." }
 
+    Write-Host "Gerando banco inicial de demonstração..." -ForegroundColor Cyan
+    & $venvPython (Join-Path $backend "seed_realista.py")
+    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar a base de demonstração." }
+
     New-Item -ItemType Directory -Path (Join-Path $root "build\\pyinstaller") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root "build\\spec") -Force | Out-Null
 
@@ -84,6 +88,7 @@ try {
         "--specpath", (Join-Path $root "build\spec"),
         "--paths", $backend,
         "--add-data", "$frontend\dist;frontend_dist",
+        "--add-data", "$backend\school_schedule_demo.db;demo_seed",
         "--collect-all", "ortools",
         "--collect-all", "webview",
         "--collect-all", "pythonnet",
