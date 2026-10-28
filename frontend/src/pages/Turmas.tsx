@@ -21,6 +21,8 @@ interface Course {
 interface ClassroomSubjectSetting {
   subject_id: number;
   workload: number;
+  workload_a?: number | null;
+  workload_b?: number | null;
   split: boolean;
 }
 
@@ -479,6 +481,23 @@ export default function Turmas() {
     await saveClassroom(classroom, {
       subject_settings: next,
     });
+  };
+
+  const handleSubjectGroupWorkload = async (
+    classroom: Classroom,
+    subjectId: number,
+    group: "A" | "B",
+    workload: number,
+  ) => {
+    if (!Number.isFinite(workload)) return;
+    const safeWorkload = Math.min(Math.max(Math.round(workload), 1), 25);
+    const key = group === "A" ? "workload_a" : "workload_b";
+    const next = (classroom.subject_settings || []).map(setting =>
+      setting.subject_id === subjectId
+        ? { ...setting, [key]: safeWorkload }
+        : setting,
+    );
+    await saveClassroom(classroom, { subject_settings: next });
   };
 
   const handleSubjectSplit = async (
@@ -1173,31 +1192,55 @@ export default function Turmas() {
 
                               {setting && (
                                 <div className="grid grid-cols-1 gap-2 mt-2 pl-5">
-                                  <label className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
-                                    <span>
-                                      Aulas por semana
-                                    </span>
-
-                                    <input
-                                      key={`${classroom.id}-${subject.id}-${setting.workload}`}
-                                      type="number"
-                                      min="1"
-                                      max="25"
-                                      defaultValue={
-                                        setting.workload
-                                      }
-                                      onBlur={event =>
-                                        handleSubjectWorkload(
-                                          classroom,
-                                          subject.id,
-                                          Number(
-                                            event.target.value,
-                                          ),
-                                        )
-                                      }
-                                      className="w-16 border border-gray-300 rounded p-1 text-center bg-white"
-                                    />
-                                  </label>
+                                  {setting.split ? (
+                                    <>
+                                      {(["A", "B"] as const).map(group => (
+                                        <label
+                                          key={`${classroom.id}-${subject.id}-${group}`}
+                                          className="flex items-center justify-between gap-2 text-[11px] text-gray-500"
+                                        >
+                                          <span>Aulas semanais · Grupo {group}</span>
+                                          <input
+                                            key={`${classroom.id}-${subject.id}-${group}-${group === "A" ? setting.workload_a ?? setting.workload : setting.workload_b ?? setting.workload}`}
+                                            type="number"
+                                            min="1"
+                                            max="25"
+                                            defaultValue={group === "A"
+                                              ? setting.workload_a ?? setting.workload
+                                              : setting.workload_b ?? setting.workload}
+                                            onBlur={event =>
+                                              handleSubjectGroupWorkload(
+                                                classroom,
+                                                subject.id,
+                                                group,
+                                                Number(event.target.value),
+                                              )
+                                            }
+                                            className="w-16 border border-gray-300 rounded p-1 text-center bg-white"
+                                          />
+                                        </label>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <label className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
+                                      <span>Aulas por semana</span>
+                                      <input
+                                        key={`${classroom.id}-${subject.id}-${setting.workload}`}
+                                        type="number"
+                                        min="1"
+                                        max="25"
+                                        defaultValue={setting.workload}
+                                        onBlur={event =>
+                                          handleSubjectWorkload(
+                                            classroom,
+                                            subject.id,
+                                            Number(event.target.value),
+                                          )
+                                        }
+                                        className="w-16 border border-gray-300 rounded p-1 text-center bg-white"
+                                      />
+                                    </label>
+                                  )}
 
                                   {classroom.has_groups && (
                                     <label className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
