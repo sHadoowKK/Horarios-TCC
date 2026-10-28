@@ -348,9 +348,12 @@ def generate_schedule(
                         )]
                     )
 
+        weekly_target = subject.get(
+            "_workload_by_target", {}
+        ).get(target, subject["workload"])
         model.Add(
             sum(workload_vars)
-            == subject["workload"]
+            == weekly_target
         )
 
     def vars_for_unit_at(
