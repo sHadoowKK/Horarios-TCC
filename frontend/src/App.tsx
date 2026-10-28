@@ -584,9 +584,9 @@ function App() {
             >
               <span className="app-theme-label-group flex items-center space-x-3">
                 {theme === "dark" ? (
-                  <Sun className="w-5 h-5" />
+                  <Sun className="w-5 h-5 text-amber-400" />
                 ) : (
-                  <Moon className="w-5 h-5" />
+                  <Moon className="w-5 h-5 text-gray-500" />
                 )}
                 <span className="app-nav-label font-medium">
                   {theme === "dark" ? "Tema claro" : "Tema escuro"}
