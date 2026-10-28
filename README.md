@@ -14,7 +14,8 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 ## O que o sistema faz
 
 - cadastra cursos, turmas e disciplinas, incluindo turmas com divisão em grupos A/B;
-- permite escolher, em cada turma, quais disciplinas realmente existem, sua carga semanal e se ficam juntas ou separadas em A/B;
+- permite escolher, em cada turma, quais disciplinas existem, a carga semanal geral ou separada para A/B, e se ficam juntas ou divididas;
+- permite configurar preferências de sequência entre matérias distintas, como uma disciplina seguida de outra, sem torná-la obrigatória;
 - cadastra, edita e remove professores;
 - registra disponibilidade de professores em 16 períodos de aula possíveis ao longo do dia;
 - atribui disciplinas aos professores habilitados;
@@ -112,9 +113,31 @@ Para comparar o gerador com as matérias e os professores do 3º INFO sem interf
 
 O atalho recria o banco DEMO isolado com somente o 3º INFO A/B e abre o aplicativo. Ele interrompe se a API ainda estiver usando o banco, para evitar recriá-lo enquanto está em uso.
 
-Isso mantém o 3º INFO, os 17 componentes e a associação de professores recuperada da referência: UDA/Erika, SW2/Marcel, CNW2/Célia, Filosofia e História/M. Emília, Sociologia/Célia, Espanhol/Fabiane, DDM2/Marcel, IRS/Joesley, Matemática/Kamila, Inglês/Gustavo, EAMT/Fabiane, Português/Marta, EACNT/Gustavo, PDTCC/Marcel, GCW/Higor e Geografia/Thiago.
+O seed usa os 17 componentes e professores que conseguimos ler no quadro original de 3º INFO. As cargas semanais transcritas do quadro são:
 
-O modo isolado usa o mesmo banco de demonstração e substitui os dados DEMO nele; não altera `backend/school_schedule.db`. As cargas semanais continuam provisórias. Como a disponibilidade oficial individual dos professores não ficou preservada, no teste só de Informática todos ficam disponíveis de segunda a sexta nos períodos do Integral; isso evita inventar dias bloqueados e deixa o teste concentrado em matérias, professores e blocos duplos. O otimizador vai reorganizar os períodos, não copiar uma posição aula a aula; isso permite testar o agrupamento de duas aulas consecutivas com os mesmos dados de matéria/professor.
+| Matéria | Carga semanal | Professor(es) no quadro |
+|---|---:|---|
+| UDA | 2 por grupo | Erika |
+| SW2 | A: 3 · B: 2 | A: Higor · B: Marcel |
+| CNW2 | 2 por grupo | A: Erika · B: Marcel |
+| Filosofia | 1 | M. Emília |
+| Sociologia | 1 | M. Emília |
+| Espanhol | 2 | Célia |
+| História | 2 | M. Emília |
+| DDM2 | 2 por grupo | Marcel |
+| IRS | 2 por grupo | Joesley |
+| Matemática | 3 | Kamila |
+| Inglês | 2 | Marta |
+| EAMT | 3 por grupo | Gustavo |
+| Português | 3 | Marta |
+| EACNT | 3 por grupo | Fabiane |
+| PDTCC | 2 por grupo | Marcel |
+| GCW | 2 por grupo | Higor |
+| Geografia | 2 | Thiago |
+
+A captura mostra cargas de 37 aulas para A e 36 para B, porque SW2 tem cargas diferentes nos dois subgrupos. Filosofia e Sociologia ficam em sequência, com a mesma professora M. Emília; isso está salvo como uma preferência configurável da turma, não como regra fixa no código.
+
+O modo isolado usa o banco de demonstração e substitui somente os dados DEMO; não altera `backend/school_schedule.db`. Como a imagem não contém a disponibilidade semanal completa dos professores, o teste só de Informática deixa os docentes disponíveis nos períodos do Integral de segunda a sexta. O gerador deve reorganizar os horários respeitando as cargas, as matérias e as preferências, não copiar cada posição do quadro original.
 
 
 Para testar turmas, grupos e professores com um conjunto maior, há um segundo script. Ele cria **um banco separado**, `backend/school_schedule_demo.db`, e nunca apaga `school_schedule.db`.
@@ -135,7 +158,7 @@ A base inclui:
 - **TI — Noite**, com as cargas anotadas na conversa: SBD 5, PTCC 3, PC2 5, RDS 5, GSO2 3, SI 2 e DSE 2, totalizando 25 aulas;
 - **seis turmas Agro** (1º, 2º e 3º PI AGRO A/B), cada uma podendo ter grupos A/B, para exercitar divisões com os componentes M.R.N e P.T.I.C.
 
-**Limitação importante dos dados:** as imagens históricas não preservaram todas as cargas semanais de 3º INFO nem a matriz completa dos Agro. Por isso, essas cargas e as disponibilidades docentes são provisórias para teste, não transcrições oficiais da escola. A distribuição noturna de TI é a parte com carga recuperada com exatidão. A base também não armazena salas ou laboratórios, conforme o escopo do Anatinus.
+**Limitação importante dos dados:** a captura do 3º INFO e a grade noturna de TI foram recuperadas e usadas para transcrever as matérias/cargas visíveis. As disponibilidades individuais dos docentes e a matriz completa dos Agro continuam provisórias para teste. A distribuição noturna de TI é a parte com carga recuperada com exatidão. A base também não armazena salas ou laboratórios, conforme o escopo do Anatinus.
 
 Todos os testes automatizados:
 
