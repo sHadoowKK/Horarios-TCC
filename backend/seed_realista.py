@@ -73,7 +73,7 @@ def main():
             ("EAMT", 3, "Media", "Técnica", True, "Fabiane"),
             ("Português", 4, "Baixa", "Ensino Médio", False, "Marta"),
             ("EACNT", 3, "Media", "Técnica", True, "Gustavo"),
-            ("PDTCC", 4, "Alta", "Técnica", True, "Marcel"),
+            ("PDTCC", 4, "Media", "Técnica", True, "Marcel"),
             ("GCW", 4, "Media", "Técnica", True, "Higor"),
             ("Geografia", 2, "Baixa", "Ensino Médio", False, "Thiago"),
         ]
