@@ -225,6 +225,12 @@ html.dark-theme .app-brand-title .app-logo-light {
   color: #ffffff !important;
 }
 
+/* Mantém os ícones da opção ativa na mesma cor do texto. */
+.app-nav-link-active > svg,
+.app-nav-link-active:hover > svg {
+  color: #ffffff !important;
+}
+
 .app-theme-toggle {
   display: flex;
   align-items: center;
