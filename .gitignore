@@ -22,3 +22,11 @@ Thumbs.db
 
 # Local database backups
 backups/
+
+# Windows desktop packaging output
+/build/
+/dist/
+/release/
+backend/build/
+backend/dist/
+backend/*.spec
