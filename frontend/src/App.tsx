@@ -221,34 +221,78 @@ function App() {
   };
 
   const handleExportExcel = () => {
-    if (!schedule || schedule.length === 0) {
+    if (!schedule || schedule.length === 0 || selectedId === "") {
       return;
     }
 
-    const groupOrder = (group: string | null | undefined) =>
-      group === "Todos" ? 0 : group === "A" ? 1 : 2;
+    const selectedClassroom = classrooms.find(
+      item => item.id === Number(selectedId)
+    );
+    const selectedName = viewMode === "turma"
+      ? getClassroomName(Number(selectedId))
+      : getProfName(Number(selectedId));
+    const rowsToExport = viewMode === "turma"
+      ? (JOURNEY_ROWS[selectedClassroom?.shift || "Manhã"] || JOURNEY_ROWS["Manhã"])
+      : PROFESSOR_ROWS;
 
-    const rows = [...schedule]
-      .sort(
-        (a, b) =>
-          a.day - b.day
-          || a.period - b.period
-          || a.classroom_id - b.classroom_id
-          || groupOrder(a.student_group) - groupOrder(b.student_group)
-          || getSubName(a.subject_id).localeCompare(getSubName(b.subject_id), "pt-BR"),
-      )
-      .map(item => [
-        String(DAYS[item.day] || item.day),
-        String(PERIOD_NAMES[item.period] || item.period),
-        getClassroomName(item.classroom_id),
-        item.student_group || "Todos",
-        getSubName(item.subject_id),
-        getProfName(item.teacher_id),
-      ]);
+    const exportRows = rowsToExport.map(row => {
+      if (row.kind === "break") {
+        return ["@BREAK@" + row.label + " · " + row.name, "", "", "", "", ""];
+      }
+
+      const cells = DAYS.map((_, day) => {
+        const lessons = schedule.filter(item =>
+          item.day === day &&
+          item.period === row.period &&
+          (viewMode === "turma"
+            ? item.classroom_id === Number(selectedId)
+            : item.teacher_id === Number(selectedId))
+        );
+
+        if (viewMode === "professor") {
+          const item = lessons.find(lessonItem => lessonItem.teacher_id === Number(selectedId));
+          if (!item) return "";
+          const groupLabel = item.student_group && item.student_group !== "Todos"
+            ? " · Grupo " + item.student_group
+            : "";
+          return getClassroomName(item.classroom_id) + "\n" +
+            getSubName(item.subject_id) + groupLabel;
+        }
+
+        if (selectedClassroom?.has_groups) {
+          const jointLesson = lessons.find(item => item.student_group === "Todos");
+          if (jointLesson) {
+            return "TURMA INTEIRA\n" + getSubName(jointLesson.subject_id) +
+              "\n" + getProfName(jointLesson.teacher_id);
+          }
+
+          const groupA = lessons.find(item => item.student_group === "A");
+          const groupB = lessons.find(item => item.student_group === "B");
+          const formatGroup = (group: "A" | "B", item: any) => item
+            ? "GRUPO " + group + "\n" + getSubName(item.subject_id) +
+              "\n" + getProfName(item.teacher_id)
+            : "GRUPO " + group + "\nLivre";
+          return formatGroup("A", groupA) + "\n\n" + formatGroup("B", groupB);
+        }
+
+        const item = lessons[0];
+        return item ? getSubName(item.subject_id) + "\n" + getProfName(item.teacher_id) : "";
+      });
+
+      return [PERIOD_NAMES[row.period] || String(row.period + 1), ...cells];
+    });
+
+    const safeName = selectedName
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
 
     exportTimetableToExcel(
-      ["Dia", "Horário", "Turma", "Grupo", "Disciplina", "Professor"],
-      rows,
+      ["Horário", ...DAYS],
+      exportRows,
+      "anatinus-" + (safeName || "grade") + ".xlsx",
     );
   };
 
