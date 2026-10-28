@@ -158,6 +158,12 @@ def ensure_database_compatibility():
             ))
             subject_settings_added = True
 
+        if "preferred_subject_sequences" not in classroom_columns:
+            conn.execute(text(
+                "ALTER TABLE classrooms "
+                "ADD COLUMN preferred_subject_sequences JSON DEFAULT '[]'"
+            ))
+
         # Migra a lógica antiga "toda turma recebe todas as matérias do curso"
         # para uma lista explícita por turma, preservando carga e divisão.
         if subject_settings_added:
