@@ -163,6 +163,17 @@ function App() {
       "dark-theme",
       theme === "dark",
     );
+
+    const favicon = document.querySelector<HTMLLinkElement>(
+      "#app-favicon",
+    );
+    if (favicon) {
+      favicon.href =
+        theme === "dark"
+          ? "/anatinus%20final%201%20branco.png"
+          : "/Anatinus%20final%201.png";
+    }
+
     localStorage.setItem("anatinus-theme", theme);
   }, [theme]);
 
