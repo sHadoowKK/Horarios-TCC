@@ -125,39 +125,47 @@ function createWorksheet(headers: string[], rows: string[][]): string {
   const allRows = [headers, ...rows];
   const lastColumn = columnName(headers.length);
   const lastRow = allRows.length;
-  const columnWidths = [14, 19, 25, 13, 25, 25];
+  const columnWidths = [20, 31, 31, 31, 31, 31];
   const columnsXml = headers.map((_, index) => {
-    const width = columnWidths[index] ?? 22;
-    return '<col min="' + (index + 1) + '" max="' + (index + 1) +
-      '" width="' + width + '" customWidth="1"/>';
+    const width = columnWidths[index] ?? 28;
+    return '<col min="' + (index + 1) + '" max="' + (index + 1) + '" width="' + width + '" customWidth="1"/>';
   }).join("");
 
+  const breakRows: number[] = [];
   const rowsXml = allRows.map((row, rowIndex) => {
     const rowNumber = rowIndex + 1;
     const isHeader = rowIndex === 0;
-    const rowStyle = isHeader ? 1 : (rowIndex % 2 === 0 ? 3 : 2);
-    const height = isHeader ? 28 : 22;
-    const cells = headers.map((_, columnIndex) => {
-      const value = row[columnIndex] ?? "";
-      const style = isHeader ? 1 : (rowIndex % 2 === 0 ? 3 : 2);
-      return cellXml(value, columnName(columnIndex + 1) + rowNumber, style);
-    }).join("");
-    return '<row r="' + rowNumber + '" ht="' + height + '" customHeight="1" s="' +
-      rowStyle + '">' + cells + "</row>";
+    const isBreak = !isHeader && String(row[0] ?? "").startsWith("@BREAK@");
+    const actualRow = isBreak ? [String(row[0]).slice(7), "", "", "", "", ""] : row;
+    const rowStyle = isHeader ? 1 : isBreak ? 4 : (rowIndex % 2 === 0 ? 3 : 2);
+    const height = isHeader ? 28 : isBreak ? 17 : 38;
+    if (isBreak) breakRows.push(rowNumber);
+    const cells = isBreak
+      ? cellXml(actualRow[0], "A" + rowNumber, 4)
+      : headers.map((_, columnIndex) => {
+          const value = actualRow[columnIndex] ?? "";
+          const style = isHeader ? 1 : (rowIndex % 2 === 0 ? 3 : 2);
+          return cellXml(value, columnName(columnIndex + 1) + rowNumber, style);
+        }).join("");
+    return '<row r="' + rowNumber + '" ht="' + height + '" customHeight="1" s="' + rowStyle + '">' + cells + "</row>";
   }).join("");
+
+  const mergeXml = breakRows.length > 0
+    ? '<mergeCells count="' + breakRows.length + '">' + breakRows.map(rowNumber => '<mergeCell ref="A' + rowNumber + ':' + lastColumn + rowNumber + '"/>').join("") + '</mergeCells>'
+    : "";
 
   return [
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
     '  <sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>',
     '  <dimension ref="A1:' + lastColumn + lastRow + '"/>',
-    '  <sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>',
+    '  <sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane xSplit="1" ySplit="1" topLeftCell="B2" activePane="bottomRight" state="frozen"/></sheetView></sheetViews>',
     '  <sheetFormatPr defaultRowHeight="20"/>',
     '  <cols>' + columnsXml + '</cols>',
     '  <sheetData>' + rowsXml + '</sheetData>',
-    '  <autoFilter ref="A1:' + lastColumn + lastRow + '"/>',
-    '  <pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>',
-    '  <pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>',
+    mergeXml,
+    '  <pageMargins left="0.25" right="0.25" top="0.35" bottom="0.35" header="0.15" footer="0.15"/>',
+    '  <pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/>',
     '</worksheet>',
   ].join("\n");
 }
@@ -204,11 +212,11 @@ const WORKBOOK_RELS = [
 const STYLES = [
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
   '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
-  '  <fonts count="2"><font><sz val="11"/><name val="Aptos"/><family val="2"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Aptos"/><family val="2"/></font></fonts>',
-  '  <fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB20000"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF9EAEA"/><bgColor indexed="64"/></patternFill></fill></fills>',
+  '  <fonts count="3"><font><sz val="10"/><name val="Aptos"/><family val="2"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Aptos"/><family val="2"/></font><font><b/><color rgb="FF454B54"/><sz val="9"/><name val="Aptos"/><family val="2"/></font></fonts>',
+  '  <fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB20000"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF9EAEA"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEEF0F3"/><bgColor indexed="64"/></patternFill></fill></fills>',
   '  <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFD9DEE5"/></left><right style="thin"><color rgb="FFD9DEE5"/></right><top style="thin"><color rgb="FFD9DEE5"/></top><bottom style="thin"><color rgb="FFD9DEE5"/></bottom><diagonal/></border></borders>',
   '  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>',
-  '  <cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf></cellXfs>',
+  '  <cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs>',
   '  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>',
   '</styleSheet>',
 ].join("\n");
