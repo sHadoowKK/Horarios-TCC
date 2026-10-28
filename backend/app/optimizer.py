@@ -85,13 +85,40 @@ def _subject_entries_for_classroom(classroom, subjects):
 
             item = dict(subject)
             base_workload = int(setting.get("workload", subject["workload"]))
+            split = bool(setting.get("split", False))
+            raw_joint_workload = setting.get("joint_workload")
+
+            if split:
+                joint_workload = int(raw_joint_workload or 0)
+                raw_a = setting.get("workload_a")
+                raw_b = setting.get("workload_b")
+                workload_a = (
+                    base_workload
+                    if raw_a is None and joint_workload == 0
+                    else int(raw_a or 0)
+                )
+                workload_b = (
+                    base_workload
+                    if raw_b is None and joint_workload == 0
+                    else int(raw_b or 0)
+                )
+            else:
+                joint_workload = (
+                    base_workload
+                    if raw_joint_workload is None
+                    else int(raw_joint_workload)
+                )
+                workload_a = 0
+                workload_b = 0
+
             item["workload"] = base_workload
+            item["_joint_workload"] = joint_workload
             item["_workload_by_target"] = {
-                "Todos": base_workload,
-                "A": int(setting.get("workload_a") or base_workload),
-                "B": int(setting.get("workload_b") or base_workload),
+                "Todos": joint_workload,
+                "A": workload_a,
+                "B": workload_b,
             }
-            item["_split"] = bool(setting.get("split", False))
+            item["_split"] = split
             entries.append(item)
 
         return entries
@@ -116,13 +143,25 @@ def _subject_entries_for_classroom(classroom, subjects):
 
 
 def _targets_for(classroom, subject):
-    if (
-        classroom.get("has_groups", False)
-        and subject.get("_split", False)
-    ):
-        return ["A", "B"]
+    if not classroom.get("has_groups", False):
+        return ["Todos"]
 
-    return ["Todos"]
+    if not subject.get("_split", False):
+        return ["Todos"]
+
+    workloads = subject.get("_workload_by_target", {})
+    targets = []
+
+    if int(subject.get("_joint_workload", 0) or 0) > 0:
+        targets.append("Todos")
+
+    if int(workloads.get("A", 0) or 0) > 0:
+        targets.append("A")
+
+    if int(workloads.get("B", 0) or 0) > 0:
+        targets.append("B")
+
+    return targets
 
 
 def _audiences_for(classroom):
