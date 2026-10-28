@@ -1437,14 +1437,18 @@ html.dark-theme .app-brand-title .app-logo-light {
   color: var(--an-text-secondary) !important;
 }
 
-.app-fixed-rule > div {
+.app-fixed-rule-title {
   gap: 7px !important;
-  color: var(--an-green) !important;
+  color: var(--an-accent-text) !important;
   font-size: 11px;
   font-weight: 680;
 }
 
-.app-fixed-rule > div svg {
+.app-fixed-rule-description {
+  color: var(--an-muted) !important;
+}
+
+.app-fixed-rule-title svg {
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
