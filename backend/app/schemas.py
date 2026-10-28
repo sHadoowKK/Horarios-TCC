@@ -28,6 +28,10 @@ class Course(CourseBase):
 class ClassroomSubjectSetting(BaseModel):
     subject_id: int = Field(gt=0)
     workload: int = Field(ge=1, le=25)
+    # Cargas opcionais por subgrupo; se omitidas, usam "workload".
+    workload_a: Optional[int] = Field(default=None, ge=0, le=25)
+    workload_b: Optional[int] = Field(default=None, ge=0, le=25)
+    joint_workload: Optional[int] = Field(default=None, ge=0, le=25)
     split: bool = False
 
 
@@ -39,6 +43,7 @@ class ClassroomBase(BaseModel):
     subject_settings: List[ClassroomSubjectSetting] = Field(
         default_factory=list
     )
+    preferred_subject_sequences: List[List[int]] = Field(default_factory=list)
 
     # Compatibilidade com versões anteriores.
     split_subject_ids: List[int] = Field(default_factory=list)

@@ -21,6 +21,8 @@ interface Course {
 interface ClassroomSubjectSetting {
   subject_id: number;
   workload: number;
+  workload_a?: number | null;
+  workload_b?: number | null;
   split: boolean;
 }
 
@@ -31,6 +33,7 @@ interface Classroom {
   course_id: number;
   has_groups: boolean;
   subject_settings: ClassroomSubjectSetting[];
+  preferred_subject_sequences?: number[][];
   split_subject_ids?: number[];
 }
 
@@ -51,6 +54,8 @@ export default function Turmas() {
     useState<Set<number>>(new Set());
   const [copySourceByClassroom, setCopySourceByClassroom] =
     useState<Record<number, string>>({});
+  const [sequenceDraftByClassroom, setSequenceDraftByClassroom] =
+    useState<Record<number, { first: string; second: string }>>({});
 
   const [newCourseName, setNewCourseName] = useState("");
   const [editingCourseId, setEditingCourseId] =
@@ -372,6 +377,10 @@ export default function Turmas() {
           changes.split_subject_ids
           ?? classroom.split_subject_ids
           ?? [],
+        preferred_subject_sequences:
+          changes.preferred_subject_sequences
+          ?? classroom.preferred_subject_sequences
+          ?? [],
       },
     );
 
@@ -474,6 +483,23 @@ export default function Turmas() {
     });
   };
 
+  const handleSubjectGroupWorkload = async (
+    classroom: Classroom,
+    subjectId: number,
+    group: "A" | "B",
+    workload: number,
+  ) => {
+    if (!Number.isFinite(workload)) return;
+    const safeWorkload = Math.min(Math.max(Math.round(workload), 1), 25);
+    const key = group === "A" ? "workload_a" : "workload_b";
+    const next = (classroom.subject_settings || []).map(setting =>
+      setting.subject_id === subjectId
+        ? { ...setting, [key]: safeWorkload }
+        : setting,
+    );
+    await saveClassroom(classroom, { subject_settings: next });
+  };
+
   const handleSubjectSplit = async (
     classroom: Classroom,
     subjectId: number,
@@ -531,6 +557,49 @@ export default function Turmas() {
     });
   };
 
+  const handleAddPreferredSequence = async (
+    classroom: Classroom,
+  ) => {
+    const draft = sequenceDraftByClassroom[classroom.id] || {
+      first: "",
+      second: "",
+    };
+    const firstId = Number(draft.first);
+    const secondId = Number(draft.second);
+    if (!firstId || !secondId || firstId === secondId) return;
+
+    const firstSetting = settingFor(classroom, firstId);
+    const secondSetting = settingFor(classroom, secondId);
+    if (!firstSetting || !secondSetting) return;
+    if (firstSetting.split !== secondSetting.split) {
+      alert("Escolha matérias da mesma organização: ambas de turma inteira ou ambas separadas A/B.");
+      return;
+    }
+
+    const current = classroom.preferred_subject_sequences || [];
+    if (current.some(pair => pair[0] === firstId && pair[1] === secondId)) {
+      return;
+    }
+
+    await saveClassroom(classroom, {
+      preferred_subject_sequences: [...current, [firstId, secondId]],
+    });
+    setSequenceDraftByClassroom(currentDrafts => ({
+      ...currentDrafts,
+      [classroom.id]: { first: "", second: "" },
+    }));
+  };
+
+  const handleRemovePreferredSequence = async (
+    classroom: Classroom,
+    index: number,
+  ) => {
+    const current = classroom.preferred_subject_sequences || [];
+    await saveClassroom(classroom, {
+      preferred_subject_sequences: current.filter((_, pairIndex) => pairIndex !== index),
+    });
+  };
+
   const handleCopySubjects = async (
     targetClassroom: Classroom,
   ) => {
@@ -575,6 +644,8 @@ export default function Turmas() {
 
     await saveClassroom(targetClassroom, {
       subject_settings: copiedSettings,
+      preferred_subject_sequences:
+        sourceClassroom.preferred_subject_sequences || [],
     });
 
     setCopySourceByClassroom(current => ({
@@ -611,15 +682,11 @@ export default function Turmas() {
   };
 
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2 mb-8">
-        <BookOpen className="w-8 h-8 text-indigo-600" />
-        Gestão Acadêmica
-      </h2>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="app-view app-view-classes p-8 max-w-7xl mx-auto">
+      <h2 className="sr-only">Cursos, turmas e disciplinas</h2>
+      <div className="app-academic-grid grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* CURSOS */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
+        <div className="app-panel app-panel-courses bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
           <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-700">
             <School className="w-5 h-5 text-blue-500" />
             Cursos
@@ -648,7 +715,7 @@ export default function Turmas() {
             </button>
           </form>
 
-          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[520px] pr-2">
+          <ul className="app-record-list">
             {courses.map(course => (
               <li
                 key={course.id}
@@ -695,10 +762,6 @@ export default function Turmas() {
                       {course.name}
                     </span>
 
-                    <span className="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">
-                      ID: {course.id}
-                    </span>
-
                     <button
                       type="button"
                       onClick={() =>
@@ -734,7 +797,7 @@ export default function Turmas() {
         </div>
 
         {/* TURMAS */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
+        <div className="app-panel app-panel-classrooms bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
           <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-700">
             <Layers className="w-5 h-5 text-emerald-500" />
             Turmas
@@ -822,7 +885,7 @@ export default function Turmas() {
             </button>
           </form>
 
-          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-2">
+          <ul className="app-record-list">
             {classrooms.map(classroom => {
               const candidates =
                 subjectsForClassroom(classroom);
@@ -1129,31 +1192,55 @@ export default function Turmas() {
 
                               {setting && (
                                 <div className="grid grid-cols-1 gap-2 mt-2 pl-5">
-                                  <label className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
-                                    <span>
-                                      Aulas por semana
-                                    </span>
-
-                                    <input
-                                      key={`${classroom.id}-${subject.id}-${setting.workload}`}
-                                      type="number"
-                                      min="1"
-                                      max="25"
-                                      defaultValue={
-                                        setting.workload
-                                      }
-                                      onBlur={event =>
-                                        handleSubjectWorkload(
-                                          classroom,
-                                          subject.id,
-                                          Number(
-                                            event.target.value,
-                                          ),
-                                        )
-                                      }
-                                      className="w-16 border border-gray-300 rounded p-1 text-center bg-white"
-                                    />
-                                  </label>
+                                  {setting.split ? (
+                                    <>
+                                      {(["A", "B"] as const).map(group => (
+                                        <label
+                                          key={`${classroom.id}-${subject.id}-${group}`}
+                                          className="flex items-center justify-between gap-2 text-[11px] text-gray-500"
+                                        >
+                                          <span>Aulas semanais · Grupo {group}</span>
+                                          <input
+                                            key={`${classroom.id}-${subject.id}-${group}-${group === "A" ? setting.workload_a ?? setting.workload : setting.workload_b ?? setting.workload}`}
+                                            type="number"
+                                            min="1"
+                                            max="25"
+                                            defaultValue={group === "A"
+                                              ? setting.workload_a ?? setting.workload
+                                              : setting.workload_b ?? setting.workload}
+                                            onBlur={event =>
+                                              handleSubjectGroupWorkload(
+                                                classroom,
+                                                subject.id,
+                                                group,
+                                                Number(event.target.value),
+                                              )
+                                            }
+                                            className="w-16 border border-gray-300 rounded p-1 text-center bg-white"
+                                          />
+                                        </label>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <label className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
+                                      <span>Aulas por semana</span>
+                                      <input
+                                        key={`${classroom.id}-${subject.id}-${setting.workload}`}
+                                        type="number"
+                                        min="1"
+                                        max="25"
+                                        defaultValue={setting.workload}
+                                        onBlur={event =>
+                                          handleSubjectWorkload(
+                                            classroom,
+                                            subject.id,
+                                            Number(event.target.value),
+                                          )
+                                        }
+                                        className="w-16 border border-gray-300 rounded p-1 text-center bg-white"
+                                      />
+                                    </label>
+                                  )}
 
                                   {classroom.has_groups && (
                                     <label className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
@@ -1192,6 +1279,114 @@ export default function Turmas() {
                           );
                         })}
 
+                        {(classroom.subject_settings || []).length >= 2 && (
+                          <section className="mt-3 border-t border-gray-200 pt-3 space-y-2">
+                            <div className="text-xs font-semibold text-gray-700">
+                              Preferir matérias em sequência
+                            </div>
+                            <p className="text-[11px] leading-relaxed text-gray-500">
+                              O gerador tenta colocar a primeira matéria imediatamente antes da segunda. É uma preferência, não uma regra obrigatória.
+                            </p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
+                              <select
+                                aria-label="Primeira matéria da sequência"
+                                value={sequenceDraftByClassroom[classroom.id]?.first || ""}
+                                onChange={event =>
+                                  setSequenceDraftByClassroom(current => ({
+                                    ...current,
+                                    [classroom.id]: {
+                                      first: event.target.value,
+                                      second: "",
+                                    },
+                                  }))
+                                }
+                                className="min-w-0 border border-gray-300 rounded p-1.5 bg-white text-[11px]"
+                              >
+                                <option value="">Primeira matéria</option>
+                                {(classroom.subject_settings || []).map(setting => {
+                                  const subject = candidates.find(item => item.id === setting.subject_id);
+                                  return subject ? (
+                                    <option key={subject.id} value={subject.id}>
+                                      {subject.name}
+                                    </option>
+                                  ) : null;
+                                })}
+                              </select>
+
+                              <span className="text-center text-[11px] text-gray-400">antes de</span>
+
+                              <select
+                                aria-label="Segunda matéria da sequência"
+                                value={sequenceDraftByClassroom[classroom.id]?.second || ""}
+                                disabled={!sequenceDraftByClassroom[classroom.id]?.first}
+                                onChange={event =>
+                                  setSequenceDraftByClassroom(current => ({
+                                    ...current,
+                                    [classroom.id]: {
+                                      ...(current[classroom.id] || { first: "", second: "" }),
+                                      second: event.target.value,
+                                    },
+                                  }))
+                                }
+                                className="min-w-0 border border-gray-300 rounded p-1.5 bg-white text-[11px] disabled:opacity-50"
+                              >
+                                <option value="">Segunda matéria</option>
+                                {(classroom.subject_settings || [])
+                                  .filter(setting => {
+                                    const draft = sequenceDraftByClassroom[classroom.id];
+                                    const firstSetting = settingFor(classroom, Number(draft?.first));
+                                    return setting.subject_id !== Number(draft?.first)
+                                      && firstSetting
+                                      && setting.split === firstSetting.split;
+                                  })
+                                  .map(setting => {
+                                    const subject = candidates.find(item => item.id === setting.subject_id);
+                                    return subject ? (
+                                      <option key={subject.id} value={subject.id}>
+                                        {subject.name}
+                                      </option>
+                                    ) : null;
+                                  })}
+                              </select>
+
+                              <button
+                                type="button"
+                                disabled={
+                                  !sequenceDraftByClassroom[classroom.id]?.first
+                                  || !sequenceDraftByClassroom[classroom.id]?.second
+                                }
+                                onClick={() => handleAddPreferredSequence(classroom)}
+                                className="text-[11px] px-2 py-1.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                Adicionar
+                              </button>
+                            </div>
+
+                            {(classroom.preferred_subject_sequences || []).map((pair, index) => (
+                              <div
+                                key={pair.join("-") + "-" + index}
+                                className="flex items-center justify-between gap-2 rounded border border-gray-200 bg-white px-2 py-1.5"
+                              >
+                                <span className="text-[11px] text-gray-700">
+                                  {candidates.find(item => item.id === pair[0])?.name || pair[0]}
+                                  <span className="mx-2 text-gray-400">→</span>
+                                  {candidates.find(item => item.id === pair[1])?.name || pair[1]}
+                                </span>
+                                <button
+                                  type="button"
+                                  title="Remover sequência preferida"
+                                  aria-label="Remover sequência preferida"
+                                  onClick={() => handleRemovePreferredSequence(classroom, index)}
+                                  className="p-1 text-gray-400 hover:text-red-600"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </section>
+                        )}
+
                         {candidates.length === 0 && (
                           <p className="text-xs text-gray-400">
                             Nenhuma disciplina foi associada
@@ -1214,7 +1409,7 @@ export default function Turmas() {
         </div>
 
         {/* DISCIPLINAS */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
+        <div className="app-panel app-panel-subjects bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
           <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-700">
             <BookOpen className="w-5 h-5 text-purple-500" />
             Disciplinas
@@ -1332,7 +1527,7 @@ export default function Turmas() {
             </button>
           </form>
 
-          <ul className="space-y-3 flex-1 overflow-y-auto max-h-[520px] pr-2">
+          <ul className="app-record-list">
             {subjects.map(subject => (
               <li
                 key={subject.id}

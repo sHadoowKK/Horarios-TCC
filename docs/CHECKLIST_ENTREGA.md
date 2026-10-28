@@ -11,10 +11,14 @@
 - [ ] testar geração pela interface
 - [ ] testar visão por turma
 - [ ] testar visão por professor
-- [ ] testar Exportar CSV
+- [ ] testar carga distinta para grupos A/B (ex.: SW2 A=3, B=2)
+- [ ] testar preferência de sequência (ex.: Filosofia → Sociologia)
+- [ ] conferir que horários de grupo sem aula ficam em branco
+- [ ] testar exportação Excel (`.xlsx`) e verificar larguras/acentos no Excel
 - [ ] testar Imprimir
 - [ ] testar exclusão de professor com grade salva
 - [ ] testar mensagem de pré-validação com uma turma propositalmente impossível
+- [ ] confirmar que a matriz do 3º INFO bate com a tabela de referência, incluindo as exceções A/B
 
 ## Resultados para registrar
 
@@ -55,6 +59,17 @@
 - [ ] testar em computador/projetor que será usado
 - [ ] levar projeto em pendrive/backup
 - [ ] confirmar que Python/Node/dependências estarão disponíveis
+
+## Aplicativo desktop Windows
+
+- [ ] Executar o workflow `Build Windows` e confirmar que o pacote foi gerado.
+- [ ] Baixar e extrair o ZIP completo em uma pasta limpa.
+- [ ] Abrir `Anatinus.exe` sem iniciar manualmente Python ou Node.js.
+- [ ] Conferir navegação pelas quatro telas, cadastro e geração de grade.
+- [ ] Fechar e reabrir o aplicativo e confirmar que os dados continuam salvos.
+- [ ] Conferir o banco em `%LOCALAPPDATA%\\Anatinus\\school_schedule.db`.
+- [ ] Testar backup e restauração do banco antes de entregar a versão.
+- [ ] Verificar o aplicativo no computador que será usado na apresentação.
 
 ## Validação final
 

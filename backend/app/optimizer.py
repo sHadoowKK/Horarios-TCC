@@ -84,10 +84,41 @@ def _subject_entries_for_classroom(classroom, subjects):
                 continue
 
             item = dict(subject)
-            item["workload"] = int(
-                setting.get("workload", subject["workload"])
-            )
-            item["_split"] = bool(setting.get("split", False))
+            base_workload = int(setting.get("workload", subject["workload"]))
+            split = bool(setting.get("split", False))
+            raw_joint_workload = setting.get("joint_workload")
+
+            if split:
+                joint_workload = int(raw_joint_workload or 0)
+                raw_a = setting.get("workload_a")
+                raw_b = setting.get("workload_b")
+                workload_a = (
+                    base_workload
+                    if raw_a is None and joint_workload == 0
+                    else int(raw_a or 0)
+                )
+                workload_b = (
+                    base_workload
+                    if raw_b is None and joint_workload == 0
+                    else int(raw_b or 0)
+                )
+            else:
+                joint_workload = (
+                    base_workload
+                    if raw_joint_workload is None
+                    else int(raw_joint_workload)
+                )
+                workload_a = 0
+                workload_b = 0
+
+            item["workload"] = base_workload
+            item["_joint_workload"] = joint_workload
+            item["_workload_by_target"] = {
+                "Todos": joint_workload,
+                "A": workload_a,
+                "B": workload_b,
+            }
+            item["_split"] = split
             entries.append(item)
 
         return entries
@@ -112,13 +143,25 @@ def _subject_entries_for_classroom(classroom, subjects):
 
 
 def _targets_for(classroom, subject):
-    if (
-        classroom.get("has_groups", False)
-        and subject.get("_split", False)
-    ):
-        return ["A", "B"]
+    if not classroom.get("has_groups", False):
+        return ["Todos"]
 
-    return ["Todos"]
+    if not subject.get("_split", False):
+        return ["Todos"]
+
+    workloads = subject.get("_workload_by_target", {})
+    targets = []
+
+    if int(subject.get("_joint_workload", 0) or 0) > 0:
+        targets.append("Todos")
+
+    if int(workloads.get("A", 0) or 0) > 0:
+        targets.append("A")
+
+    if int(workloads.get("B", 0) or 0) > 0:
+        targets.append("B")
+
+    return targets
 
 
 def _audiences_for(classroom):
@@ -344,9 +387,12 @@ def generate_schedule(
                         )]
                     )
 
+        weekly_target = subject.get(
+            "_workload_by_target", {}
+        ).get(target, subject["workload"])
         model.Add(
             sum(workload_vars)
-            == subject["workload"]
+            == weekly_target
         )
 
     def vars_for_unit_at(
@@ -812,6 +858,65 @@ def generate_schedule(
             )
             penalties.append(day_penalty)
 
+    # Preferência Soft: agrupar aulas da mesma disciplina em pares consecutivos.
+    # Só conta quando o período seguinte começa exatamente quando o anterior termina;
+    # intervalos e almoço nunca são considerados parte de um bloco duplo.
+    contiguous_period_pairs = [
+        (period, period + 1)
+        for period in range(min(num_periods - 1, len(PERIOD_START_MINUTES) - 1))
+        if PERIOD_END_MINUTES[period] == PERIOD_START_MINUTES[period + 1]
+    ]
+
+    for classroom, subject, target in units:
+        allowed_periods = set(
+            JOURNEY_PERIODS.get(
+                classroom.get("shift", "Manhã"),
+                JOURNEY_PERIODS["Manhã"],
+            )
+        )
+        for day in range(num_days):
+            for first_period, second_period in contiguous_period_pairs:
+                if first_period not in allowed_periods or second_period not in allowed_periods:
+                    continue
+                first_slot = sum(vars_for_unit_at(
+                    classroom, subject, target, day, first_period
+                ))
+                second_slot = sum(vars_for_unit_at(
+                    classroom, subject, target, day, second_period
+                ))
+                paired = model.NewBoolVar(
+                    f"double_lesson_c{classroom['id']}_s{subject['id']}_"
+                    f"g{target}_d{day}_p{first_period}"
+                )
+                model.Add(paired <= first_slot)
+                model.Add(paired <= second_slot)
+                model.Add(paired >= first_slot + second_slot - 1)
+                rewards.append(paired * 300)
+    # Preferências por sequência entre matérias configuradas na própria turma.
+    # Ex.: Filosofia seguida de Sociologia. São recompensas Soft, não restrições Hard.
+    for classroom in classrooms:
+        by_id = {item["id"]: item for item in classroom_subjects.get(classroom["id"], [])}
+        allowed = set(JOURNEY_PERIODS.get(classroom.get("shift", "Manhã"), JOURNEY_PERIODS["Manhã"]))
+        for sequence in classroom.get("preferred_subject_sequences", []) or []:
+            if len(sequence) != 2:
+                continue
+            first = by_id.get(sequence[0])
+            second = by_id.get(sequence[1])
+            if first is None or second is None:
+                continue
+            targets = set(_targets_for(classroom, first)) & set(_targets_for(classroom, second))
+            for target in targets:
+                for day in range(num_days):
+                    for p1, p2 in contiguous_period_pairs:
+                        if p1 not in allowed or p2 not in allowed:
+                            continue
+                        x = sum(vars_for_unit_at(classroom, first, target, day, p1))
+                        y = sum(vars_for_unit_at(classroom, second, target, day, p2))
+                        together = model.NewBoolVar(f"sequence_c{classroom['id']}_s{first['id']}_s{second['id']}_g{target}_d{day}_p{p1}")
+                        model.Add(together <= x)
+                        model.Add(together <= y)
+                        model.Add(together >= x + y - 1)
+                        rewards.append(together * 400)
     # Regra opcional legada de mesmo professor seguido.
     # Por padrão fica ignorada porque horários reais podem ter blocos longos.
     max_same_teacher = int(

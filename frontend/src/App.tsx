@@ -1,7 +1,8 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from './api';
+import { exportTimetableToExcel } from './utils/exportTimetableToExcel';
 import Turmas from './pages/Turmas';
 import Professores from './pages/Professores';
 import Config from './pages/Config';
@@ -66,6 +67,7 @@ const PROFESSOR_ROWS: DisplayRow[] = [
   lesson(0), lesson(1), lesson(2),
   pause("09:40 - 10:00", "Intervalo"),
   lesson(3), lesson(4), lesson(5),
+  pause("12:30 - 13:00", "Almoço"),
   lesson(6), lesson(7),
   pause("14:40 - 14:50", "Intervalo"),
   lesson(8), lesson(9), lesson(10),
@@ -83,9 +85,7 @@ function getInitialTheme(): Theme {
     return savedTheme;
   }
 
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return "dark";
 }
 
 function App() {
@@ -165,6 +165,17 @@ function App() {
       "dark-theme",
       theme === "dark",
     );
+
+    const favicon = document.querySelector<HTMLLinkElement>(
+      "#app-favicon",
+    );
+    if (favicon) {
+      favicon.href =
+        theme === "dark"
+          ? "/anatinus%20final%201%20branco.png"
+          : "/Anatinus%20final%201.png";
+    }
+
     localStorage.setItem("anatinus-theme", theme);
   }, [theme]);
 
@@ -209,59 +220,92 @@ function App() {
     }
   };
 
-  const handleExportCsv = () => {
+  const handleExportExcel = () => {
     if (!schedule || schedule.length === 0) {
       return;
     }
 
-    const escapeCsv = (value: unknown) => {
-      const text = String(value ?? "");
-      return `"${text.replaceAll('"', '""')}"`;
-    };
+    const buildRows = (
+      entityId: number,
+      mode: "turma" | "professor",
+      classroom: any | undefined,
+      rowLayout: DisplayRow[],
+    ): string[][] => rowLayout.map(row => {
+      if (row.kind === "break") {
+        return ["@BREAK@" + row.label + " · " + row.name, "", "", "", "", ""];
+      }
 
-    const rows = [
-      [
-        "Dia",
-        "Horário",
-        "Turma",
-        "Grupo",
-        "Disciplina",
-        "Professor",
-      ],
-      ...[...schedule]
-        .sort(
-          (a, b) =>
-            a.day - b.day
-            || a.period - b.period
-            || a.classroom_id - b.classroom_id,
-        )
-        .map(item => [
-          DAYS[item.day] || item.day,
-          PERIOD_NAMES[item.period] || item.period,
-          getClassroomName(item.classroom_id),
-          item.student_group || "Todos",
-          getSubName(item.subject_id),
-          getProfName(item.teacher_id),
-        ]),
-    ];
+      const cells = DAYS.map((_, day) => {
+        const lessons = schedule.filter(item =>
+          item.day === day &&
+          item.period === row.period &&
+          (mode === "turma" ? item.classroom_id === entityId : item.teacher_id === entityId)
+        );
 
-    const csv = rows
-      .map(row => row.map(escapeCsv).join(";"))
-      .join("\r\n");
+        if (mode === "professor") {
+          const item = lessons.find(lessonItem => lessonItem.teacher_id === entityId);
+          if (!item) return "";
+          const groupLabel = item.student_group && item.student_group !== "Todos"
+            ? " · Grupo " + item.student_group
+            : "";
+          return getClassroomName(item.classroom_id) + "\n" +
+            getSubName(item.subject_id) + groupLabel;
+        }
 
-    const blob = new Blob(
-      ["\ufeff", csv],
-      { type: "text/csv;charset=utf-8;" },
-    );
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+        if (classroom?.has_groups) {
+          const jointLesson = lessons.find(item => item.student_group === "Todos");
+          if (jointLesson) {
+            return "TURMA INTEIRA\n" + getSubName(jointLesson.subject_id) +
+              "\n" + getProfName(jointLesson.teacher_id);
+          }
+          const groupA = lessons.find(item => item.student_group === "A");
+          const groupB = lessons.find(item => item.student_group === "B");
+          if (!groupA && !groupB) return "";
+          const formatGroup = (group: "A" | "B", item: any) => item
+            ? "GRUPO " + group + "\n" + getSubName(item.subject_id) +
+              "\n" + getProfName(item.teacher_id)
+            : "";
+          return [formatGroup("A", groupA), formatGroup("B", groupB)]
+            .filter(Boolean)
+            .join("\n\n");
+        }
 
-    link.href = url;
-    link.download = "anatinus-grade.csv";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+        const item = lessons[0];
+        return item ? getSubName(item.subject_id) + "\n" + getProfName(item.teacher_id) : "";
+      });
+
+      return [PERIOD_NAMES[row.period] || String(row.period + 1), ...cells];
+    });
+
+    const headers = ["Horário", ...DAYS];
+    const worksheets = viewMode === "turma"
+      ? classrooms
+          .filter(classroom => schedule.some(item => item.classroom_id === classroom.id))
+          .map(classroom => ({
+            name: classroom.name,
+            headers,
+            rows: buildRows(
+              classroom.id,
+              "turma",
+              classroom,
+              JOURNEY_ROWS[classroom.shift || "Manhã"] || JOURNEY_ROWS["Manhã"],
+            ),
+          }))
+      : teachers
+          .filter(teacher => schedule.some(item => item.teacher_id === teacher.id))
+          .map(teacher => ({
+            name: teacher.name,
+            headers,
+            rows: buildRows(teacher.id, "professor", undefined, PROFESSOR_ROWS),
+          }));
+
+    if (worksheets.length === 0) {
+      setError("Não há grades para exportar nessa visualização.");
+      return;
+    }
+
+    const suffix = viewMode === "turma" ? "por-turma" : "por-professor";
+    exportTimetableToExcel(worksheets, "anatinus-grades-" + suffix + ".xlsx");
   };
 
   const handlePrint = () => {
@@ -324,16 +368,19 @@ function App() {
   const renderScheduleGrid = () => {
     if (!schedule) {
       return (
-        <div className="flex h-full items-center justify-center text-gray-500 mt-32">
-          Nenhuma grade gerada. Clique em "Gerar Nova Grade".
+        <div className="app-empty-state">
+          <div className="app-empty-icon"><Calendar className="w-6 h-6" /></div>
+          <h3>Nenhuma grade gerada</h3>
+          <p>Use “Gerar grade” para criar os horários.</p>
         </div>
       );
     }
 
     if (!selectedId) {
       return (
-        <div className="flex h-full items-center justify-center text-gray-500 mt-32">
-          Selecione uma turma ou professor para visualizar.
+        <div className="app-empty-state app-empty-state-compact">
+          <div className="app-empty-icon"><Filter className="w-5 h-5" /></div>
+          <h3>Selecione uma turma ou professor</h3>
         </div>
       );
     }
@@ -348,8 +395,8 @@ function App() {
     }
 
     return (
-      <div className="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
-        <table className="w-full text-sm text-center">
+      <div className="app-schedule-frame overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
+        <table className="app-schedule-table w-full text-sm text-center">
           <thead className="bg-gray-100 text-gray-600 font-bold border-b">
             <tr>
               <th className="p-3 border-r w-28">Horário</th>
@@ -428,12 +475,14 @@ function App() {
                           );
                         } else {
                           const renderGroup = (group: "A" | "B", item: any) => (
-                            <div className="min-h-16 flex flex-col items-center justify-center p-1.5 bg-indigo-50 border border-indigo-100 rounded">
-                              <span className="text-[10px] font-bold uppercase text-indigo-400">
-                                Grupo {group}
-                              </span>
-                              {item ? (
+                            <div className={item
+                              ? "min-h-16 flex flex-col items-center justify-center p-1.5 bg-indigo-50 border border-indigo-100 rounded"
+                              : "min-h-16"} aria-hidden={!item}>
+                              {item && (
                                 <>
+                                  <span className="text-[10px] font-bold uppercase text-indigo-400">
+                                    Grupo {group}
+                                  </span>
                                   <span className="text-xs font-bold text-indigo-900 mt-0.5 leading-tight">
                                     {getSubName(item.subject_id)}
                                   </span>
@@ -445,10 +494,6 @@ function App() {
                                     {getProfName(item.teacher_id)}
                                   </span>
                                 </>
-                              ) : (
-                                <span className="text-[10px] text-gray-400 mt-1">
-                                  Livre
-                                </span>
                               )}
                             </div>
                           );
@@ -531,103 +576,146 @@ function App() {
 
   return (
     <Router>
-      <div className="flex h-screen bg-gray-50 text-gray-900 w-full text-left">
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
-          <div className="p-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
+      <div className="app-shell flex h-screen w-full text-left">
+        <aside className="app-sidebar flex flex-col shrink-0">
+          <div className="app-brand p-6 border-b border-gray-200">
+            <h1 className="app-brand-title text-xl font-bold flex items-center gap-2">
               <img
-                src="/anatinus.svg"
+                src="/Anatinus%20final%201.png"
                 alt=""
-                className="w-8 h-8"
+                aria-hidden="true"
+                className="app-logo-light w-8 h-8"
               />
-              Anatinus
+              <img
+                src="/anatinus%20final%201%20branco.png"
+                alt=""
+                aria-hidden="true"
+                className="app-logo-dark w-8 h-8"
+              />
+              <span className="app-brand-name">Anatinus</span>
             </h1>
           </div>
 
-          <nav className="flex-1 p-4 space-y-2 flex flex-col">
-            <Link to="/" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+          <nav className="app-nav flex-1 p-4 space-y-2 flex flex-col">
+            <NavLink
+              to="/"
+              title="Grade Horária"
+              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+            >
               <Calendar className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">Grade Horária</span>
-            </Link>
+              <span className="app-nav-label font-medium">Grade Horária</span>
+            </NavLink>
 
-            <Link to="/professores" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+            <NavLink
+              to="/professores"
+              title="Professores"
+              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+            >
               <Users className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">Professores</span>
-            </Link>
+              <span className="app-nav-label font-medium">Professores</span>
+            </NavLink>
 
-            <Link to="/turmas" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+            <NavLink
+              to="/turmas"
+              title="Turmas e Matérias"
+              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+            >
               <BookOpen className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">Turmas e Matérias</span>
-            </Link>
+              <span className="app-nav-label font-medium">Turmas e Matérias</span>
+            </NavLink>
 
             <div className="flex-1" />
 
             <button
               type="button"
               onClick={toggleTheme}
-              className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors"
+              className="app-theme-toggle w-full flex items-center justify-start p-3 rounded-lg transition-colors"
               title={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
               aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
             >
-              <span className="flex items-center space-x-3">
+              <span className="app-theme-label-group flex items-center space-x-3">
                 {theme === "dark" ? (
                   <Sun className="w-5 h-5 text-amber-400" />
                 ) : (
                   <Moon className="w-5 h-5 text-gray-500" />
                 )}
-                <span className="font-medium">
+                <span className="app-nav-label font-medium">
                   {theme === "dark" ? "Tema claro" : "Tema escuro"}
                 </span>
               </span>
 
-              <span
-                className={`theme-switch ${
-                  theme === "dark" ? "theme-switch-on" : ""
-                }`}
-                aria-hidden="true"
-              >
-                <span className="theme-switch-knob" />
-              </span>
+
             </button>
 
-            <Link to="/config" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+            <NavLink
+              to="/config"
+              title="Regras e Leis"
+              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+            >
               <Settings className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">Regras e Leis</span>
-            </Link>
+              <span className="app-nav-label font-medium">Regras e Leis</span>
+            </NavLink>
           </nav>
         </aside>
 
-        <main className="flex-1 overflow-auto">
+        <main className="app-main flex-1 overflow-auto">
           <Routes>
             <Route
               path="/"
               element={
-                <div className="p-8 max-w-7xl mx-auto">
-                  <header className="flex justify-between items-center mb-8">
-                    <div>
-                      <h2 className="text-3xl font-bold text-gray-800">Grade Horária</h2>
-                      <p className="text-gray-500 mt-1">
-                        Visualize os horários gerados por turma ou professor.
-                      </p>
+                <div className="app-page p-8 max-w-7xl mx-auto">
+                  <h2 className="sr-only">Grade horária</h2>
+                  <div className="app-toolbar no-print">
+                    <div className="app-view-controls">
+                      <select
+                        aria-label="Visualizar por"
+                        className="app-toolbar-select"
+                        value={viewMode}
+                        onChange={event => {
+                          setViewMode(event.target.value as "turma" | "professor");
+                          setSelectedId("");
+                        }}
+                      >
+                        <option value="turma">Por turma</option>
+                        <option value="professor">Por professor</option>
+                      </select>
+
+                      <select
+                        aria-label={viewMode === "turma" ? "Selecionar turma" : "Selecionar professor"}
+                        className="app-toolbar-select app-toolbar-select-target"
+                        value={selectedId}
+                        onChange={event => setSelectedId(event.target.value === "" ? "" : Number(event.target.value))}
+                      >
+                        <option value="">Selecionar...</option>
+                        {viewMode === "turma" && classrooms.map(classroom => (
+                          <option key={classroom.id} value={classroom.id}>
+                            {classroom.name} ({classroom.shift}{classroom.has_groups ? " · Grupos A/B" : ""})
+                          </option>
+                        ))}
+                        {viewMode === "professor" && teachers.map(teacher => (
+                          <option key={teacher.id} value={teacher.id}>
+                            {teacher.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
-                    <div className="flex flex-wrap justify-end gap-2 no-print">
+                    <div className="app-toolbar-actions">
                       {schedule && schedule.length > 0 && (
                         <>
                           <button
                             type="button"
-                            onClick={handleExportCsv}
-                            className="secondary-action-button px-4 py-3 rounded-lg font-bold flex items-center gap-2"
-                            title="Exportar a grade completa em CSV"
+                            onClick={handleExportExcel}
+                            className="app-action-secondary"
+                            title={viewMode === "turma" ? "Exportar uma aba por turma em Excel" : "Exportar uma aba por professor em Excel"}
                           >
                             <Download className="w-4 h-4" />
-                            Exportar CSV
+                            Excel
                           </button>
-
                           <button
                             type="button"
                             onClick={handlePrint}
-                            className="secondary-action-button px-4 py-3 rounded-lg font-bold flex items-center gap-2"
+                            className="app-action-secondary"
                             title="Imprimir a visualização atual"
                           >
                             <Printer className="w-4 h-4" />
@@ -637,116 +725,70 @@ function App() {
                       )}
 
                       <button
+                        type="button"
                         onClick={handleGenerate}
                         disabled={loading}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className="app-action-primary disabled:opacity-50"
                       >
-                        {loading ? (
-                          <span className="animate-pulse">Gerando grade...</span>
-                        ) : (
-                          "Gerar Nova Grade"
-                        )}
+                        {loading ? <span>Gerando...</span> : "Gerar grade"}
                       </button>
                     </div>
-                  </header>
+                  </div>
 
                   {error && (
-                    <div className="mb-6 p-4 bg-red-100 border border-red-200 text-red-700 rounded-lg font-medium">
+                    <div className="app-status-message app-status-error" role="alert">
                       {error}
                     </div>
                   )}
 
                   {loading && schedule && (
-                    <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium">
-                      <strong>Gerando nova grade.</strong>
-                      <span className="ml-1">
-                        Enquanto o cálculo não termina, a grade abaixo ainda é a última grade salva.
-                      </span>
+                    <div className="app-status-message app-status-info" role="status">
+                      <strong>Gerando uma nova grade.</strong>
+                      <span>A grade anterior continua disponível até o cálculo terminar.</span>
                     </div>
                   )}
 
                   {!error && generationSuccess && (
-                    <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm font-semibold">
+                    <div className="app-status-message app-status-success" role="status">
                       Grade gerada.
                     </div>
                   )}
 
                   {!error && unstaffedLessons > 0 && (
-                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg">
-                      <div>
-                        <strong>
-                          {unstaffedLessons} {unstaffedLessons === 1 ? "aula está" : "aulas estão"} sem professor.
-                        </strong>
-                        <span className="ml-1">
-                          A grade continua válida; esses horários ficam reservados até a escola atribuir um docente.
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {unstaffedSummary.map(item => {
-                          const groupLabel =
-                            item.studentGroup !== "Todos"
+                    <details className="app-pending-details">
+                      <summary>
+                        <span className="app-pending-marker" aria-hidden="true" />
+                        <strong>{unstaffedLessons}</strong>
+                        <span>{unstaffedLessons === 1 ? "aula sem professor" : "aulas sem professor"}</span>
+                        <span className="app-pending-toggle app-pending-toggle-closed">Ver detalhes</span>
+                        <span className="app-pending-toggle app-pending-toggle-open">Ocultar detalhes</span>
+                      </summary>
+                      <div className="app-pending-body">
+                        <p>Esses horários permanecem reservados até a escola atribuir um docente.</p>
+                        <ul>
+                          {unstaffedSummary.map(item => {
+                            const groupLabel = item.studentGroup !== "Todos"
                               ? ` · Grupo ${item.studentGroup}`
                               : "";
-
-                          return (
-                            <span
-                              key={`${item.classroomId}-${item.subjectId}-${item.studentGroup}`}
-                              className="text-xs px-2 py-1 rounded bg-white border border-amber-200"
-                            >
-                              {getClassroomName(item.classroomId)}
-                              {" · "}
-                              {getSubName(item.subjectId)}
-                              {groupLabel}
-                              {" — "}
-                              {item.lessons} {item.lessons === 1 ? "aula" : "aulas"}
-                            </span>
-                          );
-                        })}
+                            return (
+                              <li key={`${item.classroomId}-${item.subjectId}-${item.studentGroup}`}>
+                                <span>{getClassroomName(item.classroomId)} · {getSubName(item.subjectId)}{groupLabel}</span>
+                                <strong>{item.lessons} {item.lessons === 1 ? "aula" : "aulas"}</strong>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
-                    </div>
+                    </details>
                   )}
-
-                  <div className="mb-6 bg-white p-4 rounded-xl border border-gray-200 flex gap-4 items-center shadow-sm">
-                    <div className="flex items-center gap-2 text-gray-700 font-semibold">
-                      <Filter className="w-5 h-5" />
-                      Filtro de Visão:
-                    </div>
-
-                    <select
-                      className="border border-gray-300 rounded-lg p-2 font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={viewMode}
-                      onChange={event => {
-                        setViewMode(event.target.value as "turma" | "professor");
-                        setSelectedId("");
-                      }}
-                    >
-                      <option value="turma">Visão por Turma</option>
-                      <option value="professor">Visão por Professor</option>
-                    </select>
-
-                    <select
-                      className="border border-gray-300 rounded-lg p-2 flex-1 focus:ring-2 focus:ring-indigo-500 outline-none"
-                      value={selectedId}
-                      onChange={event => setSelectedId(Number(event.target.value))}
-                    >
-                      <option value="">Selecione...</option>
-
-                      {viewMode === "turma" && classrooms.map(classroom => (
-                        <option key={classroom.id} value={classroom.id}>
-                          {classroom.name} ({classroom.shift}{classroom.has_groups ? " · Grupos A/B" : ""})
-                        </option>
-                      ))}
-
-                      {viewMode === "professor" && teachers.map(teacher => (
-                        <option key={teacher.id} value={teacher.id}>
-                          {teacher.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {renderScheduleGrid()}
+                  <section className="app-schedule-workspace" aria-label="Grade semanal">
+                    {schedule && selectedId !== "" && (
+                      <header className="app-schedule-workspace-header">
+                        <h2>{viewMode === "turma" ? getClassroomName(Number(selectedId)) : getProfName(Number(selectedId))}</h2>
+                      </header>
+                    )}
+                    {renderScheduleGrid()}
+                  </section>
                 </div>
               }
             />

@@ -25,6 +25,10 @@ class Classroom(Base):
     # Cada item possui subject_id, workload e split.
     subject_settings = Column(JSON, default=list)
 
+    # Pares ordenados de disciplinas preferidas em sequência, por ex. [[filosofia_id, sociologia_id]].
+    # São preferências Soft: nunca tornam a grade impossível por si só.
+    preferred_subject_sequences = Column(JSON, default=list)
+
     # Mantido temporariamente para compatibilidade com bancos anteriores.
     split_subject_ids = Column(JSON, default=list)
 

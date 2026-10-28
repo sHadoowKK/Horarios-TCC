@@ -69,7 +69,7 @@ Evite dizer que o sistema usa "inteligência artificial" apenas por gerar horár
 12. Ajustar preferências configuráveis.
 13. Gerar a grade.
 14. Visualizar por turma ou professor.
-15. Exportar CSV ou imprimir a visualização.
+15. Exportar a grade completa para Excel (`.xlsx`) ou imprimir a grade da turma/professor em uma página A4 horizontal.
 
 ---
 
@@ -152,7 +152,7 @@ Para uma matéria da turma com grupos:
 A e B têm aula juntos. A aula ocupa os dois grupos.
 
 ### Separada A/B
-Cada grupo possui uma carga independente.
+Cada grupo possui uma carga independente. A configuração permite informar, por exemplo, 3 aulas semanais para A e 2 para B, sem somar essas cargas como se cada aluno frequentasse ambos os grupos.
 
 Isso permite:
 - mesma matéria em horários diferentes;
@@ -168,7 +168,9 @@ O nome da turma terminar em A ou B não significa que seja o mesmo conceito de g
 
 Cada turma possui sua própria lista de matérias.
 
-A disciplina possui uma carga padrão, mas a carga real usada pelo solver fica na configuração da turma.
+A disciplina possui uma carga padrão, mas a carga real usada pelo solver fica na configuração da turma. Quando a disciplina é separada A/B, a tela permite definir cargas semanais distintas para cada subgrupo.
+
+A turma também pode configurar **sequências preferidas entre matérias diferentes** (por exemplo, Filosofia seguida de Sociologia). O otimizador trata essa relação como preferência Soft: tenta colocar as matérias em períodos contíguos, mas não sacrifica regras obrigatórias para isso. Intervalos e almoço não contam como períodos contíguos.
 
 O campo antigo "Categoria — Ensino Médio/Técnica" foi retirado da interface porque não participa mais das regras.
 

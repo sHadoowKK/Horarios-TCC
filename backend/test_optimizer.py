@@ -1185,6 +1185,98 @@ class OptimizerTests(unittest.TestCase):
         active_counts = sorted(counts_by_day.values())
         self.assertEqual(active_counts, [2, 2])
 
+    def test_daytime_workload_four_prefers_two_consecutive_pairs(self):
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [{"subject_id": 1, "workload": 4, "split": False}],
+            )
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            [subject(1, "Português", workload=4)],
+            [teacher(1, [1], score=100)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        periods_by_day = {}
+        for item in result["schedule"]:
+            periods_by_day.setdefault(item["day"], []).append(item["period"])
+
+        self.assertEqual(sorted(len(periods) for periods in periods_by_day.values()), [2, 2])
+        contiguous_pairs = {(0, 1), (1, 2), (3, 4), (4, 5), (6, 7), (8, 9), (9, 10)}
+        for periods in periods_by_day.values():
+            self.assertEqual(len(periods), 2)
+            self.assertIn(tuple(sorted(periods)), contiguous_pairs)
+
+    def test_configured_subject_sequence_prefers_adjacent_order(self):
+        classrooms = [
+            classroom(
+                1,
+                "3º INFO",
+                "Integral",
+                [
+                    {"subject_id": 1, "workload": 1, "split": False},
+                    {"subject_id": 2, "workload": 1, "split": False},
+                ],
+            )
+        ]
+        classrooms[0]["preferred_subject_sequences"] = [[1, 2]]
+
+        result = generate_schedule(
+            classrooms,
+            [
+                subject(1, "Filosofia", workload=1),
+                subject(2, "Sociologia", workload=1),
+            ],
+            [teacher(1, [1, 2], score=100)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        philosophy = next(
+            item for item in result["schedule"] if item["subject_id"] == 1
+        )
+        sociology = next(
+            item for item in result["schedule"] if item["subject_id"] == 2
+        )
+        self.assertEqual(philosophy["day"], sociology["day"])
+        self.assertEqual(philosophy["period"] + 1, sociology["period"])
+
+    def test_split_subject_can_have_different_weekly_loads(self):
+        classrooms = [
+            classroom(
+                1,
+                "3º INFO",
+                "Integral",
+                [{
+                    "subject_id": 1,
+                    "workload": 3,
+                    "workload_a": 3,
+                    "workload_b": 2,
+                    "split": True,
+                }],
+                has_groups=True,
+            )
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            [subject(1, "SW2", workload=3)],
+            [teacher(1, [1], score=100)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        counts = {"A": 0, "B": 0}
+        for item in result["schedule"]:
+            counts[item["student_group"]] += 1
+        self.assertEqual(counts, {"A": 3, "B": 2})
+
     def test_daytime_workload_three_prefers_two_plus_one(self):
         classrooms = [
             classroom(

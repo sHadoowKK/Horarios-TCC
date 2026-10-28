@@ -1,5 +1,9 @@
+import sys
+from pathlib import Path
+
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from . import models, schemas
@@ -8,6 +12,18 @@ from .optimizer import JOURNEY_PERIODS, generate_schedule
 
 models.Base.metadata.create_all(bind=engine)
 ensure_database_compatibility()
+
+
+def _frontend_dist_directory() -> Path:
+    if getattr(sys, "frozen", False):
+        bundle_root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        return bundle_root / "frontend_dist"
+
+    # backend/app/main.py -> backend/app -> backend -> raiz do repositório.
+    return Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+
+FRONTEND_DIST = _frontend_dist_directory()
 
 app = FastAPI(title="Anatinus API")
 
@@ -53,7 +69,15 @@ def get_or_create_config(db: Session) -> models.SystemConfig:
 
 @app.get("/")
 def root():
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.is_file():
+        return FileResponse(index_file)
     return {"message": "API do Anatinus"}
+
+
+@app.get("/health", include_in_schema=False)
+def health():
+    return {"app": "Anatinus", "status": "ok"}
 
 
 # ----------------------------------------------------------------------
@@ -201,6 +225,30 @@ def update_classroom(
         for subject_id in values.get("split_subject_ids", [])
         if subject_id in valid_subject_ids
     ]
+
+    selected_settings = {
+        setting["subject_id"]: setting
+        for setting in values["subject_settings"]
+    }
+    sequences = []
+    for pair in values.get("preferred_subject_sequences", []) or []:
+        if len(pair) != 2:
+            continue
+        first_id, second_id = pair
+        if (
+            first_id == second_id
+            or first_id not in selected_settings
+            or second_id not in selected_settings
+        ):
+            continue
+        if bool(selected_settings[first_id].get("split")) != bool(
+            selected_settings[second_id].get("split")
+        ):
+            continue
+        normalized_pair = [int(first_id), int(second_id)]
+        if normalized_pair not in sequences:
+            sequences.append(normalized_pair)
+    values["preferred_subject_sequences"] = sequences
 
     for key, value in values.items():
         setattr(item, key, value)
@@ -535,6 +583,9 @@ def generate_timetable(db: Session = Depends(get_db)):
             "shift": classroom.shift,
             "has_groups": classroom.has_groups,
             "subject_settings": classroom.subject_settings or [],
+            "preferred_subject_sequences": (
+                classroom.preferred_subject_sequences or []
+            ),
         }
         for classroom in classroom_rows
     ]
@@ -593,46 +644,68 @@ def generate_timetable(db: Session = Depends(get_db)):
             [],
         ) or []
 
-        total_workload = sum(
-            int(setting.get("workload", 0) or 0)
-            for setting in settings
-        )
-
-        if total_workload > weekly_capacity:
-            preflight_errors.append(
-                f"{classroom['name']}: "
-                f"{total_workload} aulas semanais para "
-                f"{weekly_capacity} períodos disponíveis."
-            )
-
-        high_workload = 0
+        has_groups = bool(classroom.get("has_groups"))
+        workload_by_group = {"A": 0, "B": 0}
+        high_workload_by_group = {"A": 0, "B": 0}
 
         for setting in settings:
-            subject = subject_by_id.get(
-                setting.get("subject_id")
-            )
+            base = int(setting.get("workload", 0) or 0)
+            split = has_groups and bool(setting.get("split"))
+            raw_joint = setting.get("joint_workload")
 
-            if (
-                subject
-                and subject.get("complexity") == "Alta"
-            ):
-                high_workload += int(
-                    setting.get("workload", 0) or 0
+            if split:
+                joint = int(raw_joint or 0)
+                raw_a = setting.get("workload_a")
+                raw_b = setting.get("workload_b")
+                workload_a = (
+                    base if raw_a is None and joint == 0
+                    else int(raw_a or 0)
                 )
+                workload_b = (
+                    base if raw_b is None and joint == 0
+                    else int(raw_b or 0)
+                )
+                effective_a = joint + workload_a
+                effective_b = joint + workload_b
+            else:
+                joint = base if raw_joint is None else int(raw_joint)
+                effective_a = joint
+                effective_b = joint
 
-        high_capacity = (
-            int(
-                config.max_high_complexity_per_day
+            workload_by_group["A"] += effective_a
+            workload_by_group["B"] += effective_b
+
+            subject = subject_by_id.get(setting.get("subject_id"))
+            if subject and subject.get("complexity") == "Alta":
+                high_workload_by_group["A"] += effective_a
+                high_workload_by_group["B"] += effective_b
+
+        max_group = max(workload_by_group, key=workload_by_group.get)
+        total_workload = workload_by_group[max_group]
+        if total_workload > weekly_capacity:
+            workload_detail = (
+                f"A={workload_by_group['A']}, B={workload_by_group['B']}"
+                if has_groups
+                else str(total_workload)
             )
-            * 5
-        )
-
-        if high_workload > high_capacity:
             preflight_errors.append(
-                f"{classroom['name']}: "
-                f"{high_workload} aulas de alta complexidade, "
-                f"mas o limite atual permite no máximo "
-                f"{high_capacity} por semana."
+                f"{classroom['name']}: {workload_detail} aulas semanais "
+                f"configuradas; há apenas {weekly_capacity} períodos "
+                f"disponíveis por grupo."
+            )
+
+        high_capacity = int(config.max_high_complexity_per_day) * 5
+        max_high_group = max(high_workload_by_group, key=high_workload_by_group.get)
+        high_workload = high_workload_by_group[max_high_group]
+        if high_workload > high_capacity:
+            high_detail = (
+                f"A={high_workload_by_group['A']}, B={high_workload_by_group['B']}"
+                if has_groups
+                else str(high_workload)
+            )
+            preflight_errors.append(
+                f"{classroom['name']}: aulas de alta complexidade {high_detail}, "
+                f"mas o limite atual permite no máximo {high_capacity} por semana."
             )
 
     if preflight_errors:
@@ -692,3 +765,29 @@ def generate_timetable(db: Session = Depends(get_db)):
     db.commit()
 
     return result
+
+
+# ----------------------------------------------------------------------
+# FRONTEND DE PRODUÇÃO
+# ----------------------------------------------------------------------
+@app.get("/{frontend_path:path}", include_in_schema=False)
+def serve_frontend(frontend_path: str):
+    index_file = FRONTEND_DIST / "index.html"
+
+    if not index_file.is_file():
+        raise HTTPException(404, "Rota não encontrada")
+
+    frontend_root = FRONTEND_DIST.resolve()
+    requested_file = (frontend_root / frontend_path).resolve()
+
+    # Não permite que um caminho solicitado leia arquivos fora da pasta pública.
+    try:
+        requested_file.relative_to(frontend_root)
+    except ValueError:
+        return FileResponse(index_file)
+
+    if requested_file.is_file():
+        return FileResponse(requested_file)
+
+    # Fallback para rotas do React Router, como /professores e /turmas.
+    return FileResponse(index_file)
