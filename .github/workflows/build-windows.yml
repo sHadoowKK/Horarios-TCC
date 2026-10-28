@@ -1,0 +1,40 @@
+name: Build Windows
+
+on:
+  push:
+    branches:
+      - main
+      - design/anatinus-dark-workspace
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Testar e empacotar
+        shell: pwsh
+        run: .\build-windows.ps1
+
+      - name: Publicar pacote como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anatinus-Windows-x64
+          path: release/Anatinus-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
