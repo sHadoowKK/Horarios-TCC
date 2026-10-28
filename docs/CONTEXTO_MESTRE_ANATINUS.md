@@ -187,6 +187,19 @@ Antes das duas otimizações estruturais:
 
 Esse benchmark precisa ser repetido na mesma máquina para medir o ganho real da versão atual.
 
+## Empacotamento desktop Windows
+
+A branch de trabalho visual/empacotamento é `design/anatinus-dark-workspace`.
+
+- `backend/app/desktop.py` inicia FastAPI e abre a interface numa janela PyWebView.
+- `backend/app/main.py` serve o frontend compilado quando o pacote desktop está em execução.
+- `frontend/src/api.ts` usa a API na mesma origem na build de produção.
+- `backend/app/database.py` guarda os dados desktop em `%LOCALAPPDATA%\\Anatinus\\school_schedule.db`.
+- `build-windows.ps1` executa testes, build e empacotamento.
+- `.github/workflows/build-windows.yml` publica `Anatinus-Windows-x64` como artefato quando a compilação passa.
+
+O pacote Windows só deve ser considerado pronto depois de baixar, abrir e testar o artefato gerado em um Windows real.
+
 ## Arquivos de documentação
 
 - `../README.md`
