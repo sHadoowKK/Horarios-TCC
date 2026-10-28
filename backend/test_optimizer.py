@@ -1247,6 +1247,36 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(philosophy["day"], sociology["day"])
         self.assertEqual(philosophy["period"] + 1, sociology["period"])
 
+    def test_split_subject_can_have_different_weekly_loads(self):
+        classrooms = [
+            classroom(
+                1,
+                "3º INFO",
+                "Integral",
+                [{
+                    "subject_id": 1,
+                    "workload": 3,
+                    "workload_a": 3,
+                    "workload_b": 2,
+                    "split": True,
+                }],
+                has_groups=True,
+            )
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            [subject(1, "SW2", workload=3)],
+            [teacher(1, [1], score=100)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success")
+        counts = {"A": 0, "B": 0}
+        for item in result["schedule"]:
+            counts[item["student_group"]] += 1
+        self.assertEqual(counts, {"A": 3, "B": 2})
+
     def test_daytime_workload_three_prefers_two_plus_one(self):
         classrooms = [
             classroom(
