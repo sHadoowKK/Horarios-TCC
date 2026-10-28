@@ -11,10 +11,14 @@
 - [ ] testar geração pela interface
 - [ ] testar visão por turma
 - [ ] testar visão por professor
+- [ ] testar carga distinta para grupos A/B (ex.: SW2 A=3, B=2)
+- [ ] testar preferência de sequência (ex.: Filosofia → Sociologia)
+- [ ] conferir que horários de grupo sem aula ficam em branco
 - [ ] testar exportação Excel (`.xlsx`) e verificar larguras/acentos no Excel
 - [ ] testar Imprimir
 - [ ] testar exclusão de professor com grade salva
 - [ ] testar mensagem de pré-validação com uma turma propositalmente impossível
+- [ ] confirmar que a matriz do 3º INFO bate com a tabela de referência, incluindo as exceções A/B
 
 ## Resultados para registrar
 
