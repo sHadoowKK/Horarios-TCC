@@ -535,7 +535,7 @@ function App() {
       <div className="app-shell flex h-screen w-full text-left">
         <aside className="app-sidebar flex flex-col shrink-0">
           <div className="app-brand p-6 border-b border-gray-200">
-            <h1 className="app-brand-title text-xl font-bold text-indigo-600 flex items-center gap-2">
+            <h1 className="app-brand-title text-xl font-bold flex items-center gap-2">
               <img
                 src="/Anatinus%20final%201.png"
                 alt=""
