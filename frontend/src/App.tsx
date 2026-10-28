@@ -260,11 +260,14 @@ function App() {
           }
           const groupA = lessons.find(item => item.student_group === "A");
           const groupB = lessons.find(item => item.student_group === "B");
+          if (!groupA && !groupB) return "";
           const formatGroup = (group: "A" | "B", item: any) => item
             ? "GRUPO " + group + "\n" + getSubName(item.subject_id) +
               "\n" + getProfName(item.teacher_id)
-            : "GRUPO " + group + "\nLivre";
-          return formatGroup("A", groupA) + "\n\n" + formatGroup("B", groupB);
+            : "";
+          return [formatGroup("A", groupA), formatGroup("B", groupB)]
+            .filter(Boolean)
+            .join("\n\n");
         }
 
         const item = lessons[0];
@@ -472,12 +475,14 @@ function App() {
                           );
                         } else {
                           const renderGroup = (group: "A" | "B", item: any) => (
-                            <div className="min-h-16 flex flex-col items-center justify-center p-1.5 bg-indigo-50 border border-indigo-100 rounded">
-                              <span className="text-[10px] font-bold uppercase text-indigo-400">
-                                Grupo {group}
-                              </span>
-                              {item ? (
+                            <div className={item
+                              ? "min-h-16 flex flex-col items-center justify-center p-1.5 bg-indigo-50 border border-indigo-100 rounded"
+                              : "min-h-16"} aria-hidden={!item}>
+                              {item && (
                                 <>
+                                  <span className="text-[10px] font-bold uppercase text-indigo-400">
+                                    Grupo {group}
+                                  </span>
                                   <span className="text-xs font-bold text-indigo-900 mt-0.5 leading-tight">
                                     {getSubName(item.subject_id)}
                                   </span>
@@ -489,10 +494,6 @@ function App() {
                                     {getProfName(item.teacher_id)}
                                   </span>
                                 </>
-                              ) : (
-                                <span className="text-[10px] text-gray-400 mt-1">
-                                  Livre
-                                </span>
                               )}
                             </div>
                           );
