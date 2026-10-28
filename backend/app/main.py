@@ -651,24 +651,34 @@ def generate_timetable(db: Session = Depends(get_db)):
         for setting in settings:
             base = int(setting.get("workload", 0) or 0)
             split = has_groups and bool(setting.get("split"))
-            workload_a = int(setting.get("workload_a") or base)
-            workload_b = int(setting.get("workload_b") or base)
+            raw_joint = setting.get("joint_workload")
 
             if split:
-                workload_by_group["A"] += workload_a
-                workload_by_group["B"] += workload_b
+                joint = int(raw_joint or 0)
+                raw_a = setting.get("workload_a")
+                raw_b = setting.get("workload_b")
+                workload_a = (
+                    base if raw_a is None and joint == 0
+                    else int(raw_a or 0)
+                )
+                workload_b = (
+                    base if raw_b is None and joint == 0
+                    else int(raw_b or 0)
+                )
+                effective_a = joint + workload_a
+                effective_b = joint + workload_b
             else:
-                workload_by_group["A"] += base
-                workload_by_group["B"] += base
+                joint = base if raw_joint is None else int(raw_joint)
+                effective_a = joint
+                effective_b = joint
+
+            workload_by_group["A"] += effective_a
+            workload_by_group["B"] += effective_b
 
             subject = subject_by_id.get(setting.get("subject_id"))
             if subject and subject.get("complexity") == "Alta":
-                if split:
-                    high_workload_by_group["A"] += workload_a
-                    high_workload_by_group["B"] += workload_b
-                else:
-                    high_workload_by_group["A"] += base
-                    high_workload_by_group["B"] += base
+                high_workload_by_group["A"] += effective_a
+                high_workload_by_group["B"] += effective_b
 
         max_group = max(workload_by_group, key=workload_by_group.get)
         total_workload = workload_by_group[max_group]
