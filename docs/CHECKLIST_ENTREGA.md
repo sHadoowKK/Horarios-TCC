@@ -11,7 +11,7 @@
 - [ ] testar geração pela interface
 - [ ] testar visão por turma
 - [ ] testar visão por professor
-- [ ] testar Exportar CSV
+- [ ] testar exportação Excel (`.xlsx`) e verificar larguras/acentos no Excel
 - [ ] testar Imprimir
 - [ ] testar exclusão de professor com grade salva
 - [ ] testar mensagem de pré-validação com uma turma propositalmente impossível
