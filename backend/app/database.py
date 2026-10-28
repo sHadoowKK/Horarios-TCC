@@ -1,9 +1,40 @@
 import json
+import os
+import sys
+from pathlib import Path
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = "sqlite:///./school_schedule.db"
+def _database_url() -> str:
+    """Mantém o banco no diretório de trabalho em desenvolvimento e usa AppData no EXE."""
+    explicit_url = os.environ.get("ANATINUS_DATABASE_URL")
+    if explicit_url:
+        return explicit_url
+
+    data_directory = os.environ.get("ANATINUS_DATA_DIR")
+    if data_directory:
+        database_directory = Path(data_directory).expanduser()
+        database_directory.mkdir(parents=True, exist_ok=True)
+        database_path = database_directory / "school_schedule.db"
+        return f"sqlite:///{database_path.as_posix()}"
+
+    if getattr(sys, "frozen", False):
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        base_directory = (
+            Path(local_app_data)
+            if local_app_data
+            else Path.home() / "AppData" / "Local"
+        )
+        database_directory = base_directory / "Anatinus"
+        database_directory.mkdir(parents=True, exist_ok=True)
+        database_path = database_directory / "school_schedule.db"
+        return f"sqlite:///{database_path.as_posix()}"
+
+    return "sqlite:///./school_schedule.db"
+
+
+DATABASE_URL = _database_url()
 
 engine = create_engine(
     DATABASE_URL,
