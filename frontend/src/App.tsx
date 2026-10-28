@@ -656,7 +656,7 @@ function App() {
                             title="Baixar a grade completa em Excel (.xlsx)"
                           >
                             <Download className="w-4 h-4" />
-                            Exportar
+                            Excel
                           </button>
                           <button
                             type="button"
