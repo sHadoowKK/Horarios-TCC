@@ -227,8 +227,18 @@ def main(only_informatica=False):
         }
 
         for name, subject_ids in info_teacher_assignments.items():
-            shifts, days, score = teacher_specs[name]
-            shift_names = shifts.split("+")
+            # No modo isolado de Informática, não inventamos dias bloqueados:
+            # a disponibilidade oficial individual não ficou preservada nas imagens.
+            # Liberamos o Integral de segunda a sexta para testar matéria/professor
+            # e a preferência por aulas em pares sem restrições arbitrárias.
+            if only_informatica:
+                days = list(range(5))
+                shift_names = ["Integral"]
+                score = teacher_specs[name][2]
+            else:
+                shifts, days, score = teacher_specs[name]
+                shift_names = shifts.split("+")
+
             db.add(models.Teacher(
                 name=name,
                 allowed_subjects=sorted(set(subject_ids)),
