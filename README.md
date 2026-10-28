@@ -4,12 +4,12 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 
 ## Documentação do projeto
 
-- [DOCUMENTACAO_TCC.md](DOCUMENTACAO_TCC.md): estado técnico e decisões do sistema;
-- [RESULTADOS_TESTES.md](RESULTADOS_TESTES.md): evidências e medições;
-- [GUIA_APRESENTACAO.md](GUIA_APRESENTACAO.md): roteiro de demo e perguntas da banca;
-- [CHECKLIST_ENTREGA.md](CHECKLIST_ENTREGA.md): lista final de validação.
-- [REVISAO_CODIGO.md](REVISAO_CODIGO.md): revisão técnica, riscos e critérios de mudança;
-- [CONTEXTO_MESTRE_ANATINUS.md](CONTEXTO_MESTRE_ANATINUS.md): contexto completo para continuar o projeto em outro chat ou conta.
+- [Documentação técnica do TCC](docs/DOCUMENTACAO_TCC.md): funcionalidades e regras implementadas;
+- [Resultados dos testes](docs/RESULTADOS_TESTES.md): evidências e medições já observadas;
+- [Guia de apresentação](docs/GUIA_APRESENTACAO.md): demonstração e perguntas da banca;
+- [Checklist de entrega](docs/CHECKLIST_ENTREGA.md): pendências de validação;
+- [Revisão de código](docs/REVISAO_CODIGO.md): riscos e critérios de mudança;
+- [Contexto mestre](docs/CONTEXTO_MESTRE_ANATINUS.md): resumo para continuidade do projeto.
 
 ## O que o sistema faz
 
@@ -28,37 +28,40 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 - permite imprimir a visualização atual;
 - possui tema claro/escuro com preferência salva no navegador.
 
-## Estrutura
+## Estrutura do repositório
 
 ```text
 Horarios-TCC/
+├── .github/workflows/
+│   └── build-windows.yml       # testa e gera o pacote Windows
 ├── backend/
 │   ├── app/
-│   │   ├── __init__.py
+│   │   ├── desktop.py          # inicializador da janela desktop
 │   │   ├── database.py
-│   │   ├── main.py
+│   │   ├── main.py             # API e frontend de produção
 │   │   ├── models.py
 │   │   ├── optimizer.py
 │   │   └── schemas.py
 │   ├── requirements.txt
+│   ├── requirements-desktop.txt
 │   ├── seed.py
-│   └── test_optimizer.py
+│   ├── test_backend.py
+│   ├── test_optimizer.py
+│   └── benchmark_optimizer.py
+├── docs/                       # documentação e material do TCC
 ├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Config.tsx
-│   │   │   ├── Professores.tsx
-│   │   │   └── Turmas.tsx
-│   │   ├── api.ts
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   └── styles.css
-│   ├── index.html
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── vite.config.ts
-├── .gitignore
-└── README.md
+│   ├── public/                 # logos originais e ícone
+│   └── src/
+│       ├── pages/
+│       ├── App.tsx
+│       ├── api.ts
+│       └── anatinus-design-system.css
+├── build-windows.ps1           # empacota a versão desktop
+├── start-dev.ps1               # inicia ambiente de desenvolvimento
+├── verify.ps1                  # testes + build do frontend
+├── backup-db.ps1               # backup do banco local
+├── README.md
+└── .gitignore
 ```
 
 ## Backend
@@ -278,3 +281,31 @@ Criar uma cópia local do banco antes de testes ou cadastro em massa:
 ```
 
 Os backups ficam em `backups/` com data e hora no nome e não são enviados ao GitHub.
+
+## Aplicativo Windows (.exe)
+
+O Anatinus também pode ser empacotado como aplicativo desktop. O executável inicia a API local, abre a interface em uma janela própria e encerra o servidor quando a janela é fechada.
+
+### Gerar o pacote no Windows
+
+Pré-requisitos recomendados: Python 3.12, Node.js 22/npm e runtime WebView2 do Microsoft Edge.
+
+Na raiz do repositório, execute no PowerShell:
+
+```powershell
+.\build-windows.ps1
+```
+
+O script instala as dependências de empacotamento, executa os testes do backend, compila o frontend e gera:
+
+`release\Anatinus-Windows-x64.zip`
+
+Extraia o ZIP inteiro e abra `Anatinus.exe`. **Não copie somente o EXE para fora da pasta**, porque ele usa arquivos auxiliares empacotados ao lado dele.
+
+Também existe uma compilação automática pelo GitHub Actions. Após uma execução bem-sucedida, abra **Actions → Build Windows → execução mais recente → Artifacts** e baixe `Anatinus-Windows-x64`.
+
+### Dados e atualização
+
+O banco da versão desktop fica em `%LOCALAPPDATA%\Anatinus\school_schedule.db`, separado dos arquivos temporários do executável. Atualizar o programa não deve apagar os cadastros.
+
+Para levar os cadastros do ambiente de desenvolvimento à primeira execução do EXE, feche o Anatinus e copie o banco `backend\school_schedule.db` para `%LOCALAPPDATA%\Anatinus\school_schedule.db` antes de abrir a versão desktop. Faça primeiro um backup com `backup-db.ps1`.
