@@ -39,6 +39,7 @@ class ClassroomBase(BaseModel):
     subject_settings: List[ClassroomSubjectSetting] = Field(
         default_factory=list
     )
+    preferred_subject_sequences: List[List[int]] = Field(default_factory=list)
 
     # Compatibilidade com versões anteriores.
     split_subject_ids: List[int] = Field(default_factory=list)
