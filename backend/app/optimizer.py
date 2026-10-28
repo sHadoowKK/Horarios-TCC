@@ -7,7 +7,7 @@ from ortools.sat.python import cp_model
 # Índices dos períodos de aula. Intervalos e almoço não recebem índice.
 JOURNEY_PERIODS = {
     "Manhã": [0, 1, 2, 3, 4, 5],
-    "Integral": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "Integral": [0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
     "Noite": [11, 12, 13, 14, 15],
     # Compatibilidade defensiva com bancos antigos.
     "Tarde": [6, 7, 8, 9, 10],
