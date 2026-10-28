@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import {
-  CheckCircle2,
   Save,
-  ShieldCheck,
+  Shield,
 } from "lucide-react";
 
 export default function Config() {
@@ -123,7 +122,7 @@ export default function Config() {
         {/* REGRAS FIXAS */}
         <section className="app-panel app-settings-section bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-4">
-            <ShieldCheck className="w-6 h-6 text-emerald-600" />
+            <Shield className="w-6 h-6 app-fixed-rules-heading-icon" />
 
             <div>
               <h3 className="text-xl font-bold text-gray-700">
@@ -139,7 +138,6 @@ export default function Config() {
                 className="app-fixed-rule p-4 rounded-lg border border-emerald-100 bg-emerald-50"
               >
                 <div className="flex items-center gap-2 text-emerald-800 font-bold">
-                  <CheckCircle2 className="w-4 h-4" />
                   {rule.title}
                 </div>
 
