@@ -19,10 +19,10 @@
   --an-muted: #6d7067;
   --an-border: #dedfd7;
   --an-border-strong: #bfc2b6;
-  --an-accent: #e4f222;
-  --an-accent-hover: #d6e51a;
-  --an-accent-soft: #f2f5d4;
-  --an-accent-text: #35391a;
+  --an-accent: #3978f6;
+  --an-accent-hover: #2865df;
+  --an-accent-soft: #eaf1ff;
+  --an-accent-text: #214fae;
   --an-green: #287c5d;
   --an-green-soft: #eaf6ef;
   --an-red: #a63c47;
@@ -47,10 +47,10 @@ html.dark-theme {
   --an-muted: #8a8f98;
   --an-border: #292b2e;
   --an-border-strong: #383b3f;
-  --an-accent: #e4f222;
-  --an-accent-hover: #d6e51a;
-  --an-accent-soft: #292d12;
-  --an-accent-text: #e4f222;
+  --an-accent: #3978f6;
+  --an-accent-hover: #2865df;
+  --an-accent-soft: #172744;
+  --an-accent-text: #8eb4ff;
   --an-green: #8dd5b5;
   --an-green-soft: #1d3028;
   --an-red: #ff9da7;
@@ -164,6 +164,11 @@ textarea {
   flex: 0 0 auto;
 }
 
+/* Inverte o símbolo branco para preto no tema claro. */
+html:not(.dark-theme) .app-brand-title img {
+  filter: invert(1);
+}
+
 .app-nav {
   display: flex;
   min-height: 0;
@@ -217,9 +222,11 @@ textarea {
 .app-theme-toggle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   min-height: 40px;
   padding: 10px 12px !important;
+  gap: 11px !important;
+  cursor: pointer;
   border: 1px solid transparent;
   border-radius: 7px !important;
   background: transparent;
@@ -244,6 +251,7 @@ textarea {
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
+  color: var(--an-accent) !important;
 }
 
 .theme-switch {
