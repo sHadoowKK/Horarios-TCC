@@ -846,6 +846,31 @@ def generate_schedule(
                 model.Add(paired <= second_slot)
                 model.Add(paired >= first_slot + second_slot - 1)
                 rewards.append(paired * 300)
+    # Preferências por sequência entre matérias configuradas na própria turma.
+    # Ex.: Filosofia seguida de Sociologia. São recompensas Soft, não restrições Hard.
+    for classroom in classrooms:
+        by_id = {item["id"]: item for item in classroom_subjects.get(classroom["id"], [])}
+        allowed = set(JOURNEY_PERIODS.get(classroom.get("shift", "Manhã"), JOURNEY_PERIODS["Manhã"]))
+        for sequence in classroom.get("preferred_subject_sequences", []) or []:
+            if len(sequence) != 2:
+                continue
+            first = by_id.get(sequence[0])
+            second = by_id.get(sequence[1])
+            if first is None or second is None:
+                continue
+            targets = set(_targets_for(classroom, first)) & set(_targets_for(classroom, second))
+            for target in targets:
+                for day in range(num_days):
+                    for p1, p2 in contiguous_period_pairs:
+                        if p1 not in allowed or p2 not in allowed:
+                            continue
+                        x = sum(vars_for_unit_at(classroom, first, target, day, p1))
+                        y = sum(vars_for_unit_at(classroom, second, target, day, p2))
+                        together = model.NewBoolVar(f"sequence_c{classroom['id']}_s{first['id']}_s{second['id']}_g{target}_d{day}_p{p1}")
+                        model.Add(together <= x)
+                        model.Add(together <= y)
+                        model.Add(together >= x + y - 1)
+                        rewards.append(together * 400)
     # Regra opcional legada de mesmo professor seguido.
     # Por padrão fica ignorada porque horários reais podem ter blocos longos.
     max_same_teacher = int(
