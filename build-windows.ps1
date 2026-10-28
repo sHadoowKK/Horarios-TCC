@@ -67,12 +67,18 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $root "build\\pyinstaller") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root "build\\spec") -Force | Out-Null
 
+    $iconPath = Join-Path $frontend "public\Anatinus final 1.png"
+    if (-not (Test-Path $iconPath)) {
+        throw "Logo do executável não encontrada: $iconPath"
+    }
+
     $buildArgs = @(
         "--noconfirm",
         "--clean",
         "--onedir",
         "--windowed",
         "--name", "Anatinus",
+        "--icon", $iconPath,
         "--distpath", (Join-Path $root "dist"),
         "--workpath", (Join-Path $root "build\pyinstaller"),
         "--specpath", (Join-Path $root "build\spec"),
