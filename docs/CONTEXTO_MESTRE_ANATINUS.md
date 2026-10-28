@@ -189,7 +189,7 @@ Esse benchmark precisa ser repetido na mesma máquina para medir o ganho real da
 
 ## Arquivos de documentação
 
-- `README.md`
+- `../README.md`
 - `DOCUMENTACAO_TCC.md`
 - `RESULTADOS_TESTES.md`
 - `GUIA_APRESENTACAO.md`
