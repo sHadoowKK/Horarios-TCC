@@ -84,9 +84,13 @@ def _subject_entries_for_classroom(classroom, subjects):
                 continue
 
             item = dict(subject)
-            item["workload"] = int(
-                setting.get("workload", subject["workload"])
-            )
+            base_workload = int(setting.get("workload", subject["workload"]))
+            item["workload"] = base_workload
+            item["_workload_by_target"] = {
+                "Todos": base_workload,
+                "A": int(setting.get("workload_a") or base_workload),
+                "B": int(setting.get("workload_b") or base_workload),
+            }
             item["_split"] = bool(setting.get("split", False))
             entries.append(item)
 
