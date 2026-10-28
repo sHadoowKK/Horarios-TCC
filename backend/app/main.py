@@ -679,8 +679,9 @@ def generate_timetable(db: Session = Depends(get_db)):
                 else str(total_workload)
             )
             preflight_errors.append(
-                f"{classroom['name']}: carga semanal {workload_detail}, "
-                f"mas cada grupo dispõe de no máximo {weekly_capacity} períodos."
+                f"{classroom['name']}: {workload_detail} aulas semanais "
+                f"configuradas, mas cada grupo dispõe de no máximo "
+                f"{weekly_capacity} períodos."
             )
 
         high_capacity = int(config.max_high_complexity_per_day) * 5
