@@ -53,6 +53,9 @@ try {
     & $venvPython -m unittest discover -p "test_*.py"
     if ($LASTEXITCODE -ne 0) { throw "Os testes do backend falharam; o EXE não será empacotado." }
 
+    New-Item -ItemType Directory -Path (Join-Path $root "build\\pyinstaller") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root "build\\spec") -Force | Out-Null
+
     $buildArgs = @(
         "--noconfirm",
         "--clean",
