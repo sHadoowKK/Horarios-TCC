@@ -24,6 +24,7 @@ interface ClassroomSubjectSetting {
   workload_a?: number | null;
   workload_b?: number | null;
   split: boolean;
+  prefer_triple_block?: boolean | null;
 }
 
 interface Classroom {
@@ -447,6 +448,7 @@ export default function Turmas() {
             subject_id: subject.id,
             workload: subject.workload,
             split: false,
+            prefer_triple_block: subject.workload === 3,
           },
         ];
 
@@ -500,6 +502,19 @@ export default function Turmas() {
     await saveClassroom(classroom, { subject_settings: next });
   };
 
+  const handleTripleBlockPreference = async (
+    classroom: Classroom,
+    subjectId: number,
+    preferTripleBlock: boolean,
+  ) => {
+    const next = (classroom.subject_settings || []).map(setting =>
+      setting.subject_id === subjectId
+        ? { ...setting, prefer_triple_block: preferTripleBlock }
+        : setting,
+    );
+
+    await saveClassroom(classroom, { subject_settings: next });
+  };
   const handleSubjectSplit = async (
     classroom: Classroom,
     subjectId: number,
@@ -540,6 +555,7 @@ export default function Turmas() {
           subject_id: subject.id,
           workload: subject.workload,
           split: false,
+          prefer_triple_block: subject.workload === 3,
         }
       );
     });
@@ -1155,9 +1171,19 @@ export default function Turmas() {
                             classroom,
                             subject.id,
                           );
-                          const selected = Boolean(
-                            setting,
-                          );
+                          const selected = Boolean(setting);
+                          const subjectLoads = setting
+                            ? setting.split
+                              ? [
+                                  setting.workload_a ?? setting.workload,
+                                  setting.workload_b ?? setting.workload,
+                                ]
+                              : [setting.workload]
+                            : [];
+                          const canPreferTripleBlock = subjectLoads.includes(3);
+                          const prefersTripleBlock = setting
+                            ? setting.prefer_triple_block ?? canPreferTripleBlock
+                            : false;
 
                           return (
                             <div
@@ -1242,6 +1268,23 @@ export default function Turmas() {
                                     </label>
                                   )}
 
+                                  {canPreferTripleBlock && (
+                                    <label className="flex items-center gap-2 text-[11px] text-gray-500 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={prefersTripleBlock}
+                                        onChange={event =>
+                                          handleTripleBlockPreference(
+                                            classroom,
+                                            subject.id,
+                                            event.target.checked,
+                                          )
+                                        }
+                                        style={{ accentColor: "var(--an-accent)" }}
+                                      />
+                                      <span>Preferir as 3 aulas seguidas</span>
+                                    </label>
+                                  )}
                                   {classroom.has_groups && (
                                     <label className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
                                       <span>
