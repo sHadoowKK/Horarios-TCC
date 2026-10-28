@@ -1,5 +1,9 @@
+import sys
+from pathlib import Path
+
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from . import models, schemas
@@ -8,6 +12,18 @@ from .optimizer import JOURNEY_PERIODS, generate_schedule
 
 models.Base.metadata.create_all(bind=engine)
 ensure_database_compatibility()
+
+
+def _frontend_dist_directory() -> Path:
+    if getattr(sys, "frozen", False):
+        bundle_root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        return bundle_root / "frontend_dist"
+
+    # backend/app/main.py -> backend/app -> backend -> raiz do repositório.
+    return Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+
+FRONTEND_DIST = _frontend_dist_directory()
 
 app = FastAPI(title="Anatinus API")
 
@@ -53,7 +69,15 @@ def get_or_create_config(db: Session) -> models.SystemConfig:
 
 @app.get("/")
 def root():
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.is_file():
+        return FileResponse(index_file)
     return {"message": "API do Anatinus"}
+
+
+@app.get("/health", include_in_schema=False)
+def health():
+    return {"app": "Anatinus", "status": "ok"}
 
 
 # ----------------------------------------------------------------------
@@ -692,3 +716,29 @@ def generate_timetable(db: Session = Depends(get_db)):
     db.commit()
 
     return result
+
+
+# ----------------------------------------------------------------------
+# FRONTEND DE PRODUÇÃO
+# ----------------------------------------------------------------------
+@app.get("/{frontend_path:path}", include_in_schema=False)
+def serve_frontend(frontend_path: str):
+    index_file = FRONTEND_DIST / "index.html"
+
+    if not index_file.is_file():
+        raise HTTPException(404, "Rota não encontrada")
+
+    frontend_root = FRONTEND_DIST.resolve()
+    requested_file = (frontend_root / frontend_path).resolve()
+
+    # Não permite que um caminho solicitado leia arquivos fora da pasta pública.
+    try:
+        requested_file.relative_to(frontend_root)
+    except ValueError:
+        return FileResponse(index_file)
+
+    if requested_file.is_file():
+        return FileResponse(requested_file)
+
+    # Fallback para rotas do React Router, como /professores e /turmas.
+    return FileResponse(index_file)
