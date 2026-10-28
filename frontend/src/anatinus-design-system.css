@@ -159,18 +159,20 @@ textarea {
 
 .app-brand-title img {
   display: block;
-  width: 28px !important;
+  width: auto !important;
   height: 28px !important;
+  max-width: 24px;
+  object-fit: contain;
   flex: 0 0 auto;
 }
 
-/* Inverte o símbolo branco para preto no tema claro. */
-html:not(.dark-theme) .app-brand-title img {
-  filter: none;
+/* Usa cada arquivo original, sem filtros nem inversão de cores. */
+html:not(.dark-theme) .app-brand-title .app-logo-dark {
+  display: none !important;
 }
 
-html.dark-theme .app-brand-title img {
-  filter: invert(1);
+html.dark-theme .app-brand-title .app-logo-light {
+  display: none !important;
 }
 
 .app-nav {
@@ -1604,8 +1606,9 @@ html.dark-theme .app-brand-title img {
   }
 
   .app-brand-title img {
-    width: 25px !important;
+    width: auto !important;
     height: 25px !important;
+    max-width: 22px;
   }
 
   .app-nav {
