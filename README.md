@@ -45,6 +45,7 @@ Horarios-TCC/
 │   ├── requirements.txt
 │   ├── requirements-desktop.txt
 │   ├── seed.py
+│   ├── seed_realista.py          # base de teste inspirada nas grades ETEC
 │   ├── test_backend.py
 │   ├── test_optimizer.py
 │   └── benchmark_optimizer.py
@@ -57,7 +58,8 @@ Horarios-TCC/
 │       ├── api.ts
 │       └── anatinus-design-system.css
 ├── build-windows.ps1           # empacota a versão desktop
-├── start-dev.ps1               # inicia ambiente de desenvolvimento
+├── start-dev.ps1               # usa o banco local normal
+├── start-demo.ps1              # usa banco realista isolado
 ├── verify.ps1                  # testes + build do frontend
 ├── backup-db.ps1               # backup do banco local
 ├── README.md
@@ -95,7 +97,29 @@ Para dados de demonstração, com o backend ligado e **somente em um banco vazio
 python seed.py
 ```
 
-O seed não deve ser executado repetidamente no mesmo banco, pois ele cria novos cadastros.
+O seed pequeno não deve ser executado repetidamente no mesmo banco, pois ele cria novos cadastros.
+
+### Base realista inspirada nas grades da ETEC
+
+Para testar turmas, grupos e professores com um conjunto maior, há um segundo script. Ele cria **um banco separado**, `backend/school_schedule_demo.db`, e nunca apaga `school_schedule.db`.
+
+Feche as janelas do Anatinus antes de recriar essa base e execute, na raiz do projeto:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe seed_realista.py
+cd ..
+.\start-demo.ps1
+```
+
+O `start-demo.ps1` inicia frontend e backend usando somente o banco realista. O banco normal continua separado.
+
+A base inclui:
+- **3º INFO Integral**, com os nomes de disciplinas/professores que conseguimos recuperar e grupos A/B: disciplinas técnicas separadas e disciplinas do ensino médio compartilhadas;
+- **TI — Noite**, com as cargas anotadas na conversa: SBD 5, PTCC 3, PC2 5, RDS 5, GSO2 3, SI 2 e DSE 2, totalizando 25 aulas;
+- **seis turmas Agro** (1º, 2º e 3º PI AGRO A/B), cada uma podendo ter grupos A/B, para exercitar divisões com os componentes M.R.N e P.T.I.C.
+
+**Limitação importante dos dados:** as imagens históricas não preservaram todas as cargas semanais de 3º INFO nem a matriz completa dos Agro. Por isso, essas cargas e as disponibilidades docentes são provisórias para teste, não transcrições oficiais da escola. A distribuição noturna de TI é a parte com carga recuperada com exatidão. A base também não armazena salas ou laboratórios, conforme o escopo do Anatinus.
 
 Todos os testes automatizados:
 
