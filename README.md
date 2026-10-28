@@ -59,7 +59,8 @@ Horarios-TCC/
 │       └── anatinus-design-system.css
 ├── build-windows.ps1           # empacota a versão desktop
 ├── start-dev.ps1               # usa o banco local normal
-├── start-demo.ps1              # usa banco realista isolado
+├── start-demo.ps1              # abre o banco realista isolado
+├── start-informatica.ps1       # recria e abre somente o 3º INFO
 ├── verify.ps1                  # testes + build do frontend
 ├── backup-db.ps1               # backup do banco local
 ├── README.md
@@ -103,14 +104,13 @@ O seed pequeno não deve ser executado repetidamente no mesmo banco, pois ele cr
 
 ### Testar somente a turma de Informática
 
-Para comparar o gerador com a matriz conhecida do 3º INFO sem interferência das outras turmas, recrie a base DEMO com somente Informática:
+Para comparar o gerador com as matérias e os professores do 3º INFO sem interferência das outras turmas, feche primeiro o Anatinus e execute na raiz:
 
 ```powershell
-cd backend
-.\.venv\Scripts\python.exe seed_realista.py --informatica-only
-cd ..
-.\start-demo.ps1
+.\start-informatica.ps1
 ```
+
+O atalho recria o banco DEMO isolado com somente o 3º INFO A/B e abre o aplicativo. Ele interrompe se a API ainda estiver usando o banco, para evitar recriá-lo enquanto está em uso.
 
 Isso mantém o 3º INFO, os 17 componentes e a associação de professores recuperada da referência: UDA/Erika, SW2/Marcel, CNW2/Célia, Filosofia e História/M. Emília, Sociologia/Célia, Espanhol/Fabiane, DDM2/Marcel, IRS/Joesley, Matemática/Kamila, Inglês/Gustavo, EAMT/Fabiane, Português/Marta, EACNT/Gustavo, PDTCC/Marcel, GCW/Higor e Geografia/Thiago.
 
