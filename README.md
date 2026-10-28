@@ -24,7 +24,7 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 - considera carga horária, jornada da turma, disponibilidade, complexidade, grupos A/B, intervalos e janelas;
 - salva a última grade no SQLite;
 - permite visualizar a grade por turma ou professor;
-- exporta a grade completa em CSV;
+- exporta a grade completa em arquivo Excel `.xlsx`, com colunas dimensionadas e cabeçalho fixo;
 - permite imprimir a visualização atual;
 - possui tema claro/escuro com preferência salva no navegador.
 
