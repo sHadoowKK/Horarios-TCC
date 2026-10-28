@@ -221,21 +221,16 @@ function App() {
   };
 
   const handleExportExcel = () => {
-    if (!schedule || schedule.length === 0 || selectedId === "") {
+    if (!schedule || schedule.length === 0) {
       return;
     }
 
-    const selectedClassroom = classrooms.find(
-      item => item.id === Number(selectedId)
-    );
-    const selectedName = viewMode === "turma"
-      ? getClassroomName(Number(selectedId))
-      : getProfName(Number(selectedId));
-    const rowsToExport = viewMode === "turma"
-      ? (JOURNEY_ROWS[selectedClassroom?.shift || "Manhã"] || JOURNEY_ROWS["Manhã"])
-      : PROFESSOR_ROWS;
-
-    const exportRows = rowsToExport.map(row => {
+    const buildRows = (
+      entityId: number,
+      mode: "turma" | "professor",
+      classroom: any | undefined,
+      rowLayout: DisplayRow[],
+    ): string[][] => rowLayout.map(row => {
       if (row.kind === "break") {
         return ["@BREAK@" + row.label + " · " + row.name, "", "", "", "", ""];
       }
@@ -244,13 +239,11 @@ function App() {
         const lessons = schedule.filter(item =>
           item.day === day &&
           item.period === row.period &&
-          (viewMode === "turma"
-            ? item.classroom_id === Number(selectedId)
-            : item.teacher_id === Number(selectedId))
+          (mode === "turma" ? item.classroom_id === entityId : item.teacher_id === entityId)
         );
 
-        if (viewMode === "professor") {
-          const item = lessons.find(lessonItem => lessonItem.teacher_id === Number(selectedId));
+        if (mode === "professor") {
+          const item = lessons.find(lessonItem => lessonItem.teacher_id === entityId);
           if (!item) return "";
           const groupLabel = item.student_group && item.student_group !== "Todos"
             ? " · Grupo " + item.student_group
@@ -259,13 +252,12 @@ function App() {
             getSubName(item.subject_id) + groupLabel;
         }
 
-        if (selectedClassroom?.has_groups) {
+        if (classroom?.has_groups) {
           const jointLesson = lessons.find(item => item.student_group === "Todos");
           if (jointLesson) {
             return "TURMA INTEIRA\n" + getSubName(jointLesson.subject_id) +
               "\n" + getProfName(jointLesson.teacher_id);
           }
-
           const groupA = lessons.find(item => item.student_group === "A");
           const groupB = lessons.find(item => item.student_group === "B");
           const formatGroup = (group: "A" | "B", item: any) => item
@@ -282,18 +274,35 @@ function App() {
       return [PERIOD_NAMES[row.period] || String(row.period + 1), ...cells];
     });
 
-    const safeName = selectedName
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
+    const headers = ["Horário", ...DAYS];
+    const worksheets = viewMode === "turma"
+      ? classrooms
+          .filter(classroom => schedule.some(item => item.classroom_id === classroom.id))
+          .map(classroom => ({
+            name: classroom.name,
+            headers,
+            rows: buildRows(
+              classroom.id,
+              "turma",
+              classroom,
+              JOURNEY_ROWS[classroom.shift || "Manhã"] || JOURNEY_ROWS["Manhã"],
+            ),
+          }))
+      : teachers
+          .filter(teacher => schedule.some(item => item.teacher_id === teacher.id))
+          .map(teacher => ({
+            name: teacher.name,
+            headers,
+            rows: buildRows(teacher.id, "professor", undefined, PROFESSOR_ROWS),
+          }));
 
-    exportTimetableToExcel(
-      ["Horário", ...DAYS],
-      exportRows,
-      "anatinus-" + (safeName || "grade") + ".xlsx",
-    );
+    if (worksheets.length === 0) {
+      setError("Não há grades para exportar nessa visualização.");
+      return;
+    }
+
+    const suffix = viewMode === "turma" ? "por-turma" : "por-professor";
+    exportTimetableToExcel(worksheets, "anatinus-grades-" + suffix + ".xlsx");
   };
 
   const handlePrint = () => {
@@ -697,7 +706,7 @@ function App() {
                             type="button"
                             onClick={handleExportExcel}
                             className="app-action-secondary"
-                            title="Baixar a grade completa em Excel (.xlsx)"
+                            title={viewMode === "turma" ? "Exportar uma aba por turma em Excel" : "Exportar uma aba por professor em Excel"}
                           >
                             <Download className="w-4 h-4" />
                             Excel
