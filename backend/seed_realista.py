@@ -60,7 +60,7 @@ def main():
         # ocupando os 10 períodos diários de segunda a sexta no Integral.
         info_subjects = [
             ("UDA", 3, "Alta", "Técnica", True, "Erika"),
-            ("SW2", 3, "Alta", "Técnica", True, "Marcel"),
+            ("SW2", 3, "Media", "Técnica", True, "Marcel"),
             ("CNW2", 3, "Media", "Técnica", True, "Célia"),
             ("Filosofia", 2, "Baixa", "Ensino Médio", False, "M. Emília"),
             ("Sociologia", 2, "Baixa", "Ensino Médio", False, "Célia"),
@@ -83,7 +83,7 @@ def main():
             ("SBD", 5, "Alta", "Camila"),
             ("PTCC", 3, "Media", "Marcel"),
             ("PC2", 5, "Alta", "Marcel"),
-            ("RDS", 5, "Alta", "Higor"),
+            ("RDS", 5, "Media", "Higor"),
             ("GSO2", 3, "Media", "Augusto"),
             ("SI", 2, "Media", "Leonardo"),
             ("DSE", 2, "Media", "Augusto"),
