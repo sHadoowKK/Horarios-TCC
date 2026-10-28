@@ -29,8 +29,8 @@
   --an-red-soft: #fff0f1;
   --an-amber: #81591c;
   --an-amber-soft: #fff5df;
-  --an-blue: #365d87;
-  --an-blue-soft: #edf4ff;
+  --an-blue: var(--an-accent-text);
+  --an-blue-soft: var(--an-accent-soft);
   --an-shadow: none;
 }
 
@@ -57,8 +57,8 @@ html.dark-theme {
   --an-red-soft: #352024;
   --an-amber: #f3d092;
   --an-amber-soft: #30281b;
-  --an-blue: #b8d4ff;
-  --an-blue-soft: #1c2937;
+  --an-blue: var(--an-accent-text);
+  --an-blue-soft: var(--an-accent-soft);
   --an-shadow: none;
 }
 
@@ -430,7 +430,7 @@ html.dark-theme .app-brand-title .app-logo-light {
   border: 1px solid var(--an-accent) !important;
   border-radius: 7px !important;
   background: var(--an-accent) !important;
-  color: #08090a !important;
+  color: #ffffff !important;
   box-shadow: none !important;
   font-size: 12px;
   font-weight: 590;
@@ -442,7 +442,7 @@ html.dark-theme .app-brand-title .app-logo-light {
 .app-main button.bg-purple-600:hover {
   border-color: var(--an-accent-hover) !important;
   background: var(--an-accent-hover) !important;
-  color: #08090a !important;
+  color: #ffffff !important;
 }
 
 .app-action-primary,
@@ -464,12 +464,13 @@ html.dark-theme .app-brand-title .app-logo-light {
 .app-action-primary {
   border-color: var(--an-accent) !important;
   background: var(--an-accent) !important;
-  color: #08090a !important;
+  color: #ffffff !important;
 }
 
 .app-action-primary:hover:not(:disabled) {
   border-color: var(--an-accent-hover) !important;
   background: var(--an-accent-hover) !important;
+  color: #ffffff !important;
 }
 
 .app-action-primary:disabled {
