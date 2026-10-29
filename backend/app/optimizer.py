@@ -693,10 +693,14 @@ def generate_schedule(
     model.Maximize(sum(rewards) - sum(penalties))
 
     solver = cp_model.CpSolver()
-    # Modelos pequenos devem ser resolvidos deterministicamente com um worker;
-    # para a escola inteira, o paralelismo ajuda a encontrar uma solução.
+    # Grades de escola inteira têm milhares de variáveis. Primeiro precisamos
+    # obter uma solução válida em vez de gastar todo o tempo provando que ela
+    # é ótima; modelos menores continuam buscando o ótimo normalmente.
     solver.parameters.max_time_in_seconds = 60.0
     solver.parameters.num_search_workers = 8
+    large_model = len(model.Proto().variables) >= 5000
+    if large_model:
+        solver.parameters.stop_after_first_solution = True
     status = solver.Solve(model)
 
     if status == cp_model.INFEASIBLE:
