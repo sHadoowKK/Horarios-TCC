@@ -245,6 +245,16 @@ def ensure_database_compatibility():
                     },
                 )
 
+        # Preserva o turno de tarde legado como períodos específicos antes de
+        # normalizar o rótulo para Integral, evitando ampliar a jornada existente.
+        conn.execute(
+            text(
+                "UPDATE classrooms SET allowed_periods = :periods "
+                "WHERE shift = 'Tarde' AND allowed_periods IS NULL"
+            ),
+            {"periods": json.dumps([6, 7, 8, 9, 10])},
+        )
+
         old_afternoon_count = conn.execute(
             text(
                 "SELECT COUNT(*) FROM classrooms "
@@ -257,6 +267,51 @@ def ensure_database_compatibility():
                 "UPDATE classrooms SET shift = 'Integral' "
                 "WHERE shift = 'Tarde'"
             ))
+
+        # No turno noturno nunca existem subgrupos internos A/B.
+        # Remove cargas de grupo antigas para que a carga base continue valendo.
+        night_classrooms = conn.execute(text(
+            "SELECT id, has_groups, subject_settings FROM classrooms "
+            "WHERE shift = 'Noite'"
+        )).fetchall()
+        for classroom_id, has_groups, raw_settings in night_classrooms:
+            settings = _load_json(raw_settings, [])
+            settings_need_normalization = bool(has_groups)
+            normalized_settings = []
+            for setting in settings if isinstance(settings, list) else []:
+                if not isinstance(setting, dict):
+                    continue
+                if (
+                    setting.get("split")
+                    or setting.get("workload_a") is not None
+                    or setting.get("workload_b") is not None
+                    or setting.get("joint_workload") is not None
+                ):
+                    settings_need_normalization = True
+                normalized = {
+                    key: value
+                    for key, value in setting.items()
+                    if key not in {
+                        "workload_a", "workload_b", "joint_workload"
+                    }
+                }
+                normalized["split"] = False
+                normalized_settings.append(normalized)
+
+            if settings_need_normalization:
+                conn.execute(
+                    text(
+                        "UPDATE classrooms SET has_groups = 0, "
+                        "subject_settings = :settings WHERE id = :classroom_id"
+                    ),
+                    {
+                        "settings": json.dumps(
+                            normalized_settings,
+                            ensure_ascii=False,
+                        ),
+                        "classroom_id": classroom_id,
+                    },
+                )
 
         # DISPONIBILIDADE DE PROFESSORES
         availability_changed = False
