@@ -191,6 +191,9 @@ def generate_schedule(
     sys_config: Dict[str, Any],
     num_days: int = 5,
     num_periods: int = 16,
+    fixed_schedule: List[Dict[str, Any]] | None = None,
+    mutable_classroom_id: int | None = None,
+    mutable_subject_id: int | None = None,
 ):
     model = cp_model.CpModel()
     penalties = []
@@ -344,6 +347,227 @@ def generate_schedule(
                             or not day_availability[period]
                         ):
                             model.Add(lesson[key] == 0)
+
+    # ------------------------------------------------------------------
+    # PRESERVAÇÃO DA GRADE FORA DO ESCOPO SOLICITADO
+    # ------------------------------------------------------------------
+    # Em uma regeneração parcial, todas as unidades fora do alvo ficam
+    # fixas exatamente nos períodos/professores atuais. Se a configuração
+    # dessas unidades mudou e já não corresponde à grade salva, solicitamos
+    # que o usuário inclua o item afetado no escopo ou gere a escola inteira.
+    if fixed_schedule is not None and mutable_classroom_id is not None:
+        units_by_key = {
+            (classroom["id"], subject["id"], target): (
+                classroom,
+                subject,
+                target,
+            )
+            for classroom, subject, target in units
+        }
+        fixed_items_by_unit = {
+            key: []
+            for key in units_by_key
+        }
+
+        for item in fixed_schedule:
+            classroom_id = int(item["classroom_id"])
+            subject_id = int(item["subject_id"])
+
+            is_mutable = (
+                classroom_id == mutable_classroom_id
+                and (
+                    mutable_subject_id is None
+                    or subject_id == mutable_subject_id
+                )
+            )
+            if is_mutable:
+                continue
+
+            target = item.get("student_group") or "Todos"
+            unit_key = (classroom_id, subject_id, target)
+            if unit_key not in units_by_key:
+                # Quando uma matéria não está mais configurada para uma
+                # unidade preservada, não podemos manter fielmente a grade.
+                if (classroom_id, subject_id, "Todos") in units_by_key:
+                    unit_key = (classroom_id, subject_id, "Todos")
+                else:
+                    return {
+                        "status": "infeasible",
+                        "message": (
+                            "Não dá para preservar a grade atual porque uma "
+                            "aula salva não corresponde à configuração atual "
+                            f"(turma {classroom_id}, matéria {subject_id}). "
+                            "Inclua essa turma/matéria na regeneração ou gere "
+                            "a escola inteira."
+                        ),
+                    }
+
+            fixed_items_by_unit[unit_key].append(item)
+
+        for unit_key, unit_rows in fixed_items_by_unit.items():
+            classroom, subject, target = units_by_key[unit_key]
+            classroom_id, subject_id, target = unit_key
+
+            is_mutable = (
+                classroom_id == mutable_classroom_id
+                and (
+                    mutable_subject_id is None
+                    or subject_id == mutable_subject_id
+                )
+            )
+            if is_mutable:
+                continue
+
+            expected_workload = int(
+                subject.get("_workload_by_target", {}).get(
+                    target,
+                    subject["workload"],
+                )
+            )
+
+            if len(unit_rows) != expected_workload:
+                return {
+                    "status": "infeasible",
+                    "message": (
+                        f"A grade salva de {classroom['name']} / "
+                        f"{subject['name']} tem {len(unit_rows)} aulas, mas "
+                        f"a configuração atual pede {expected_workload}. "
+                        "Para preservar os outros horários, gere também essa "
+                        "matéria ou escolha a turma inteira; para recalcular "
+                        "tudo, use Escola inteira."
+                    ),
+                }
+
+            teacher_ids = {item.get("teacher_id") for item in unit_rows}
+            if len(teacher_ids) > 1:
+                return {
+                    "status": "infeasible",
+                    "message": (
+                        f"A grade salva de {classroom['name']} / "
+                        f"{subject['name']} alterna professores dentro da "
+                        "mesma unidade e não pode ser congelada exatamente. "
+                        "Gere a turma inteira ou a escola inteira."
+                    ),
+                }
+
+            fixed_teacher_id = next(iter(teacher_ids), None)
+            eligible_ids = {
+                teacher["id"]
+                for teacher in eligible_teachers[unit_key]
+            }
+
+            if fixed_teacher_id is not None and fixed_teacher_id not in eligible_ids:
+                return {
+                    "status": "infeasible",
+                    "message": (
+                        f"O professor salvo para {classroom['name']} / "
+                        f"{subject['name']} não está mais habilitado para "
+                        "essa matéria. Gere essa turma/matéria ou a escola inteira."
+                    ),
+                }
+
+            if fixed_teacher_id is not None:
+                teacher_data = next(
+                    teacher
+                    for teacher in eligible_teachers[unit_key]
+                    if teacher["id"] == fixed_teacher_id
+                )
+                availability = teacher_data.get("availability", {})
+                for item in unit_rows:
+                    day = int(item["day"])
+                    period = int(item["period"])
+                    if period not in JOURNEY_PERIODS.get(
+                        classroom.get("shift", "Manhã"),
+                        JOURNEY_PERIODS["Manhã"],
+                    ):
+                        return {
+                            "status": "infeasible",
+                            "message": (
+                                f"A aula salva de {classroom['name']} / "
+                                f"{subject['name']} está fora do turno atual. "
+                                "Gere essa turma ou a escola inteira."
+                            ),
+                        }
+                    day_availability = availability.get(str(day))
+                    if (
+                        day_availability is not None
+                        and (
+                            period >= len(day_availability)
+                            or not day_availability[period]
+                        )
+                    ):
+                        return {
+                            "status": "infeasible",
+                            "message": (
+                                f"A disponibilidade atual do professor para "
+                                f"{classroom['name']} / {subject['name']} "
+                                "não permite manter uma das aulas salvas. "
+                                "Gere essa turma/matéria ou a escola inteira."
+                            ),
+                        }
+
+            # Congela também a escolha do docente para a unidade inteira.
+            for teacher in eligible_teachers[unit_key]:
+                assignment_key = (
+                    classroom_id,
+                    subject_id,
+                    target,
+                    teacher["id"],
+                )
+                model.Add(
+                    assignment[assignment_key]
+                    == int(fixed_teacher_id == teacher["id"])
+                )
+            model.Add(
+                no_teacher_assignment[unit_key]
+                == int(fixed_teacher_id is None)
+            )
+
+            cells = {}
+            for item in unit_rows:
+                cell = (int(item["day"]), int(item["period"]))
+                if cell in cells:
+                    return {
+                        "status": "infeasible",
+                        "message": (
+                            f"A grade salva de {classroom['name']} / "
+                            f"{subject['name']} tem duas aulas no mesmo grupo "
+                            "e período. Gere a turma ou a escola inteira."
+                        ),
+                    }
+                cells[cell] = item
+
+            for day in range(num_days):
+                for period in range(num_periods):
+                    cell_item = cells.get((day, period))
+                    no_teacher_key = (
+                        classroom_id,
+                        subject_id,
+                        target,
+                        day,
+                        period,
+                    )
+                    model.Add(
+                        no_teacher_lesson[no_teacher_key]
+                        == int(cell_item is not None and cell_item.get("teacher_id") is None)
+                    )
+
+                    for teacher in eligible_teachers[unit_key]:
+                        lesson_key = (
+                            classroom_id,
+                            subject_id,
+                            target,
+                            teacher["id"],
+                            day,
+                            period,
+                        )
+                        model.Add(
+                            lesson[lesson_key]
+                            == int(
+                                cell_item is not None
+                                and cell_item.get("teacher_id") == teacher["id"]
+                            )
+                        )
 
     # ------------------------------------------------------------------
     # ESCOLHA DO PROFESSOR E CARGA HORÁRIA
