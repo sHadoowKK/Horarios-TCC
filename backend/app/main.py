@@ -173,7 +173,16 @@ def create_classroom(
     if values["shift"] == "Noite":
         values["has_groups"] = False
         values["subject_settings"] = [
-            {**setting, "split": False}
+            {
+                **{
+                    key: value
+                    for key, value in setting.items()
+                    if key not in {
+                        "workload_a", "workload_b", "joint_workload"
+                    }
+                },
+                "split": False,
+            }
             for setting in values.get("subject_settings", [])
         ]
     item = models.Classroom(**values)
@@ -206,6 +215,19 @@ def update_classroom(
     values = data.model_dump()
     if values["shift"] == "Noite":
         values["has_groups"] = False
+        values["subject_settings"] = [
+            {
+                **{
+                    key: value
+                    for key, value in setting.items()
+                    if key not in {
+                        "workload_a", "workload_b", "joint_workload"
+                    }
+                },
+                "split": False,
+            }
+            for setting in values.get("subject_settings", [])
+        ]
 
     valid_subject_ids = {
         subject.id
