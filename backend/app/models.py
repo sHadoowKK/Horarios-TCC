@@ -18,6 +18,9 @@ class Classroom(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
     shift = Column(String, nullable=False)
+    # Índices de períodos permitidos para esta jornada específica.
+    # None mantém o padrão do turno para compatibilidade com bancos antigos.
+    allowed_periods = Column(JSON, nullable=True, default=None)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     has_groups = Column(Boolean, default=False)
 
