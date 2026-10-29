@@ -95,6 +95,10 @@ function App() {
   const [error, setError] = useState("");
   const [generationSuccess, setGenerationSuccess] =
     useState(false);
+  const [generationMessage, setGenerationMessage] = useState("");
+  const [generationScope, setGenerationScope] = useState<"all" | "classroom" | "subject">("all");
+  const [generationClassroomId, setGenerationClassroomId] = useState<number | "">("");
+  const [generationSubjectId, setGenerationSubjectId] = useState<number | "">("");
 
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -143,6 +147,42 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const selectedClassroom = classrooms.find(
+      classroom => classroom.id === generationClassroomId,
+    );
+
+    if (!selectedClassroom) {
+      if (classrooms.length > 0 && generationClassroomId === "") {
+        const preferredId =
+          viewMode === "turma" && typeof selectedId === "number"
+            ? selectedId
+            : classrooms[0].id;
+        const preferredClassroom =
+          classrooms.find(classroom => classroom.id === preferredId)
+          || classrooms[0];
+
+        setGenerationClassroomId(preferredClassroom.id);
+        setGenerationSubjectId(
+          preferredClassroom.subject_settings?.[0]?.subject_id ?? "",
+        );
+      }
+      return;
+    }
+
+    const configuredSubjectIds = (selectedClassroom.subject_settings || [])
+      .map(setting => Number(setting.subject_id));
+    if (!configuredSubjectIds.includes(Number(generationSubjectId))) {
+      setGenerationSubjectId(configuredSubjectIds[0] ?? "");
+    }
+  }, [
+    classrooms,
+    generationClassroomId,
+    generationSubjectId,
+    selectedId,
+    viewMode,
+  ]);
+
+  useEffect(() => {
     const handleAcademicDataChanged = () => {
       fetchBaseData(false);
     };
@@ -186,19 +226,43 @@ function App() {
   };
 
   const handleGenerate = async () => {
+    if (generationScope !== "all" && generationClassroomId === "") {
+      setError("Selecione a turma que deseja regenerar.");
+      setGenerationSuccess(false);
+      return;
+    }
+
+    if (generationScope === "subject" && generationSubjectId === "") {
+      setError("Selecione a matéria que deseja regenerar.");
+      setGenerationSuccess(false);
+      return;
+    }
+
     setLoading(true);
     setError("");
     setGenerationSuccess(false);
+    setGenerationMessage("");
 
     try {
-      // Recarrega turmas, disciplinas e professores antes de gerar.
-      // Isso evita usar na grade dados antigos que foram alterados
-      // em outra página, como Grupos A/B e tipo da disciplina.
+      // Atualiza os cadastros antes do cálculo, preservando a última grade.
       await fetchBaseData(false);
 
-      const response = await api.post("/generate/");
-      const newSchedule = response.data.schedule;
-      setSchedule(newSchedule);
+      const request: {
+        scope: "all" | "classroom" | "subject";
+        classroom_id?: number;
+        subject_id?: number;
+      } = { scope: generationScope };
+
+      if (generationScope !== "all") {
+        request.classroom_id = Number(generationClassroomId);
+      }
+      if (generationScope === "subject") {
+        request.subject_id = Number(generationSubjectId);
+      }
+
+      const response = await api.post("/generate/", request);
+      setSchedule(response.data.schedule);
+      setGenerationMessage(response.data.message || "Grade gerada.");
       setGenerationSuccess(true);
     } catch (err: any) {
       setGenerationSuccess(false);
