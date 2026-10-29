@@ -483,7 +483,7 @@ def main(only_informatica=False):
         print("SW2 e CNW2 permitem os professores vistos nos grupos A/B.")
         print("Disponibilidades docentes oficiais não constam no quadro; permanecem provisórias.")
         if not only_informatica:
-            print("Turmas adicionais: TI Noite + seis turmas Agro com matrizes ampliadas.")
+            print("Turmas adicionais: TI Noite + seis turmas Agro independentes, sem subgrupos internos A/B.")
             print("As cargas de Agro foram inferidas da grade diurna de 02/06/2026; revisar rótulos/cargas pouco nítidos e disponibilidades docentes.")
     finally:
         db.close()
