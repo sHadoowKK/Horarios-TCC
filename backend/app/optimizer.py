@@ -225,17 +225,29 @@ def generate_schedule(
     lesson = {}
     no_teacher_lesson = {}
 
+    # Em uma primeira geração, não criamos variáveis para slots impossíveis.
+    # Regenerações com aulas fixadas preservam a grade antiga e mantêm o caminho
+    # de compatibilidade completo para não descartar manualizações existentes.
+    candidate_periods = (
+        list(range(num_periods)) if fixed_schedule else None
+    )
+
     for classroom, subject, target in units:
         allowed_periods = set(_get_allowed_periods(classroom))
+        unit_periods = (
+            candidate_periods
+            if candidate_periods is not None
+            else sorted(allowed_periods)
+        )
         none_key = (classroom["id"], subject["id"], target)
         no_teacher_assignment[none_key] = model.NewBoolVar(f"N_c{classroom['id']}_s{subject['id']}_g{target}")
 
         for day in range(num_days):
-            for period in range(num_periods):
+            for period in unit_periods:
                 key = (classroom["id"], subject["id"], target, day, period)
                 no_teacher_lesson[key] = model.NewBoolVar(f"U_c{classroom['id']}_s{subject['id']}_g{target}_d{day}_p{period}")
                 model.Add(no_teacher_lesson[key] <= no_teacher_assignment[none_key])
-                
+
                 if period not in allowed_periods:
                     model.Add(no_teacher_lesson[key] == 0)
 
@@ -243,19 +255,25 @@ def generate_schedule(
         for teacher in eligible_teachers[unit_key]:
             assignment_key = (classroom["id"], subject["id"], target, teacher["id"])
             assignment[assignment_key] = model.NewBoolVar(f"A_c{classroom['id']}_s{subject['id']}_g{target}_t{teacher['id']}")
+            availability = teacher.get("availability", {})
 
             for day in range(num_days):
-                for period in range(num_periods):
+                day_availability = availability.get(str(day))
+                for period in unit_periods:
+                    # Na geração inicial, slots fora da disponibilidade docente
+                    # são omitidos, não criados como variáveis travadas em zero.
+                    if candidate_periods is None and day_availability is not None:
+                        if period >= len(day_availability) or not day_availability[period]:
+                            continue
+
                     key = (classroom["id"], subject["id"], target, teacher["id"], day, period)
                     lesson[key] = model.NewBoolVar(f"Y_c{classroom['id']}_s{subject['id']}_g{target}_t{teacher['id']}_d{day}_p{period}")
                     model.Add(lesson[key] <= assignment[assignment_key])
-                    
+
                     if period not in allowed_periods:
                         model.Add(lesson[key] == 0)
 
-                    availability = teacher.get("availability", {})
-                    day_availability = availability.get(str(day))
-                    if day_availability is not None:
+                    if candidate_periods is not None and day_availability is not None:
                         if period >= len(day_availability) or not day_availability[period]:
                             model.Add(lesson[key] == 0)
 
