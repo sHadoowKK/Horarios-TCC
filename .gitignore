@@ -20,6 +20,13 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
+# Local database files (never commit local school data or generated demo DBs)
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
 # Local database backups
 backups/
 
