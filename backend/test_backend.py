@@ -203,5 +203,88 @@ class BackendIntegrationTests(unittest.TestCase):
         )
 
 
+    def test_subject_can_regenerate_across_every_class_that_uses_it(self):
+        course, math, first_class, math_teacher = self._basic_school(
+            workload=2,
+        )
+        history = models.Subject(
+            name="História",
+            workload=2,
+            complexity="Baixa",
+            category="Ensino Médio",
+            course_ids=[course.id],
+        )
+        self.db.add(history)
+        self.db.flush()
+
+        first_class.subject_settings = [
+            *first_class.subject_settings,
+            {
+                "subject_id": history.id,
+                "workload": 2,
+                "split": False,
+            },
+        ]
+        second_class = models.Classroom(
+            name="2º A",
+            shift="Manhã",
+            course_id=course.id,
+            has_groups=False,
+            subject_settings=[
+                {"subject_id": math.id, "workload": 2, "split": False},
+                {"subject_id": history.id, "workload": 2, "split": False},
+            ],
+            split_subject_ids=[],
+        )
+        history_teacher = models.Teacher(
+            name="Professor de História",
+            allowed_subjects=[history.id],
+            availability=full_availability(),
+            score=100,
+        )
+        self.db.add_all([second_class, history_teacher])
+        self.db.commit()
+        self.db.refresh(first_class)
+        self.db.refresh(second_class)
+
+        original = main.generate_timetable(db=self.db)
+        self.assertEqual(original["status"], "success")
+
+        original_history = sorted(
+            (
+                row["classroom_id"],
+                row["teacher_id"],
+                row["day"],
+                row["period"],
+                row["student_group"],
+            )
+            for row in original["schedule"]
+            if row["subject_id"] == history.id
+        )
+        request = main.schemas.TimetableGenerationRequest(
+            scope="subject_all",
+            subject_id=math.id,
+        )
+        regenerated = main.generate_timetable(db=self.db, payload=request)
+        self.assertEqual(regenerated["status"], "success")
+        self.assertIn("2 turma(s)", regenerated["message"])
+
+        regenerated_history = sorted(
+            (
+                row["classroom_id"],
+                row["teacher_id"],
+                row["day"],
+                row["period"],
+                row["student_group"],
+            )
+            for row in regenerated["schedule"]
+            if row["subject_id"] == history.id
+        )
+        self.assertEqual(regenerated_history, original_history)
+        self.assertEqual(
+            sum(row["subject_id"] == math.id for row in regenerated["schedule"]),
+            4,
+        )
+
 if __name__ == "__main__":
     unittest.main()
