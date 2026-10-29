@@ -8,6 +8,13 @@ Complexity = Literal["Alta", "Media", "Baixa"]
 SubjectCategory = Literal["Ensino Médio", "Técnica"]
 StudentGroup = Literal["Todos", "A", "B"]
 RuleMode = Literal["ignore", "soft", "hard"]
+GenerationScope = Literal["all", "classroom", "subject"]
+
+
+class TimetableGenerationRequest(BaseModel):
+    scope: GenerationScope = "all"
+    classroom_id: Optional[int] = Field(default=None, gt=0)
+    subject_id: Optional[int] = Field(default=None, gt=0)
 
 
 class CourseBase(BaseModel):
