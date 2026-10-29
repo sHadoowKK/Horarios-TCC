@@ -415,7 +415,7 @@ def generate_schedule(
             classroom_id, subject_id, target = unit_key
 
             is_mutable = (
-                classroom_id == mutable_classroom_id
+                classroom_id in mutable_ids
                 and (
                     mutable_subject_id is None
                     or subject_id == mutable_subject_id
