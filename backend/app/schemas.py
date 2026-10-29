@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal, Optional
+from typing import Annotated, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -53,6 +53,8 @@ class ClassroomSubjectSetting(BaseModel):
 class ClassroomBase(BaseModel):
     name: str = Field(min_length=1)
     shift: Shift
+    # Índices de períodos permitidos (0–15); None usa o padrão do turno.
+    allowed_periods: Optional[List[Annotated[int, Field(ge=0, le=15)]]] = None
     course_id: int = Field(gt=0)
     has_groups: bool = False
     subject_settings: List[ClassroomSubjectSetting] = Field(
