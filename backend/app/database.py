@@ -172,7 +172,7 @@ def ensure_database_compatibility():
         for classroom_id, classroom_name, shift, configured_periods in legacy_classrooms:
             normalized_name = (classroom_name or "").upper()
             is_legacy_extended = (
-                shift == "Integral"
+                shift in {"Integral", "Tarde"}
                 and any(marker in normalized_name for marker in (
                     "ALIMENTOS", "ITINERÁRIO", "ITINERARIO"
                 ))
@@ -245,17 +245,7 @@ def ensure_database_compatibility():
                     },
                 )
 
-        # Preserva o turno de tarde legado como períodos específicos antes de
-        # normalizar o rótulo para Integral, evitando ampliar a jornada existente.
-        conn.execute(
-            text(
-                "UPDATE classrooms SET allowed_periods = :periods "
-                "WHERE shift = 'Tarde' AND allowed_periods IS NULL"
-            ),
-            {"periods": json.dumps([6, 7, 8, 9, 10])},
-        )
-
-        old_afternoon_count = conn.execute(
+remove afternoon migration block        old_afternoon_count = conn.execute(
             text(
                 "SELECT COUNT(*) FROM classrooms "
                 "WHERE shift = 'Tarde'"
