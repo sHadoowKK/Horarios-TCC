@@ -286,5 +286,65 @@ class BackendIntegrationTests(unittest.TestCase):
             4,
         )
 
+
+    def test_preflight_uses_configured_period_capacity(self):
+        self._basic_school(workload=6, with_teacher=False)
+        classroom = self.db.query(models.Classroom).first()
+        classroom.allowed_periods = [0]
+        self.db.commit()
+
+        with self.assertRaises(HTTPException) as context:
+            main.generate_timetable(db=self.db)
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertIn("apenas 5 períodos disponíveis", context.exception.detail)
+
+    def test_night_class_cannot_keep_internal_groups_or_split_loads(self):
+        course, subject, classroom, _ = self._basic_school(
+            workload=2,
+            with_teacher=False,
+        )
+        classroom.has_groups = True
+        classroom.subject_settings = [{
+            "subject_id": subject.id,
+            "workload": 2,
+            "workload_a": 1,
+            "workload_b": 1,
+            "joint_workload": 0,
+            "split": True,
+        }]
+        self.db.commit()
+
+        payload = main.schemas.ClassroomCreate(
+            name=classroom.name,
+            shift="Noite",
+            allowed_periods=[11, 12, 13, 14, 15],
+            course_id=course.id,
+            has_groups=True,
+            subject_settings=[{
+                "subject_id": subject.id,
+                "workload": 2,
+                "workload_a": 1,
+                "workload_b": 1,
+                "joint_workload": 0,
+                "split": True,
+            }],
+            split_subject_ids=[subject.id],
+        )
+        updated = main.update_classroom(
+            classroom_id=classroom.id,
+            data=payload,
+            db=self.db,
+        )
+
+        self.assertFalse(updated.has_groups)
+        self.assertEqual(updated.allowed_periods, [11, 12, 13, 14, 15])
+        setting = updated.subject_settings[0]
+        self.assertEqual(setting["workload"], 2)
+        self.assertFalse(setting["split"])
+        self.assertNotIn("workload_a", setting)
+        self.assertNotIn("workload_b", setting)
+        self.assertNotIn("joint_workload", setting)
+
 if __name__ == "__main__":
     unittest.main()
