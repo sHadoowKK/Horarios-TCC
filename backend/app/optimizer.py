@@ -1,3 +1,4 @@
+from itertools import combinations
 from typing import Any, Dict, List
 import time
 
@@ -30,7 +31,7 @@ PERIOD_START_MINUTES = [
     940,  # 9: Tarde 4ª (15:40)
     990,  # 10: Tarde 5ª (16:30)
     1140, # 11: Noturno Mod 1ª (19:00)
-    1185, # 12: Noturno Mod 2ª (19:45)
+    1190, # 12: Noturno Mod 2ª (19:50)
     1230, # 13: Noturno Mod 3ª (20:30)
     1290, # 14: Noturno Mod 4ª (21:30)
     1335  # 15: Noturno Mod 5ª (22:15)
@@ -48,7 +49,7 @@ PERIOD_END_MINUTES = [
     940,  # 8: 15:40
     990,  # 9: 16:30
     1040, # 10: 17:20
-    1185, # 11: 19:45
+    1190, # 11: 19:50
     1230, # 12: 20:30
     1275, # 13: 21:15
     1335, # 14: 22:15
@@ -183,6 +184,9 @@ def generate_schedule(
     num_days: int = 5,
     num_periods: int = 16,
     fixed_schedule: List[Dict[str, Any]] | None = None,
+    mutable_classroom_id: int | None = None,
+    mutable_classroom_ids: List[int] | None = None,
+    mutable_subject_id: int | None = None,
 ):
     model = cp_model.CpModel()
     penalties = []
@@ -263,6 +267,31 @@ def generate_schedule(
             fx_d = fx.get("day")
             fx_p = fx.get("period")
             fx_g = fx.get("student_group", "Todos")
+
+            # Em uma regeneração parcial, libera somente as aulas do escopo
+            # solicitado. Todo o restante continua fixado no dia/período/professor.
+            has_mutable_scope = (
+                mutable_classroom_id is not None
+                or mutable_classroom_ids is not None
+                or mutable_subject_id is not None
+            )
+            is_mutable_classroom = (
+                (mutable_classroom_id is None or fx_c == mutable_classroom_id)
+                and (
+                    mutable_classroom_ids is None
+                    or fx_c in mutable_classroom_ids
+                )
+            )
+            is_mutable = (
+                has_mutable_scope
+                and is_mutable_classroom
+                and (
+                    mutable_subject_id is None
+                    or fx_s == mutable_subject_id
+                )
+            )
+            if is_mutable:
+                continue
 
             # Força a aula a ocorrer exatamente neste slot com este professor
             unit_key = (fx_c, fx_s, fx_g)
@@ -371,6 +400,32 @@ def generate_schedule(
                     model.Add(occupancy == 0)
                 teacher_occupancy[(teacher["id"], day, period)] = occupancy
 
+    # Descanso mínimo de 11 horas entre jornadas em dias consecutivos.
+    # Se o descanso real entre duas aulas possíveis for menor que 660 min,
+    # o professor não pode ocupar ambos os períodos.
+    for teacher in teachers:
+        teacher_id = teacher["id"]
+        for day in range(num_days - 1):
+            for previous_period in range(min(num_periods, len(PERIOD_END_MINUTES))):
+                previous_key = (teacher_id, day, previous_period)
+                if previous_key not in teacher_occupancy:
+                    continue
+                for next_period in range(min(num_periods, len(PERIOD_START_MINUTES))):
+                    next_key = (teacher_id, day + 1, next_period)
+                    if next_key not in teacher_occupancy:
+                        continue
+                    rest_minutes = (
+                        1440
+                        + PERIOD_START_MINUTES[next_period]
+                        - PERIOD_END_MINUTES[previous_period]
+                    )
+                    if rest_minutes < 11 * 60:
+                        model.Add(
+                            teacher_occupancy[previous_key]
+                            + teacher_occupancy[next_key]
+                            <= 1
+                        )
+
     # Equilíbrio diário entre Grupo A e Grupo B
     for classroom in classrooms:
         if classroom.get("has_groups", False) and classroom.get("shift") != "Noite":
@@ -388,15 +443,41 @@ def generate_schedule(
             for day in range(num_days):
                 for turn_name, turn_periods in TURNS_DEFINITIONS.items():
                     valid_turn_periods = [p for p in turn_periods if p in allowed_periods]
-                    if valid_turn_periods:
+                    if valid_turn_periods and min_classes_students >= 2:
                         turn_sum = sum(student_occupancy[(classroom["id"], audience, day, p)] for p in valid_turn_periods if (classroom["id"], audience, day, p) in student_occupancy)
                         model.Add(turn_sum != 1)
 
     for teacher in teachers:
         for day in range(num_days):
             for turn_name, turn_periods in TURNS_DEFINITIONS.items():
-                turn_sum = sum(teacher_occupancy[(teacher["id"], day, p)] for p in turn_periods if (teacher["id"], day, p) in teacher_occupancy)
-                model.Add(turn_sum != 1)
+                if min_classes_teachers >= 2:
+                    turn_sum = sum(teacher_occupancy[(teacher["id"], day, p)] for p in turn_periods if (teacher["id"], day, p) in teacher_occupancy)
+                    model.Add(turn_sum != 1)
+
+    # Máximo de seis aulas consecutivas sem uma pausa de pelo menos 60 min.
+    # Proíbe qualquer conjunto de sete aulas ocupadas em que cada aula seguinte
+    # comece a menos de 60 min do término da anterior.
+    valid_streak_periods = [
+        period for period in range(min(num_periods, len(PERIOD_START_MINUTES), len(PERIOD_END_MINUTES)))
+    ]
+    streak_windows = [
+        window
+        for window in combinations(valid_streak_periods, 7)
+        if all(
+            PERIOD_START_MINUTES[right] - PERIOD_END_MINUTES[left] < 60
+            for left, right in zip(window, window[1:])
+        )
+    ]
+    for teacher in teachers:
+        teacher_id = teacher["id"]
+        for day in range(num_days):
+            for window in streak_windows:
+                model.Add(
+                    sum(
+                        teacher_occupancy[(teacher_id, day, period)]
+                        for period in window
+                    ) <= 6
+                )
 
     # COMPRESSÃO DE DIAS DOS PROFESSORES
     for teacher in teachers:
@@ -483,6 +564,11 @@ def generate_schedule(
 
             elif weekly_workload in (3, 5):
                 model.Add(day_sum <= 3)
+                if (
+                    weekly_workload == 3
+                    and not subject.get("_prefer_triple_block", False)
+                ):
+                    model.Add(day_sum <= 2)
 
         if weekly_workload == 3:
             model.Add(sum(days_active) <= 2)
