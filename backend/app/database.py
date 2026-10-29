@@ -245,6 +245,16 @@ def ensure_database_compatibility():
                     },
                 )
 
+        # Preserva turmas legadas exclusivamente vespertinas antes de
+        # normalizar o rótulo Tarde para Integral.
+        conn.execute(
+            text(
+                "UPDATE classrooms SET allowed_periods = :periods "
+                "WHERE shift = 'Tarde' AND allowed_periods IS NULL"
+            ),
+            {"periods": json.dumps([6, 7, 8, 9, 10])},
+        )
+
         old_afternoon_count = conn.execute(
             text(
                 "SELECT COUNT(*) FROM classrooms "
