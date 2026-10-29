@@ -24,7 +24,8 @@ from app.database import Base, SessionLocal, engine, ensure_database_compatibili
 
 
 # Índices de períodos da ETEC; intervalos/almoço não são aulas.
-INTEGRAL_PERIODS = (0, 1, 2, 3, 4, 6, 7, 8, 9, 10)
+# A disponibilidade de demonstração é ampla; cada turma restringe sua própria jornada.
+INTEGRAL_AVAILABILITY_PERIODS = tuple(range(11))
 NIGHT_PERIODS = (11, 12, 13, 14, 15)
 
 
@@ -32,7 +33,7 @@ def make_availability(shifts, available_days=range(5)):
     allowed = set()
     for shift in shifts:
         allowed.update(
-            INTEGRAL_PERIODS if shift == "Integral"
+            INTEGRAL_AVAILABILITY_PERIODS if shift == "Integral"
             else NIGHT_PERIODS if shift == "Noite"
             else range(6)
         )
@@ -298,34 +299,30 @@ def main(only_informatica=False):
                 settings = []
                 for subject_name, load in matrix.items():
                     subject = subject_by_name[subject_name]
+
+                    # Os sufixos A/B identificam turmas completas diferentes,
+                    # não grupos internos de uma mesma turma.
                     if isinstance(load, int):
-                        settings.append({
-                            "subject_id": subject.id,
-                            "workload": load,
-                            "split": False,
-                        })
+                        weekly_load = load
                     elif isinstance(load, tuple):
-                        load_a, load_b = load
-                        settings.append({
-                            "subject_id": subject.id,
-                            "workload": max(1, load_a, load_b),
-                            "workload_a": load_a,
-                            "workload_b": load_b,
-                            "joint_workload": 0,
-                            "split": True,
-                        })
+                        # A matriz anterior codificava os sufixos como grupos.
+                        # Em cada turma separada, conta-se uma única carga semanal.
+                        weekly_load = max(int(load[0]), int(load[1]))
                     else:
                         joint = int(load.get("joint", 0))
                         load_a = int(load.get("a", 0))
                         load_b = int(load.get("b", 0))
-                        settings.append({
-                            "subject_id": subject.id,
-                            "workload": max(1, joint, load_a, load_b),
-                            "workload_a": load_a,
-                            "workload_b": load_b,
-                            "joint_workload": joint,
-                            "split": True,
-                        })
+                        # Colapsa a carga comum + a carga específica em uma só carga.
+                        weekly_load = joint + max(load_a, load_b)
+
+                    if weekly_load <= 0:
+                        continue
+
+                    settings.append({
+                        "subject_id": subject.id,
+                        "workload": weekly_load,
+                        "split": False,
+                    })
                 agro_settings_by_class[classroom_name] = settings
         classrooms = [
             models.Classroom(
@@ -333,6 +330,7 @@ def main(only_informatica=False):
                 shift="Integral",
                 course_id=info_course.id,
                 has_groups=True,
+                allowed_periods=[0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
                 subject_settings=info_settings,
                 preferred_subject_sequences=[[
                     subject_by_name["Filosofia"].id,
@@ -347,6 +345,7 @@ def main(only_informatica=False):
                 shift="Noite",
                 course_id=night_course.id,
                 has_groups=False,
+                allowed_periods=[11, 12, 13, 14, 15],
                 subject_settings=night_settings,
                 split_subject_ids=[],
             ))
@@ -355,12 +354,39 @@ def main(only_informatica=False):
                     name=name,
                     shift="Integral",
                     course_id=agro_course.id,
-                    has_groups=True,
+                    has_groups=False,
+                    allowed_periods=list(range(11)),
                     subject_settings=agro_settings_by_class[name],
                     split_subject_ids=[],
                 )
                 for name in agro_class_names
             )
+        if not only_informatica:
+            agro_classrooms = [
+                classroom for classroom in classrooms
+                if classroom.course_id == agro_course.id
+            ]
+            if len(agro_classrooms) != 6:
+                raise RuntimeError(
+                    f"Esperadas 6 turmas Agro independentes; encontradas {len(agro_classrooms)}"
+                )
+            for classroom in agro_classrooms:
+                if classroom.has_groups:
+                    raise RuntimeError(
+                        f"{classroom.name} não deve ter subgrupos A/B internos"
+                    )
+                if classroom.allowed_periods != list(range(11)):
+                    raise RuntimeError(
+                        f"Jornada diurna incompleta em {classroom.name}"
+                    )
+                if any(
+                    setting.get("split")
+                    for setting in classroom.subject_settings
+                ):
+                    raise RuntimeError(
+                        f"{classroom.name} contém divisão interna indevida"
+                    )
+
         db.add_all(classrooms)
 
         # Nomes mantidos conforme os exemplos da imagem/conversa.
