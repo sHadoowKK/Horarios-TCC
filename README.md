@@ -171,7 +171,7 @@ Todos os testes automatizados:
 python -m unittest discover -p "test_*.py"
 ```
 
-A suíte atual possui **24 testes automatizados** após incluir cenários de regressão para jornadas configuráveis; a contagem exata é verificada pelo fluxo de CI. Entre eles há um cenário de **semana noturna completa com 25 aulas**, baseado em uma grade real usada durante o desenvolvimento.
+A suíte tem **34 testes automatizados**: 27 cenários do otimizador e 7 testes de integração do backend, incluindo regressões para jornadas configuráveis e turno noturno. Entre eles há um cenário de **semana noturna completa com 25 aulas**, baseado em uma grade real usada durante o desenvolvimento.
 
 ### Benchmark de carga
 
