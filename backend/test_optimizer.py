@@ -126,6 +126,41 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(len(result["schedule"]), 1)
         self.assertEqual(result["schedule"][0]["period"], 5)
 
+    def test_friday_afternoon_is_available_when_not_excluded_by_classroom(self):
+        classrooms = [
+            classroom(
+                1,
+                "1º A",
+                "Integral",
+                [{"subject_id": 1, "workload": 1, "split": False}],
+                allowed_periods=[6],
+            )
+        ]
+        subjects = [subject(1, "Matemática", workload=1)]
+        teachers = [teacher(1, [1])]
+        fixed_schedule = [{
+            "classroom_id": 1,
+            "subject_id": 1,
+            "teacher_id": 1,
+            "day": 4,
+            "period": 6,
+            "student_group": "Todos",
+        }]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+            fixed_schedule=fixed_schedule,
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(
+            [(item["day"], item["period"]) for item in result["schedule"]],
+            [(4, 6)],
+        )
+
     def test_classroom_uses_only_selected_subjects(self):
         classrooms = [
             classroom(
