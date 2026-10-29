@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from . import models, schemas
 from .database import engine, ensure_database_compatibility, get_db
-from .optimizer import JOURNEY_PERIODS, generate_schedule
+from .optimizer import generate_schedule, get_allowed_periods
 
 models.Base.metadata.create_all(bind=engine)
 ensure_database_compatibility()
@@ -687,6 +687,7 @@ def generate_timetable(
             "name": classroom.name,
             "course_id": classroom.course_id,
             "shift": classroom.shift,
+            "allowed_periods": classroom.allowed_periods,
             "has_groups": classroom.has_groups,
             "subject_settings": classroom.subject_settings or [],
             "preferred_subject_sequences": (
@@ -729,15 +730,7 @@ def generate_timetable(
     preflight_errors = []
 
     for classroom in classrooms:
-        weekly_capacity = (
-            len(
-                JOURNEY_PERIODS.get(
-                    classroom.get("shift", "Manhã"),
-                    JOURNEY_PERIODS["Manhã"],
-                )
-            )
-            * 5
-        )
+        weekly_capacity = len(get_allowed_periods(classroom)) * 5
 
         settings = classroom.get(
             "subject_settings",
