@@ -56,20 +56,42 @@ PERIOD_END_MINUTES = [
 ]
 
 
-def _get_allowed_periods(classroom):
+def get_allowed_periods(classroom):
+    """Retorna os períodos configurados, com fallback para o turno legado.
+
+    O período 5 (11:40–12:30) só pode ser usado por jornadas diurnas
+    que o habilitem explicitamente; a jornada padrão permanece 5+5.
+    """
     shift = classroom.get("shift", "Manhã")
-    name = (classroom.get("name") or "").upper()
-    periods = list(JOURNEY_PERIODS.get(shift, JOURNEY_PERIODS["Manhã"]))
-    
-    if "ALIMENTOS" in name or "ITINERÁRIO" in name:
-        if 5 not in periods:
-            periods.append(5)
-        for p in [6, 7, 8, 9, 10]:
-            if p not in periods:
-                periods.append(p)
-        periods.sort()
-        
-    return periods
+    fallback = list(JOURNEY_PERIODS.get(shift, JOURNEY_PERIODS["Manhã"]))
+    configured = classroom.get("allowed_periods")
+
+    if configured is None:
+        return fallback
+
+    if shift == "Integral":
+        valid_periods = set(range(11))
+    else:
+        valid_periods = set(fallback)
+
+    normalized = set()
+    if not isinstance(configured, (list, tuple, set)):
+        return fallback
+
+    for raw_period in configured:
+        try:
+            period = int(raw_period)
+        except (TypeError, ValueError):
+            continue
+        if period in valid_periods and 0 <= period < len(PERIOD_START_MINUTES):
+            normalized.add(period)
+
+    return sorted(normalized)
+
+
+def _get_allowed_periods(classroom):
+    """Alias compatível com testes/código que usam o nome interno antigo."""
+    return get_allowed_periods(classroom)
 
 
 def _subject_entries_for_classroom(classroom, subjects):
