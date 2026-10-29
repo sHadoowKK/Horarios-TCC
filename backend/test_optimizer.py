@@ -1,6 +1,6 @@
 import unittest
 
-from app.optimizer import generate_schedule
+from app.optimizer import generate_schedule, get_allowed_periods
 
 
 def default_config():
@@ -38,6 +38,7 @@ def classroom(
     shift,
     settings,
     has_groups=False,
+    allowed_periods=None,
 ):
     return {
         "id": classroom_id,
@@ -45,6 +46,7 @@ def classroom(
         "course_id": 1,
         "shift": shift,
         "has_groups": has_groups,
+        "allowed_periods": allowed_periods,
         "subject_settings": settings,
     }
 
@@ -85,6 +87,45 @@ def teacher(
 
 
 class OptimizerTests(unittest.TestCase):
+    def test_explicit_journey_periods_are_respected_and_limited_to_turn(self):
+        standard = get_allowed_periods({
+            "shift": "Integral",
+            "allowed_periods": [0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
+        })
+        extended = get_allowed_periods({
+            "shift": "Integral",
+            "allowed_periods": list(range(11)),
+        })
+        night = get_allowed_periods({
+            "shift": "Noite",
+            "allowed_periods": [0, 11, 12, 15],
+        })
+
+        self.assertEqual(standard, [0, 1, 2, 3, 4, 6, 7, 8, 9, 10])
+        self.assertEqual(extended, list(range(11)))
+        self.assertEqual(night, [11, 12, 15])
+
+    def test_extended_integral_can_schedule_sixth_morning_period(self):
+        classrooms = [
+            classroom(
+                1,
+                "1º PI AGRO A",
+                "Integral",
+                [{"subject_id": 1, "workload": 1, "split": False}],
+                allowed_periods=[5],
+            )
+        ]
+        subjects = [subject(1, "Matemática", workload=1)]
+        teachers = [teacher(1, [1])]
+
+        result = generate_schedule(
+            classrooms, subjects, teachers, default_config()
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(len(result["schedule"]), 1)
+        self.assertEqual(result["schedule"][0]["period"], 5)
+
     def test_classroom_uses_only_selected_subjects(self):
         classrooms = [
             classroom(
