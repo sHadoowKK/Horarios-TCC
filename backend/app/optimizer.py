@@ -194,7 +194,13 @@ def generate_schedule(
     fixed_schedule: List[Dict[str, Any]] | None = None,
     mutable_classroom_id: int | None = None,
     mutable_subject_id: int | None = None,
+    mutable_classroom_ids: List[int] | None = None,
 ):
+    mutable_ids = (
+        set(mutable_classroom_ids)
+        if mutable_classroom_ids is not None
+        else ({mutable_classroom_id} if mutable_classroom_id is not None else None)
+    )
     model = cp_model.CpModel()
     penalties = []
     rewards = []
@@ -355,7 +361,7 @@ def generate_schedule(
     # fixas exatamente nos períodos/professores atuais. Se a configuração
     # dessas unidades mudou e já não corresponde à grade salva, solicitamos
     # que o usuário inclua o item afetado no escopo ou gere a escola inteira.
-    if fixed_schedule is not None and mutable_classroom_id is not None:
+    if fixed_schedule is not None and mutable_ids is not None:
         units_by_key = {
             (classroom["id"], subject["id"], target): (
                 classroom,
@@ -374,7 +380,7 @@ def generate_schedule(
             subject_id = int(item["subject_id"])
 
             is_mutable = (
-                classroom_id == mutable_classroom_id
+                classroom_id in mutable_ids
                 and (
                     mutable_subject_id is None
                     or subject_id == mutable_subject_id
