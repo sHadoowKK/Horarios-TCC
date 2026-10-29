@@ -1479,6 +1479,71 @@ class OptimizerTests(unittest.TestCase):
         )
         self.assertEqual(regenerated_other_class, original_other_class)
 
+    def test_regenerate_subject_in_multiple_classes_preserves_every_other_unit(self):
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [
+                    {"subject_id": 1, "workload": 2, "split": False},
+                    {"subject_id": 2, "workload": 2, "split": False},
+                ],
+            ),
+            classroom(
+                2,
+                "2A",
+                "Manhã",
+                [
+                    {"subject_id": 1, "workload": 2, "split": False},
+                    {"subject_id": 2, "workload": 2, "split": False},
+                ],
+            ),
+        ]
+        subjects = [
+            subject(1, "Matemática", workload=2),
+            subject(2, "História", workload=2),
+        ]
+        teachers = [
+            teacher(1, [1]),
+            teacher(2, [2]),
+        ]
+
+        original = generate_schedule(
+            classrooms, subjects, teachers, default_config()
+        )
+        self.assertEqual(original["status"], "success")
+
+        regenerated = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+            fixed_schedule=original["schedule"],
+            mutable_classroom_ids=[1, 2],
+            mutable_subject_id=1,
+        )
+        self.assertEqual(regenerated["status"], "success")
+
+        original_preserved = sorted(
+            self._lesson_signature(item)
+            for item in original["schedule"]
+            if item["subject_id"] == 2
+        )
+        regenerated_preserved = sorted(
+            self._lesson_signature(item)
+            for item in regenerated["schedule"]
+            if item["subject_id"] == 2
+        )
+        self.assertEqual(regenerated_preserved, original_preserved)
+
+        for classroom_id in (1, 2):
+            regenerated_subject = [
+                item for item in regenerated["schedule"]
+                if item["classroom_id"] == classroom_id and item["subject_id"] == 1
+            ]
+            self.assertEqual(len(regenerated_subject), 2)
+
     def test_regenerate_one_subject_keeps_other_subject_in_same_class(self):
         classrooms = [
             classroom(
