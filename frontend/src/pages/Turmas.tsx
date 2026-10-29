@@ -891,8 +891,12 @@ export default function Turmas() {
                 className="border border-gray-300 p-2 rounded-lg flex-1 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 value={newClassShift}
                 onChange={event => {
-                  setNewClassShift(event.target.value);
+                  const shift = event.target.value;
+                  setNewClassShift(shift);
                   setNewClassIntegralProfile("standard");
+                  if (shift === "Noite") {
+                    setNewClassHasGroups(false);
+                  }
                 }}
               >
                 <option value="Manhã">
