@@ -96,8 +96,8 @@ function App() {
   const [generationSuccess, setGenerationSuccess] =
     useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
-  const [generationScope, setGenerationScope] = useState<"all" | "classroom" | "subject">("all");
-  const [generationClassroomId, setGenerationClassroomId] = useState<number | "">("");
+  const [generationScope, setGenerationScope] = useState<"all" | "classrooms" | "subject_selected" | "subject_all">("all");
+  const [generationClassroomIds, setGenerationClassroomIds] = useState<number[]>([]);
   const [generationSubjectId, setGenerationSubjectId] = useState<number | "">("");
 
   const [classrooms, setClassrooms] = useState<any[]>([]);
@@ -147,40 +147,29 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const selectedClassroom = classrooms.find(
-      classroom => classroom.id === generationClassroomId,
+    if (classrooms.length === 0) return;
+
+    setGenerationClassroomIds(current => {
+      const valid = current.filter(id => classrooms.some(classroom => classroom.id === id));
+      if (valid.length > 0) return valid;
+
+      const preferredClassroom =
+        classrooms.find(classroom => classroom.id === selectedId)
+        || classrooms[0];
+      return [preferredClassroom.id];
+    });
+
+    const configuredSubjectIds = Array.from(new Set(
+      classrooms.flatMap(classroom =>
+        (classroom.subject_settings || []).map((setting: any) => Number(setting.subject_id))
+      ),
+    ));
+    setGenerationSubjectId(current =>
+      configuredSubjectIds.includes(Number(current))
+        ? current
+        : (configuredSubjectIds[0] ?? ""),
     );
-
-    if (!selectedClassroom) {
-      if (classrooms.length > 0 && generationClassroomId === "") {
-        const preferredId =
-          viewMode === "turma" && typeof selectedId === "number"
-            ? selectedId
-            : classrooms[0].id;
-        const preferredClassroom =
-          classrooms.find(classroom => classroom.id === preferredId)
-          || classrooms[0];
-
-        setGenerationClassroomId(preferredClassroom.id);
-        setGenerationSubjectId(
-          preferredClassroom.subject_settings?.[0]?.subject_id ?? "",
-        );
-      }
-      return;
-    }
-
-    const configuredSubjectIds = (selectedClassroom.subject_settings || [])
-      .map((setting: any) => Number(setting.subject_id));
-    if (!configuredSubjectIds.includes(Number(generationSubjectId))) {
-      setGenerationSubjectId(configuredSubjectIds[0] ?? "");
-    }
-  }, [
-    classrooms,
-    generationClassroomId,
-    generationSubjectId,
-    selectedId,
-    viewMode,
-  ]);
+  }, [classrooms, selectedId]);
 
   useEffect(() => {
     const handleAcademicDataChanged = () => {
@@ -226,13 +215,18 @@ function App() {
   };
 
   const handleGenerate = async () => {
-    if (generationScope !== "all" && generationClassroomId === "") {
-      setError("Selecione a turma que deseja regenerar.");
+    const needsSelectedClasses =
+      generationScope === "classrooms" || generationScope === "subject_selected";
+    const needsSubject =
+      generationScope === "subject_selected" || generationScope === "subject_all";
+
+    if (needsSelectedClasses && generationClassroomIds.length === 0) {
+      setError("Selecione pelo menos uma turma para regenerar.");
       setGenerationSuccess(false);
       return;
     }
 
-    if (generationScope === "subject" && generationSubjectId === "") {
+    if (needsSubject && generationSubjectId === "") {
       setError("Selecione a matéria que deseja regenerar.");
       setGenerationSuccess(false);
       return;
@@ -244,19 +238,18 @@ function App() {
     setGenerationMessage("");
 
     try {
-      // Atualiza os cadastros antes do cálculo, preservando a última grade.
       await fetchBaseData(false);
 
       const request: {
-        scope: "all" | "classroom" | "subject";
-        classroom_id?: number;
+        scope: "all" | "classrooms" | "subject_selected" | "subject_all";
+        classroom_ids?: number[];
         subject_id?: number;
       } = { scope: generationScope };
 
-      if (generationScope !== "all") {
-        request.classroom_id = Number(generationClassroomId);
+      if (needsSelectedClasses) {
+        request.classroom_ids = generationClassroomIds;
       }
-      if (generationScope === "subject") {
+      if (needsSubject) {
         request.subject_id = Number(generationSubjectId);
       }
 
