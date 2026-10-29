@@ -544,10 +544,53 @@ def save_timetable(
 # GERAÇÃO
 # ----------------------------------------------------------------------
 @app.post("/generate/")
-def generate_timetable(db: Session = Depends(get_db)):
+def generate_timetable(
+    db: Session = Depends(get_db),
+    payload: schemas.TimetableGenerationRequest | None = None,
+):
+    payload = payload or schemas.TimetableGenerationRequest()
+    scope = payload.scope
+    target_classroom_id = payload.classroom_id
+    target_subject_id = payload.subject_id
+
     classroom_rows = db.query(models.Classroom).all()
     subject_rows = db.query(models.Subject).all()
     teacher_rows = db.query(models.Teacher).all()
+    saved_rows = db.query(models.TimetableItem).all()
+
+    if scope != "all":
+        if not saved_rows:
+            raise HTTPException(
+                400,
+                "Gere a grade da escola inteira antes de usar uma regeneração parcial.",
+            )
+        if target_classroom_id is None:
+            raise HTTPException(400, "Selecione a turma que deseja regenerar.")
+
+        target_classroom = next(
+            (row for row in classroom_rows if row.id == target_classroom_id),
+            None,
+        )
+        if target_classroom is None:
+            raise HTTPException(404, "A turma selecionada não existe.")
+
+        if scope == "subject":
+            if target_subject_id is None:
+                raise HTTPException(400, "Selecione a matéria que deseja regenerar.")
+            if not any(
+                int(setting.get("subject_id", -1)) == target_subject_id
+                for setting in (target_classroom.subject_settings or [])
+            ):
+                raise HTTPException(
+                    400,
+                    "A matéria selecionada não está configurada nessa turma.",
+                )
+        elif scope != "classroom":
+            raise HTTPException(400, "Escopo de regeneração inválido.")
+    else:
+        # Ignora IDs de escopo antigos se o usuário voltar para Escola inteira.
+        target_classroom_id = None
+        target_subject_id = None
 
     if not classroom_rows:
         raise HTTPException(
@@ -735,11 +778,27 @@ def generate_timetable(db: Session = Depends(get_db)):
             config.max_consec_teacher_mode,
     }
 
+    saved_schedule = [
+        {
+            "classroom_id": row.classroom_id,
+            "subject_id": row.subject_id,
+            "teacher_id": row.teacher_id,
+            "day": row.day,
+            "period": row.period,
+            "student_group": row.student_group,
+        }
+        for row in saved_rows
+    ]
+
+    fixed_schedule = saved_schedule if scope != "all" else None
     result = generate_schedule(
         classrooms,
         subjects,
         teachers,
         sys_config,
+        fixed_schedule=fixed_schedule,
+        mutable_classroom_id=target_classroom_id,
+        mutable_subject_id=target_subject_id if scope == "subject" else None,
     )
 
     if result["status"] == "infeasible":
@@ -750,6 +809,29 @@ def generate_timetable(db: Session = Depends(get_db)):
 
     if result["status"] == "error":
         raise HTTPException(500, result["message"])
+
+    if scope == "all":
+        result["generation_scope"] = "all"
+        result["preserved_lessons"] = 0
+        result["message"] = "Grade da escola inteira gerada."
+    else:
+        preserved = [
+            row for row in saved_schedule
+            if not (
+                row["classroom_id"] == target_classroom_id
+                and (
+                    scope == "classroom"
+                    or row["subject_id"] == target_subject_id
+                )
+            )
+        ]
+        result["generation_scope"] = scope
+        result["preserved_lessons"] = len(preserved)
+        result["message"] = (
+            "Grade da turma regenerada; os demais horários foram preservados."
+            if scope == "classroom"
+            else "Grade da matéria regenerada; os demais horários foram preservados."
+        )
 
     # A geração e o salvamento passam a fazer parte da mesma operação.
     # Assim a interface nunca precisa depender de uma segunda requisição

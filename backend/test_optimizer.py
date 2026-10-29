@@ -1420,5 +1420,110 @@ class OptimizerTests(unittest.TestCase):
         )
 
 
+    @staticmethod
+    def _lesson_signature(item):
+        return (
+            item["classroom_id"],
+            item["subject_id"],
+            item["teacher_id"],
+            item["day"],
+            item["period"],
+            item["student_group"],
+        )
+
+    def test_regenerate_one_class_keeps_other_classes_unchanged(self):
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [{"subject_id": 1, "workload": 2, "split": False}],
+            ),
+            classroom(
+                2,
+                "2A",
+                "Manhã",
+                [{"subject_id": 2, "workload": 2, "split": False}],
+            ),
+        ]
+        subjects = [
+            subject(1, "Matemática", workload=2),
+            subject(2, "História", workload=2),
+        ]
+        teachers = [teacher(1, [1]), teacher(2, [2])]
+
+        original = generate_schedule(
+            classrooms, subjects, teachers, default_config()
+        )
+        self.assertEqual(original["status"], "success")
+
+        regenerated = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+            fixed_schedule=original["schedule"],
+            mutable_classroom_id=1,
+        )
+        self.assertEqual(regenerated["status"], "success")
+
+        original_other_class = sorted(
+            self._lesson_signature(item)
+            for item in original["schedule"]
+            if item["classroom_id"] != 1
+        )
+        regenerated_other_class = sorted(
+            self._lesson_signature(item)
+            for item in regenerated["schedule"]
+            if item["classroom_id"] != 1
+        )
+        self.assertEqual(regenerated_other_class, original_other_class)
+
+    def test_regenerate_one_subject_keeps_other_subject_in_same_class(self):
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [
+                    {"subject_id": 1, "workload": 2, "split": False},
+                    {"subject_id": 2, "workload": 2, "split": False},
+                ],
+            )
+        ]
+        subjects = [
+            subject(1, "Matemática", workload=2),
+            subject(2, "História", workload=2),
+        ]
+        teachers = [teacher(1, [1]), teacher(2, [2])]
+
+        original = generate_schedule(
+            classrooms, subjects, teachers, default_config()
+        )
+        self.assertEqual(original["status"], "success")
+
+        regenerated = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+            fixed_schedule=original["schedule"],
+            mutable_classroom_id=1,
+            mutable_subject_id=1,
+        )
+        self.assertEqual(regenerated["status"], "success")
+
+        original_other_subject = sorted(
+            self._lesson_signature(item)
+            for item in original["schedule"]
+            if item["classroom_id"] == 1 and item["subject_id"] != 1
+        )
+        regenerated_other_subject = sorted(
+            self._lesson_signature(item)
+            for item in regenerated["schedule"]
+            if item["classroom_id"] == 1 and item["subject_id"] != 1
+        )
+        self.assertEqual(regenerated_other_subject, original_other_subject)
+
 if __name__ == "__main__":
     unittest.main()
