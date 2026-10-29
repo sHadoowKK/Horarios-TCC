@@ -96,8 +96,8 @@ function App() {
   const [generationSuccess, setGenerationSuccess] =
     useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
-  const [generationScope, setGenerationScope] = useState<"all" | "classroom" | "subject">("all");
-  const [generationClassroomId, setGenerationClassroomId] = useState<number | "">("");
+  const [generationScope, setGenerationScope] = useState<"all" | "classrooms" | "subject_selected" | "subject_all">("all");
+  const [generationClassroomIds, setGenerationClassroomIds] = useState<number[]>([]);
   const [generationSubjectId, setGenerationSubjectId] = useState<number | "">("");
 
   const [classrooms, setClassrooms] = useState<any[]>([]);
@@ -147,40 +147,29 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const selectedClassroom = classrooms.find(
-      classroom => classroom.id === generationClassroomId,
+    if (classrooms.length === 0) return;
+
+    setGenerationClassroomIds(current => {
+      const valid = current.filter(id => classrooms.some(classroom => classroom.id === id));
+      if (valid.length > 0) return valid;
+
+      const preferredClassroom =
+        classrooms.find(classroom => classroom.id === selectedId)
+        || classrooms[0];
+      return [preferredClassroom.id];
+    });
+
+    const configuredSubjectIds = Array.from(new Set(
+      classrooms.flatMap(classroom =>
+        (classroom.subject_settings || []).map((setting: any) => Number(setting.subject_id))
+      ),
+    ));
+    setGenerationSubjectId(current =>
+      configuredSubjectIds.includes(Number(current))
+        ? current
+        : (configuredSubjectIds[0] ?? ""),
     );
-
-    if (!selectedClassroom) {
-      if (classrooms.length > 0 && generationClassroomId === "") {
-        const preferredId =
-          viewMode === "turma" && typeof selectedId === "number"
-            ? selectedId
-            : classrooms[0].id;
-        const preferredClassroom =
-          classrooms.find(classroom => classroom.id === preferredId)
-          || classrooms[0];
-
-        setGenerationClassroomId(preferredClassroom.id);
-        setGenerationSubjectId(
-          preferredClassroom.subject_settings?.[0]?.subject_id ?? "",
-        );
-      }
-      return;
-    }
-
-    const configuredSubjectIds = (selectedClassroom.subject_settings || [])
-      .map((setting: any) => Number(setting.subject_id));
-    if (!configuredSubjectIds.includes(Number(generationSubjectId))) {
-      setGenerationSubjectId(configuredSubjectIds[0] ?? "");
-    }
-  }, [
-    classrooms,
-    generationClassroomId,
-    generationSubjectId,
-    selectedId,
-    viewMode,
-  ]);
+  }, [classrooms, selectedId]);
 
   useEffect(() => {
     const handleAcademicDataChanged = () => {
@@ -226,13 +215,18 @@ function App() {
   };
 
   const handleGenerate = async () => {
-    if (generationScope !== "all" && generationClassroomId === "") {
-      setError("Selecione a turma que deseja regenerar.");
+    const needsSelectedClasses =
+      generationScope === "classrooms" || generationScope === "subject_selected";
+    const needsSubject =
+      generationScope === "subject_selected" || generationScope === "subject_all";
+
+    if (needsSelectedClasses && generationClassroomIds.length === 0) {
+      setError("Selecione pelo menos uma turma para regenerar.");
       setGenerationSuccess(false);
       return;
     }
 
-    if (generationScope === "subject" && generationSubjectId === "") {
+    if (needsSubject && generationSubjectId === "") {
       setError("Selecione a matéria que deseja regenerar.");
       setGenerationSuccess(false);
       return;
@@ -244,19 +238,18 @@ function App() {
     setGenerationMessage("");
 
     try {
-      // Atualiza os cadastros antes do cálculo, preservando a última grade.
       await fetchBaseData(false);
 
       const request: {
-        scope: "all" | "classroom" | "subject";
-        classroom_id?: number;
+        scope: "all" | "classrooms" | "subject_selected" | "subject_all";
+        classroom_ids?: number[];
         subject_id?: number;
       } = { scope: generationScope };
 
-      if (generationScope !== "all") {
-        request.classroom_id = Number(generationClassroomId);
+      if (needsSelectedClasses) {
+        request.classroom_ids = generationClassroomIds;
       }
-      if (generationScope === "subject") {
+      if (needsSubject) {
         request.subject_id = Number(generationSubjectId);
       }
 
@@ -392,6 +385,28 @@ function App() {
 
   const getClassroomName = (id: number) =>
     classrooms.find(classroom => classroom.id === id)?.name || "N/A";
+
+  const regenerationSubjectOptions = subjects.filter(subject =>
+    classrooms.some(classroom =>
+      (classroom.subject_settings || []).some(
+        (setting: any) => Number(setting.subject_id) === subject.id,
+      ),
+    ),
+  );
+
+  const regenerationClassroomOptions = generationScope === "subject_selected"
+    ? classrooms.filter(classroom =>
+        (classroom.subject_settings || []).some(
+          (setting: any) => Number(setting.subject_id) === Number(generationSubjectId),
+        ),
+      )
+    : classrooms;
+
+  const allVisibleRegenerationClassesSelected =
+    regenerationClassroomOptions.length > 0
+    && regenerationClassroomOptions.every(classroom =>
+      generationClassroomIds.includes(classroom.id),
+    );
 
   const unstaffedLessons =
     schedule?.filter(item => item.teacher_id == null).length || 0;
@@ -799,61 +814,130 @@ function App() {
                       className="app-toolbar-select app-generation-scope-select"
                       value={generationScope}
                       onChange={event => {
-                        setGenerationScope(event.target.value as "all" | "classroom" | "subject");
+                        const nextScope = event.target.value as
+                          | "all"
+                          | "classrooms"
+                          | "subject_selected"
+                          | "subject_all";
+                        setGenerationScope(nextScope);
                         setError("");
                         setGenerationSuccess(false);
+
+                        if (nextScope === "subject_selected" && generationSubjectId !== "") {
+                          const matchingIds = classrooms
+                            .filter(classroom =>
+                              (classroom.subject_settings || []).some(
+                                (setting: any) => Number(setting.subject_id) === Number(generationSubjectId),
+                              ),
+                            )
+                            .map(classroom => classroom.id);
+                          setGenerationClassroomIds(current => {
+                            const retained = current.filter(id => matchingIds.includes(id));
+                            return retained.length > 0 ? retained : matchingIds.slice(0, 1);
+                          });
+                        }
                       }}
                     >
                       <option value="all">Escola inteira</option>
-                      <option value="classroom" disabled={!schedule || schedule.length === 0}>Uma turma</option>
-                      <option value="subject" disabled={!schedule || schedule.length === 0}>Uma matéria da turma</option>
+                      <option value="classrooms" disabled={!schedule || schedule.length === 0}>Turmas selecionadas</option>
+                      <option value="subject_selected" disabled={!schedule || schedule.length === 0}>Matéria nas turmas selecionadas</option>
+                      <option value="subject_all" disabled={!schedule || schedule.length === 0}>Matéria na escola inteira</option>
                     </select>
 
-                    {generationScope !== "all" && (
-                      <select
-                        aria-label="Turma para regeneração"
-                        className="app-toolbar-select app-generation-target-select"
-                        value={generationClassroomId}
-                        onChange={event => {
-                          const nextId = event.target.value === "" ? "" : Number(event.target.value);
-                          const nextClassroom = classrooms.find(classroom => classroom.id === nextId);
-                          setGenerationClassroomId(nextId);
-                          setGenerationSubjectId(nextClassroom?.subject_settings?.[0]?.subject_id ?? "");
-                          setError("");
-                          setGenerationSuccess(false);
-                        }}
-                      >
-                        <option value="">Selecionar turma...</option>
-                        {classrooms.map(classroom => (
-                          <option key={classroom.id} value={classroom.id}>
-                            {classroom.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-
-                    {generationScope === "subject" && (
+                    {(generationScope === "subject_selected" || generationScope === "subject_all") && (
                       <select
                         aria-label="Matéria para regeneração"
                         className="app-toolbar-select app-generation-target-select"
                         value={generationSubjectId}
                         onChange={event => {
-                          setGenerationSubjectId(event.target.value === "" ? "" : Number(event.target.value));
+                          const nextSubjectId = event.target.value === "" ? "" : Number(event.target.value);
+                          setGenerationSubjectId(nextSubjectId);
                           setError("");
                           setGenerationSuccess(false);
+
+                          if (generationScope === "subject_selected" && nextSubjectId !== "") {
+                            const matchingIds = classrooms
+                              .filter(classroom =>
+                                (classroom.subject_settings || []).some(
+                                  (setting: any) => Number(setting.subject_id) === Number(nextSubjectId),
+                                ),
+                              )
+                              .map(classroom => classroom.id);
+                            setGenerationClassroomIds(current => {
+                              const retained = current.filter(id => matchingIds.includes(id));
+                              return retained.length > 0 ? retained : matchingIds.slice(0, 1);
+                            });
+                          }
                         }}
                       >
                         <option value="">Selecionar matéria...</option>
-                        {(classrooms.find(classroom => classroom.id === generationClassroomId)?.subject_settings || [])
-                          .map((setting: any) => {
-                            const subject = subjects.find(item => item.id === setting.subject_id);
-                            return subject ? (
-                              <option key={subject.id} value={subject.id}>
-                                {subject.name}
-                              </option>
-                            ) : null;
-                          })}
+                        {regenerationSubjectOptions.map(subject => (
+                          <option key={subject.id} value={subject.id}>
+                            {subject.name}
+                          </option>
+                        ))}
                       </select>
+                    )}
+
+                    {(generationScope === "classrooms" || generationScope === "subject_selected") && (
+                      <div className="app-generation-classroom-picker">
+                        <div className="app-generation-classroom-picker-header">
+                          <span>
+                            Turmas incluídas ({generationClassroomIds.filter(id =>
+                              regenerationClassroomOptions.some(classroom => classroom.id === id),
+                            ).length})
+                          </span>
+                          <button
+                            type="button"
+                            className="app-generation-select-all"
+                            onClick={() => {
+                              const visibleIds = regenerationClassroomOptions.map(classroom => classroom.id);
+                              setGenerationClassroomIds(current =>
+                                allVisibleRegenerationClassesSelected
+                                  ? current.filter(id => !visibleIds.includes(id))
+                                  : Array.from(new Set([...current, ...visibleIds])),
+                              );
+                              setError("");
+                              setGenerationSuccess(false);
+                            }}
+                          >
+                            {allVisibleRegenerationClassesSelected ? "Desmarcar todas" : "Selecionar todas"}
+                          </button>
+                        </div>
+                        <div className="app-generation-classroom-list">
+                          {regenerationClassroomOptions.map(classroom => (
+                            <label key={classroom.id} className="app-generation-classroom-option">
+                              <input
+                                type="checkbox"
+                                checked={generationClassroomIds.includes(classroom.id)}
+                                onChange={event => {
+                                  setGenerationClassroomIds(current =>
+                                    event.target.checked
+                                      ? Array.from(new Set([...current, classroom.id]))
+                                      : current.filter(id => id !== classroom.id),
+                                  );
+                                  setError("");
+                                  setGenerationSuccess(false);
+                                }}
+                                style={{ accentColor: "var(--an-accent)" }}
+                              />
+                              <span>{classroom.name}</span>
+                              <small>{classroom.shift}</small>
+                            </label>
+                          ))}
+                          {regenerationClassroomOptions.length === 0 && (
+                            <p className="app-generation-empty">
+                              Essa matéria não está configurada em nenhuma turma.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {generationScope === "subject_all" && (
+                      <p className="app-generation-scope-note">
+                        A matéria será reorganizada em todas as turmas onde está cadastrada. Os demais horários serão preservados.
+                      </p>
                     )}
 
                     <button

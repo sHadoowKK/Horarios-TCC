@@ -22,6 +22,9 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 - atribui disciplinas aos professores habilitados;
 - configura regras obrigatórias (Hard) e preferências (Soft);
 - gera uma grade evitando conflitos de turma e professor;
+- permite regenerar a escola inteira, várias turmas selecionadas ou uma matéria em turmas escolhidas;
+- permite regenerar uma matéria em toda a escola, apenas nas turmas em que ela está cadastrada;
+- preserva horários ocupados e vazios fora do escopo da regeneração parcial, recusando a operação se a grade antiga não puder ser mantida com as novas configurações;
 - mantém disciplinas na grade mesmo quando ainda não existe professor disponível, exibindo "Sem professor";
 - considera carga horária, jornada da turma, disponibilidade, complexidade, grupos A/B, intervalos e janelas;
 - salva a última grade no SQLite;
@@ -229,6 +232,17 @@ O modelo atual representa três jornadas de turma:
 - **Noite:** 5 aulas, de 19:00 a 23:00.
 
 Intervalos e almoço aparecem visualmente na grade, mas não são períodos onde o solver possa colocar uma disciplina.
+
+## Regeneração parcial da grade
+
+Na tela **Grade Horária**, o seletor **Gerar novamente** oferece quatro opções:
+
+- **Escola inteira**: recalcula todas as turmas e matérias.
+- **Turmas selecionadas**: recalcula todas as matérias das turmas marcadas.
+- **Matéria nas turmas selecionadas**: escolha uma matéria e marque uma ou mais turmas que a utilizam.
+- **Matéria na escola inteira**: escolha uma matéria e recalcula essa matéria em todas as turmas onde ela está configurada.
+
+Nos modos parciais, o otimizador congela os períodos preenchidos e vazios, os professores e as cargas fora do escopo selecionado. Se a carga ou os cadastros de uma unidade preservada não corresponderem à grade salva, a operação é interrompida com uma mensagem explicativa, em vez de mudar a grade silenciosamente. Gere também a parte afetada ou escolha **Escola inteira**.
 
 ## Matriz de cada turma e grupos A/B
 
