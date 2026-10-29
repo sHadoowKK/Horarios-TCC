@@ -31,6 +31,13 @@ jobs:
         working-directory: backend
         run: python -m unittest discover -p "test_*.py"
 
+      - name: Validar seeds de demonstração
+        working-directory: backend
+        run: |
+          python -m py_compile seed_realista.py
+          python seed_realista.py
+          python seed_realista.py --informatica-only
+
   frontend:
     name: Build do frontend
     runs-on: ubuntu-latest
