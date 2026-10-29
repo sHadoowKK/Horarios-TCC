@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-from fastapi import Body, Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -546,7 +546,7 @@ def save_timetable(
 @app.post("/generate/")
 def generate_timetable(
     db: Session = Depends(get_db),
-    payload: schemas.TimetableGenerationRequest | None = Body(default=None),
+    payload: schemas.TimetableGenerationRequest | None = None,
 ):
     payload = payload or schemas.TimetableGenerationRequest()
     scope = payload.scope
