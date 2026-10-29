@@ -550,13 +550,26 @@ def generate_timetable(
 ):
     payload = payload or schemas.TimetableGenerationRequest()
     scope = payload.scope
-    target_classroom_id = payload.classroom_id
     target_subject_id = payload.subject_id
+    requested_classroom_ids = list(dict.fromkeys(
+        int(value) for value in (payload.classroom_ids or [])
+    ))
+    if not requested_classroom_ids and payload.classroom_id is not None:
+        requested_classroom_ids = [int(payload.classroom_id)]
+
+    # Aceita os nomes anteriores enquanto instalações antigas são atualizadas.
+    if scope == "classroom":
+        scope = "classrooms"
+    elif scope == "subject":
+        scope = "subject_selected"
 
     classroom_rows = db.query(models.Classroom).all()
     subject_rows = db.query(models.Subject).all()
     teacher_rows = db.query(models.Teacher).all()
     saved_rows = db.query(models.TimetableItem).all()
+
+    target_classroom_ids = []
+    subject_scopes = {"subject_selected", "subject_all"}
 
     if scope != "all":
         if not saved_rows:
@@ -564,34 +577,72 @@ def generate_timetable(
                 400,
                 "Gere a grade da escola inteira antes de usar uma regeneração parcial.",
             )
-        if target_classroom_id is None:
-            raise HTTPException(400, "Selecione a turma que deseja regenerar.")
 
-        target_classroom = next(
-            (row for row in classroom_rows if row.id == target_classroom_id),
-            None,
-        )
-        if target_classroom is None:
-            raise HTTPException(404, "A turma selecionada não existe.")
-
-        if scope == "subject":
-            if target_subject_id is None:
-                raise HTTPException(400, "Selecione a matéria que deseja regenerar.")
-            if not any(
-                int(setting.get("subject_id", -1)) == target_subject_id
-                for setting in (target_classroom.subject_settings or [])
-            ):
+        if scope in {"classrooms", "subject_selected"}:
+            if not requested_classroom_ids:
                 raise HTTPException(
                     400,
-                    "A matéria selecionada não está configurada nessa turma.",
+                    "Selecione pelo menos uma turma para regenerar.",
                 )
-        elif scope != "classroom":
-            raise HTTPException(400, "Escopo de regeneração inválido.")
-    else:
-        # Ignora IDs de escopo antigos se o usuário voltar para Escola inteira.
-        target_classroom_id = None
-        target_subject_id = None
+            existing_classroom_ids = {row.id for row in classroom_rows}
+            missing_ids = [
+                classroom_id
+                for classroom_id in requested_classroom_ids
+                if classroom_id not in existing_classroom_ids
+            ]
+            if missing_ids:
+                raise HTTPException(
+                    404,
+                    "Uma ou mais turmas selecionadas não existem mais.",
+                )
+            target_classroom_ids = requested_classroom_ids
 
+        elif scope == "subject_all":
+            if target_subject_id is None:
+                raise HTTPException(
+                    400,
+                    "Selecione a matéria que deseja regenerar na escola inteira.",
+                )
+            target_classroom_ids = [
+                row.id for row in classroom_rows
+                if any(
+                    int(setting.get("subject_id", -1)) == target_subject_id
+                    for setting in (row.subject_settings or [])
+                )
+            ]
+            if not target_classroom_ids:
+                raise HTTPException(
+                    400,
+                    "Essa matéria não está configurada em nenhuma turma.",
+                )
+        else:
+            raise HTTPException(400, "Escopo de regeneração inválido.")
+
+        if scope in subject_scopes:
+            if target_subject_id is None:
+                raise HTTPException(400, "Selecione a matéria que deseja regenerar.")
+
+            selected_classrooms = [
+                row for row in classroom_rows
+                if row.id in target_classroom_ids
+            ]
+            missing_subject_classrooms = [
+                row.name for row in selected_classrooms
+                if not any(
+                    int(setting.get("subject_id", -1)) == target_subject_id
+                    for setting in (row.subject_settings or [])
+                )
+            ]
+            if missing_subject_classrooms:
+                names = ", ".join(missing_subject_classrooms)
+                raise HTTPException(
+                    400,
+                    f"A matéria selecionada não está configurada em: {names}.",
+                )
+    else:
+        # Ignora parâmetros de escopo se o usuário escolher Escola inteira.
+        target_classroom_ids = []
+        target_subject_id = None
     if not classroom_rows:
         raise HTTPException(
             400,
@@ -797,8 +848,8 @@ def generate_timetable(
         teachers,
         sys_config,
         fixed_schedule=fixed_schedule,
-        mutable_classroom_id=target_classroom_id,
-        mutable_subject_id=target_subject_id if scope == "subject" else None,
+        mutable_classroom_ids=target_classroom_ids if scope != "all" else None,
+        mutable_subject_id=target_subject_id if scope in subject_scopes else None,
     )
 
     if result["status"] == "infeasible":
@@ -818,20 +869,30 @@ def generate_timetable(
         preserved = [
             row for row in saved_schedule
             if not (
-                row["classroom_id"] == target_classroom_id
+                row["classroom_id"] in target_classroom_ids
                 and (
-                    scope == "classroom"
+                    scope == "classrooms"
                     or row["subject_id"] == target_subject_id
                 )
             )
         ]
         result["generation_scope"] = scope
         result["preserved_lessons"] = len(preserved)
-        result["message"] = (
-            "Grade da turma regenerada; os demais horários foram preservados."
-            if scope == "classroom"
-            else "Grade da matéria regenerada; os demais horários foram preservados."
-        )
+        if scope == "classrooms":
+            result["message"] = (
+                f"Regeneradas {len(target_classroom_ids)} turma(s); "
+                "os demais horários foram preservados."
+            )
+        elif scope == "subject_all":
+            result["message"] = (
+                f"Matéria regenerada em {len(target_classroom_ids)} turma(s) "
+                "da escola; os demais horários foram preservados."
+            )
+        else:
+            result["message"] = (
+                f"Matéria regenerada em {len(target_classroom_ids)} turma(s); "
+                "os demais horários foram preservados."
+            )
 
     # A geração e o salvamento passam a fazer parte da mesma operação.
     # Assim a interface nunca precisa depender de uma segunda requisição
