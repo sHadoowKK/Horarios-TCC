@@ -32,6 +32,7 @@ interface Classroom {
   id: number;
   name: string;
   shift: string;
+  allowed_periods?: number[] | null;
   course_id: number;
   has_groups: boolean;
   subject_settings: ClassroomSubjectSetting[];
@@ -47,6 +48,31 @@ interface Subject {
   category: "Ensino Médio" | "Técnica";
   course_ids: number[];
 }
+
+type IntegralProfile = "standard" | "extended";
+
+const STANDARD_INTEGRAL_PERIODS = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10];
+const EXTENDED_INTEGRAL_PERIODS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+const periodsForShift = (
+  shift: string,
+  integralProfile: IntegralProfile = "standard",
+): number[] => {
+  if (shift === "Noite") return [11, 12, 13, 14, 15];
+  if (shift === "Tarde") return [6, 7, 8, 9, 10];
+  if (shift === "Integral") {
+    return [...(
+      integralProfile === "extended"
+        ? EXTENDED_INTEGRAL_PERIODS
+        : STANDARD_INTEGRAL_PERIODS
+    )];
+  }
+  return [0, 1, 2, 3, 4, 5];
+};
+
+const integralProfileForPeriods = (
+  periods?: number[] | null,
+): IntegralProfile => periods?.includes(5) ? "extended" : "standard";
 
 export default function Turmas() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -71,7 +97,10 @@ export default function Turmas() {
     name: "",
     shift: "Manhã",
     course_id: 0,
+    allowed_periods: periodsForShift("Manhã"),
   });
+  const [classroomDraftIntegralProfile, setClassroomDraftIntegralProfile] =
+    useState<IntegralProfile>("standard");
 
   const [editingSubjectId, setEditingSubjectId] =
     useState<number | null>(null);
@@ -92,6 +121,8 @@ export default function Turmas() {
   const [newClassCourseId, setNewClassCourseId] = useState("");
   const [newClassHasGroups, setNewClassHasGroups] =
     useState(false);
+  const [newClassIntegralProfile, setNewClassIntegralProfile] =
+    useState<IntegralProfile>("standard");
 
   const [newSubName, setNewSubName] = useState("");
   const [newSubWorkload, setNewSubWorkload] = useState(4);
@@ -163,11 +194,21 @@ export default function Turmas() {
     classroom: Classroom,
   ) => {
     setEditingClassroomId(classroom.id);
+    const allowedPeriods = (
+      classroom.allowed_periods
+      ?? periodsForShift(classroom.shift)
+    );
     setClassroomDraft({
       name: classroom.name,
       shift: classroom.shift,
       course_id: classroom.course_id,
+      allowed_periods: [...allowedPeriods],
     });
+    setClassroomDraftIntegralProfile(
+      classroom.shift === "Integral"
+        ? integralProfileForPeriods(allowedPeriods)
+        : "standard",
+    );
   };
 
   const saveClassroomEdit = async (
@@ -192,6 +233,7 @@ export default function Turmas() {
       name,
       shift: classroomDraft.shift,
       course_id: classroomDraft.course_id,
+      allowed_periods: classroomDraft.allowed_periods,
       subject_settings: (
         classroom.subject_settings || []
       ).filter(setting =>
@@ -347,6 +389,10 @@ export default function Turmas() {
     await api.post("/classrooms/", {
       name: newClassName,
       shift: newClassShift,
+      allowed_periods: periodsForShift(
+        newClassShift,
+        newClassIntegralProfile,
+      ),
       course_id: Number(newClassCourseId),
       has_groups: newClassHasGroups,
       subject_settings: [],
@@ -355,6 +401,7 @@ export default function Turmas() {
 
     setNewClassName("");
     setNewClassHasGroups(false);
+    setNewClassIntegralProfile("standard");
     fetchData();
   };
 
@@ -367,6 +414,10 @@ export default function Turmas() {
       {
         name: changes.name ?? classroom.name,
         shift: changes.shift ?? classroom.shift,
+        allowed_periods:
+          changes.allowed_periods
+          ?? classroom.allowed_periods
+          ?? periodsForShift(classroom.shift),
         course_id:
           changes.course_id ?? classroom.course_id,
         has_groups:
@@ -839,9 +890,10 @@ export default function Turmas() {
               <select
                 className="border border-gray-300 p-2 rounded-lg flex-1 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 value={newClassShift}
-                onChange={event =>
-                  setNewClassShift(event.target.value)
-                }
+                onChange={event => {
+                  setNewClassShift(event.target.value);
+                  setNewClassIntegralProfile("standard");
+                }}
               >
                 <option value="Manhã">
                   Manhã
@@ -878,6 +930,24 @@ export default function Turmas() {
                 ))}
               </select>
             </div>
+
+            {newClassShift === "Integral" && (
+              <label className="flex flex-col gap-1 text-xs text-gray-600">
+                <span>Jornada integral</span>
+                <select
+                  value={newClassIntegralProfile}
+                  onChange={event =>
+                    setNewClassIntegralProfile(
+                      event.target.value as IntegralProfile,
+                    )
+                  }
+                  className="border border-gray-300 p-2 rounded-lg bg-white"
+                >
+                  <option value="standard">Padrão: 5 aulas de manhã + 5 à tarde</option>
+                  <option value="extended">Estendida: 6 aulas de manhã + 5 à tarde</option>
+                </select>
+              </label>
+            )}
 
             <label className="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-pointer">
               <input
@@ -937,12 +1007,15 @@ export default function Turmas() {
                       <div className="flex gap-2">
                         <select
                           value={classroomDraft.shift}
-                          onChange={event =>
+                          onChange={event => {
+                            const shift = event.target.value;
                             setClassroomDraft(current => ({
                               ...current,
-                              shift: event.target.value,
-                            }))
-                          }
+                              shift,
+                              allowed_periods: periodsForShift(shift),
+                            }));
+                            setClassroomDraftIntegralProfile("standard");
+                          }}
                           className="min-w-0 flex-1 border border-gray-300 rounded p-1.5 bg-white"
                         >
                           <option value="Manhã">Manhã</option>
@@ -972,6 +1045,27 @@ export default function Turmas() {
                           ))}
                         </select>
                       </div>
+
+                      {classroomDraft.shift === "Integral" && (
+                        <label className="flex flex-col gap-1 text-[11px] text-gray-600">
+                          <span>Jornada integral</span>
+                          <select
+                            value={classroomDraftIntegralProfile}
+                            onChange={event => {
+                              const profile = event.target.value as IntegralProfile;
+                              setClassroomDraftIntegralProfile(profile);
+                              setClassroomDraft(current => ({
+                                ...current,
+                                allowed_periods: periodsForShift("Integral", profile),
+                              }));
+                            }}
+                            className="border border-gray-300 rounded p-1.5 bg-white"
+                          >
+                            <option value="standard">Padrão: 5 aulas de manhã + 5 à tarde</option>
+                            <option value="extended">Estendida: 6 aulas de manhã + 5 à tarde</option>
+                          </select>
+                        </label>
+                      )}
 
                       <div className="flex justify-end gap-2">
                         <button
