@@ -170,7 +170,7 @@ function App() {
     }
 
     const configuredSubjectIds = (selectedClassroom.subject_settings || [])
-      .map(setting => Number(setting.subject_id));
+      .map((setting: any) => Number(setting.subject_id));
     if (!configuredSubjectIds.includes(Number(generationSubjectId))) {
       setGenerationSubjectId(configuredSubjectIds[0] ?? "");
     }
@@ -845,7 +845,7 @@ function App() {
                       >
                         <option value="">Selecionar matéria...</option>
                         {(classrooms.find(classroom => classroom.id === generationClassroomId)?.subject_settings || [])
-                          .map(setting => {
+                          .map((setting: any) => {
                             const subject = subjects.find(item => item.id === setting.subject_id);
                             return subject ? (
                               <option key={subject.id} value={subject.id}>
