@@ -949,19 +949,21 @@ export default function Turmas() {
               </label>
             )}
 
-            <label className="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={newClassHasGroups}
-                onChange={event =>
-                  setNewClassHasGroups(
-                    event.target.checked,
-                  )
-                }
-                className="accent-emerald-600"
-              />
-              Esta turma utiliza Grupos A/B
-            </label>
+            {newClassShift !== "Noite" && (
+              <label className="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newClassHasGroups}
+                  onChange={event =>
+                    setNewClassHasGroups(
+                      event.target.checked,
+                    )
+                  }
+                  className="accent-emerald-600"
+                />
+                Esta turma utiliza Grupos A/B
+              </label>
+            )}
 
             <button
               type="submit"
@@ -1140,19 +1142,21 @@ export default function Turmas() {
                     )?.name || classroom.course_id}
                   </div>
 
-                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={classroom.has_groups}
-                      onChange={() =>
-                        handleToggleClassGroups(
-                          classroom,
-                        )
-                      }
-                      className="accent-emerald-600"
-                    />
-                    Turma possui Grupos A/B
-                  </label>
+                  {classroom.shift !== "Noite" && (
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={classroom.has_groups}
+                        onChange={() =>
+                          handleToggleClassGroups(
+                            classroom,
+                          )
+                        }
+                        className="accent-emerald-600"
+                      />
+                      Turma possui Grupos A/B
+                    </label>
+                  )}
 
                   <div className="mt-1 border-t border-gray-200 pt-2">
                     <button
