@@ -26,7 +26,7 @@ O **Anatinus** é um sistema para cadastro de dados acadêmicos e geração auto
 - permite regenerar uma matéria em toda a escola, apenas nas turmas em que ela está cadastrada;
 - preserva horários ocupados e vazios fora do escopo da regeneração parcial, recusando a operação se a grade antiga não puder ser mantida com as novas configurações;
 - mantém disciplinas na grade mesmo quando ainda não existe professor disponível, exibindo "Sem professor";
-- considera carga horária, jornada da turma, disponibilidade, complexidade, grupos A/B, intervalos e janelas;
+- considera carga horária, jornada explícita por turma, disponibilidade, complexidade, grupos A/B, intervalos e janelas;
 - salva a última grade no SQLite;
 - permite visualizar a grade por turma ou professor;
 - exporta a grade completa em arquivo Excel `.xlsx`, com colunas dimensionadas e cabeçalho fixo;
@@ -160,9 +160,10 @@ O `start-demo.ps1` inicia frontend e backend usando somente o banco realista. O 
 A base inclui:
 - **3º INFO Integral**, com os nomes de disciplinas/professores que conseguimos recuperar e grupos A/B: disciplinas técnicas separadas e disciplinas do ensino médio compartilhadas;
 - **TI — Noite**, com as cargas anotadas na conversa: SBD 5, PTCC 3, PC2 5, RDS 5, GSO2 3, SI 2 e DSE 2, totalizando 25 aulas;
-- **seis turmas Agro** (1º, 2º e 3º PI AGRO A/B), cada uma podendo ter grupos A/B, para exercitar divisões com os componentes M.R.N e P.T.I.C.
+- **seis turmas Agro independentes** (1º, 2º e 3º PI AGRO A/B). O sufixo A/B identifica duas turmas diferentes; nenhuma delas é criada com subgrupos internos.
+- **Jornada explícita por turma**: o 3º INFO usa cinco aulas de manhã e cinco à tarde; as turmas Agro usam seis aulas de manhã e cinco à tarde; TI noturno usa cinco períodos à noite.
 
-**Limitação importante dos dados:** a captura do 3º INFO e a grade noturna de TI foram recuperadas e usadas para transcrever as matérias/cargas visíveis. As disponibilidades individuais dos docentes e a matriz completa dos Agro continuam provisórias para teste. A distribuição noturna de TI é a parte com carga recuperada com exatidão. A base também não armazena salas ou laboratórios, conforme o escopo do Anatinus.
+**Limitação importante dos dados:** a captura do 3º INFO e a grade noturna de TI foram recuperadas e usadas para transcrever as matérias/cargas visíveis. As disponibilidades individuais dos docentes e parte da matriz de Agro continuam provisórias para teste, sobretudo onde o texto da imagem não está nítido. A jornada de seis aulas de manhã nas turmas Agro é preservada como configuração explícita; não é inferida do nome da turma. A distribuição noturna de TI é a parte com carga recuperada com exatidão. A base também não armazena salas ou laboratórios, conforme o escopo do Anatinus.
 
 Todos os testes automatizados:
 
@@ -170,7 +171,7 @@ Todos os testes automatizados:
 python -m unittest discover -p "test_*.py"
 ```
 
-A suíte atual possui **22 testes automatizados**: 18 cenários do solucionador e 4 testes de integração do backend. Entre eles há um cenário de **semana noturna completa com 25 aulas**, baseado em uma grade real usada durante o desenvolvimento.
+A suíte atual possui **24 testes automatizados** após incluir cenários de regressão para jornadas configuráveis; a contagem exata é verificada pelo fluxo de CI. Entre eles há um cenário de **semana noturna completa com 25 aulas**, baseado em uma grade real usada durante o desenvolvimento.
 
 ### Benchmark de carga
 
@@ -200,7 +201,7 @@ Para usar outro endereço de API, copie `frontend/.env.example` para `frontend/.
 
 ## Observação sobre o banco
 
-O SQLite é criado automaticamente a partir dos modelos atuais. Como esta é uma base limpa, não há uma sequência de scripts `migrate1`, `migrate2` etc. Se o modelo do banco mudar durante o desenvolvimento, será necessário decidir entre recriar o banco local ou adotar uma ferramenta de migração como Alembic.
+O SQLite é criado automaticamente a partir dos modelos atuais. O arquivo `backend/app/database.py` também aplica migrações de compatibilidade para bancos locais antigos, incluindo a coluna `allowed_periods`. Para novos recursos de maior complexidade, vale adotar Alembic; até lá, qualquer alteração de esquema precisa vir acompanhada de uma migração compatível e de testes.
 
 ## Regras do otimizador
 
