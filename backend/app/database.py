@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+
 def _database_url() -> str:
     """Mantém o banco no diretório de trabalho em desenvolvimento e usa AppData no EXE."""
     explicit_url = os.environ.get("ANATINUS_DATABASE_URL")
@@ -31,8 +32,6 @@ def _database_url() -> str:
         database_directory.mkdir(parents=True, exist_ok=True)
         database_path = database_directory / "school_schedule.db"
 
-        # Na primeira execução, instala uma cópia independente da base de demonstração.
-        # Se o banco já existir, nunca o substitui: cadastros do usuário são preservados.
         if not database_path.exists():
             bundle_root = Path(
                 getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent)
@@ -72,9 +71,7 @@ def _load_json(raw, fallback):
 def ensure_database_compatibility():
     """Atualiza automaticamente bancos locais antigos para a estrutura atual."""
     with engine.begin() as conn:
-        # --------------------------------------------------------------
         # CONFIGURAÇÕES
-        # --------------------------------------------------------------
         config_columns = {
             row[1]
             for row in conn.execute(
@@ -104,7 +101,6 @@ def ensure_database_compatibility():
                     "SET avoid_last_period = avoid_edges"
                 ))
 
-        # Regras que não podem ser relaxadas pela interface.
         conn.execute(text(
             "UPDATE system_configs "
             "SET max_classes_per_day = 9 "
@@ -119,8 +115,6 @@ def ensure_database_compatibility():
             "SET student_gaps_hard = 1"
         ))
 
-        # O antigo padrão de 2 aulas seguidas do mesmo professor entrava
-        # em conflito com grades reais que possuem blocos maiores.
         conn.execute(text(
             "UPDATE system_configs "
             "SET max_consec_teacher_mode = 'ignore' "
@@ -128,9 +122,7 @@ def ensure_database_compatibility():
             "AND max_consec_per_teacher = 2"
         ))
 
-        # --------------------------------------------------------------
         # TURMAS E MATRIZES
-        # --------------------------------------------------------------
         classroom_columns = {
             row[1]
             for row in conn.execute(
@@ -164,8 +156,6 @@ def ensure_database_compatibility():
                 "ADD COLUMN preferred_subject_sequences JSON DEFAULT '[]'"
             ))
 
-        # Migra a lógica antiga "toda turma recebe todas as matérias do curso"
-        # para uma lista explícita por turma, preservando carga e divisão.
         if subject_settings_added:
             subject_rows = conn.execute(text(
                 "SELECT id, workload, course_ids FROM subjects"
@@ -222,7 +212,6 @@ def ensure_database_compatibility():
                     },
                 )
 
-        # O antigo tipo de turma "Tarde" passa a representar Integral.
         old_afternoon_count = conn.execute(
             text(
                 "SELECT COUNT(*) FROM classrooms "
@@ -236,9 +225,7 @@ def ensure_database_compatibility():
                 "WHERE shift = 'Tarde'"
             ))
 
-        # --------------------------------------------------------------
         # DISPONIBILIDADE DE PROFESSORES
-        # --------------------------------------------------------------
         availability_changed = False
         teacher_rows = conn.execute(
             text("SELECT id, availability FROM teachers")
@@ -253,8 +240,6 @@ def ensure_database_compatibility():
 
             for day, values in availability.items():
                 if isinstance(values, list) and len(values) == 15:
-                    # A nova 6ª aula da manhã herda a disponibilidade
-                    # da antiga última aula matutina.
                     availability[day] = (
                         values[:5] + [values[4]] + values[5:]
                     )
@@ -277,105 +262,18 @@ def ensure_database_compatibility():
                 )
                 availability_changed = True
 
-        # --------------------------------------------------------------
-        # GRADE SALVA: teacher_id agora pode ser nulo.
-        # SQLite não altera NOT NULL diretamente, então a tabela antiga
-        # precisa ser reconstruída uma vez.
-        # --------------------------------------------------------------
+        # GRADE SALVA: garante a presença da coluna is_manual
         timetable_info = conn.execute(
             text("PRAGMA table_info(timetable)")
         ).fetchall()
 
-        timetable_rebuilt = False
-
         if timetable_info:
-            timetable_columns = {
-                row[1]: row
-                for row in timetable_info
-            }
-
-            teacher_column = timetable_columns.get("teacher_id")
-            teacher_is_not_null = bool(
-                teacher_column and teacher_column[3]
-            )
-            has_student_group = (
-                "student_group" in timetable_columns
-            )
-
-            if teacher_is_not_null or not has_student_group:
+            timetable_columns = {row[1] for row in timetable_info}
+            if "is_manual" not in timetable_columns:
                 conn.execute(text(
-                    "DROP TABLE IF EXISTS timetable_new"
+                    "ALTER TABLE timetable "
+                    "ADD COLUMN is_manual BOOLEAN DEFAULT 0"
                 ))
-                conn.execute(text(
-                    """
-                    CREATE TABLE timetable_new (
-                        id INTEGER NOT NULL PRIMARY KEY,
-                        classroom_id INTEGER NOT NULL,
-                        subject_id INTEGER NOT NULL,
-                        teacher_id INTEGER,
-                        day INTEGER NOT NULL,
-                        period INTEGER NOT NULL,
-                        student_group VARCHAR NOT NULL DEFAULT 'Todos'
-                    )
-                    """
-                ))
-
-                student_group_expr = (
-                    "student_group"
-                    if has_student_group
-                    else "'Todos'"
-                )
-
-                conn.execute(text(
-                    f"""
-                    INSERT INTO timetable_new (
-                        id,
-                        classroom_id,
-                        subject_id,
-                        teacher_id,
-                        day,
-                        period,
-                        student_group
-                    )
-                    SELECT
-                        id,
-                        classroom_id,
-                        subject_id,
-                        teacher_id,
-                        day,
-                        period,
-                        {student_group_expr}
-                    FROM timetable
-                    """
-                ))
-
-                conn.execute(text("DROP TABLE timetable"))
-                conn.execute(text(
-                    "ALTER TABLE timetable_new "
-                    "RENAME TO timetable"
-                ))
-                conn.execute(text(
-                    "CREATE INDEX IF NOT EXISTS "
-                    "ix_timetable_classroom_id "
-                    "ON timetable (classroom_id)"
-                ))
-                conn.execute(text(
-                    "CREATE INDEX IF NOT EXISTS "
-                    "ix_timetable_teacher_id "
-                    "ON timetable (teacher_id)"
-                ))
-
-                timetable_rebuilt = True
-
-        # Alterações estruturais tornam uma grade antiga ambígua.
-        # Os cadastros permanecem preservados.
-        if (
-            subject_settings_added
-            or old_afternoon_count
-            or availability_changed
-            or timetable_rebuilt
-        ):
-            conn.execute(text("DELETE FROM timetable"))
 
 
 def get_db():

@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
-import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer } from 'lucide-react';
+import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer, Lock, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { exportTimetableToExcel } from './utils/exportTimetableToExcel';
@@ -50,7 +50,6 @@ const JOURNEY_ROWS: Record<string, DisplayRow[]> = {
     pause("14:40 - 14:50", "Intervalo"),
     lesson(8), lesson(9), lesson(10),
   ],
-  // Compatibilidade visual temporária até bancos antigos serem migrados.
   "Tarde": [
     lesson(6), lesson(7),
     pause("14:40 - 14:50", "Intervalo"),
@@ -93,8 +92,7 @@ function App() {
   const [schedule, setSchedule] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [generationSuccess, setGenerationSuccess] =
-    useState(false);
+  const [generationSuccess, setGenerationSuccess] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
   const [generationScope, setGenerationScope] = useState<"all" | "classrooms" | "subject_selected" | "subject_all">("all");
   const [generationClassroomIds, setGenerationClassroomIds] = useState<number[]>([]);
@@ -106,6 +104,12 @@ function App() {
 
   const [viewMode, setViewMode] = useState<"turma" | "professor">("turma");
   const [selectedId, setSelectedId] = useState<number | "">("");
+
+  // Estado para controle da aula selecionada na edição manual
+  const [editingLesson, setEditingLesson] = useState<any | null>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<number | "">("");
+  const [isFixed, setIsFixed] = useState<boolean>(false);
+  const [savingLesson, setSavingLesson] = useState(false);
 
   const fetchBaseData = async (loadSavedSchedule = true) => {
     try {
@@ -274,6 +278,38 @@ function App() {
       console.error("Erro ao gerar grade", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenEditLesson = (lessonItem: any) => {
+    setEditingLesson(lessonItem);
+    setSelectedTeacherId(lessonItem.teacher_id ?? "");
+    setIsFixed(!!lessonItem.is_fixed);
+  };
+
+  const handleSaveLesson = async () => {
+    if (!editingLesson || !editingLesson.id) {
+      setError("Não é possível alterar uma aula sem ID gravado no banco.");
+      setEditingLesson(null);
+      return;
+    }
+
+    setSavingLesson(true);
+    try {
+      const payload = {
+        teacher_id: selectedTeacherId === "" ? null : Number(selectedTeacherId),
+        is_fixed: isFixed,
+      };
+
+      const response = await api.put(`/timetable/lessons/${editingLesson.id}`, payload);
+      
+      setSchedule(prev => prev ? prev.map(item => item.id === editingLesson.id ? response.data : item) : null);
+      setEditingLesson(null);
+    } catch (err: any) {
+      console.error("Erro ao salvar alteração de aula", err);
+      alert(err.response?.data?.detail || "Erro ao atualizar aula.");
+    } finally {
+      setSavingLesson(false);
     }
   };
 
@@ -536,7 +572,15 @@ function App() {
 
                         if (jointLesson) {
                           cellContent = (
-                            <div className="flex flex-col items-center justify-center p-2 h-full bg-indigo-50 border border-indigo-100 rounded">
+                            <div 
+                              onClick={() => handleOpenEditLesson(jointLesson)}
+                              className="relative cursor-pointer flex flex-col items-center justify-center p-2 h-full bg-indigo-50 border border-indigo-100 rounded hover:opacity-80 transition-opacity"
+                            >
+                              {jointLesson.is_fixed && (
+                                <span title="Fixada manualmente" className="absolute top-1 right-1">
+                                  <Lock className="w-3 h-3 text-amber-600" />
+                                </span>
+                              )}
                               <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-400 mb-1">
                                 Turma inteira
                               </span>
@@ -554,11 +598,18 @@ function App() {
                           );
                         } else {
                           const renderGroup = (group: "A" | "B", item: any) => (
-                            <div className={item
-                              ? "min-h-16 flex flex-col items-center justify-center p-1.5 bg-indigo-50 border border-indigo-100 rounded"
+                            <div 
+                              onClick={() => item && handleOpenEditLesson(item)}
+                              className={item
+                              ? "relative cursor-pointer min-h-16 flex flex-col items-center justify-center p-1.5 bg-indigo-50 border border-indigo-100 rounded hover:opacity-80 transition-opacity"
                               : "min-h-16"} aria-hidden={!item}>
                               {item && (
                                 <>
+                                  {item.is_fixed && (
+                                    <span title="Fixada manualmente" className="absolute top-1 right-1">
+                                      <Lock className="w-3 h-3 text-amber-600" />
+                                    </span>
+                                  )}
                                   <span className="text-[10px] font-bold uppercase text-indigo-400">
                                     Grupo {group}
                                   </span>
@@ -589,7 +640,15 @@ function App() {
 
                         if (currentLesson) {
                           cellContent = (
-                            <div className="flex flex-col items-center justify-center p-2 h-full bg-indigo-50 border border-indigo-100 rounded">
+                            <div 
+                              onClick={() => handleOpenEditLesson(currentLesson)}
+                              className="relative cursor-pointer flex flex-col items-center justify-center p-2 h-full bg-indigo-50 border border-indigo-100 rounded hover:opacity-80 transition-opacity"
+                            >
+                              {currentLesson.is_fixed && (
+                                <span title="Fixada manualmente" className="absolute top-1 right-1">
+                                  <Lock className="w-3 h-3 text-amber-600" />
+                                </span>
+                              )}
                               <span className="font-bold text-indigo-900">
                                 {getSubName(currentLesson.subject_id)}
                               </span>
@@ -620,7 +679,15 @@ function App() {
                             : "";
 
                         cellContent = (
-                          <div className="flex flex-col items-center justify-center p-2 h-full bg-emerald-50 border border-emerald-100 rounded">
+                          <div 
+                            onClick={() => handleOpenEditLesson(currentLesson)}
+                            className="relative cursor-pointer flex flex-col items-center justify-center p-2 h-full bg-emerald-50 border border-emerald-100 rounded hover:opacity-80 transition-opacity"
+                          >
+                            {currentLesson.is_fixed && (
+                              <span title="Fixada manualmente" className="absolute top-1 right-1">
+                                <Lock className="w-3 h-3 text-amber-600" />
+                              </span>
+                            )}
                             <span className="font-bold text-emerald-900">
                               {getSubName(currentLesson.subject_id)}
                             </span>
@@ -722,8 +789,6 @@ function App() {
                   {theme === "dark" ? "Tema claro" : "Tema escuro"}
                 </span>
               </span>
-
-
             </button>
 
             <NavLink
@@ -802,7 +867,6 @@ function App() {
                           </button>
                         </>
                       )}
-
                     </div>
                   </div>
 
@@ -1013,6 +1077,86 @@ function App() {
             <Route path="/config" element={<Config />} />
           </Routes>
         </main>
+
+        {/* Modal para Alterar e Fixar Professor/Aula */}
+        {editingLesson && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="app-panel w-full max-w-md bg-white p-6 rounded-xl shadow-lg border relative">
+              <button
+                type="button"
+                onClick={() => setEditingLesson(null)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <h3 className="text-lg font-bold mb-4">Editar Aula</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Turma</span>
+                  <p className="font-semibold text-gray-900">{getClassroomName(editingLesson.classroom_id)}</p>
+                </div>
+
+                <div>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Matéria</span>
+                  <p className="font-semibold text-gray-900">{getSubName(editingLesson.subject_id)}</p>
+                </div>
+
+                <div>
+                  <label htmlFor="modal-teacher" className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    Professor Atribuído
+                  </label>
+                  <select
+                    id="modal-teacher"
+                    value={selectedTeacherId}
+                    onChange={e => setSelectedTeacherId(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="">Nenhum (Sem Professor)</option>
+                    {teachers.map(teacher => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="is_fixed_checkbox"
+                    checked={isFixed}
+                    onChange={e => setIsFixed(e.target.checked)}
+                    className="w-4 h-4 rounded"
+                    style={{ accentColor: "var(--an-accent)" }}
+                  />
+                  <label htmlFor="is_fixed_checkbox" className="text-sm font-medium cursor-pointer select-none">
+                    Fixar aula manual (impede alteração automática)
+                  </label>
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-4 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setEditingLesson(null)}
+                    className="app-action-secondary"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveLesson}
+                    disabled={savingLesson}
+                    className="app-action-primary"
+                  >
+                    {savingLesson ? "A guardar..." : "Guardar Alterações"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Router>
   );

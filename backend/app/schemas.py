@@ -13,7 +13,6 @@ GenerationScope = Literal[
     "classrooms",
     "subject_selected",
     "subject_all",
-    # Compatibilidade temporária com versões antigas da interface.
     "classroom",
     "subject",
 ]
@@ -22,7 +21,6 @@ GenerationScope = Literal[
 class TimetableGenerationRequest(BaseModel):
     scope: GenerationScope = "all"
     classroom_ids: List[int] = Field(default_factory=list)
-    # Campo legado aceito para clientes antigos durante a transição.
     classroom_id: Optional[int] = Field(default=None, gt=0)
     subject_id: Optional[int] = Field(default=None, gt=0)
 
@@ -45,12 +43,10 @@ class Course(CourseBase):
 class ClassroomSubjectSetting(BaseModel):
     subject_id: int = Field(gt=0)
     workload: int = Field(ge=1, le=25)
-    # Cargas opcionais por subgrupo; se omitidas, usam "workload".
     workload_a: Optional[int] = Field(default=None, ge=0, le=25)
     workload_b: Optional[int] = Field(default=None, ge=0, le=25)
     joint_workload: Optional[int] = Field(default=None, ge=0, le=25)
     split: bool = False
-    # None preserva a compatibilidade: o otimizador infere preferência inicial quando a carga é 3.
     prefer_triple_block: Optional[bool] = None
 
 
@@ -63,8 +59,6 @@ class ClassroomBase(BaseModel):
         default_factory=list
     )
     preferred_subject_sequences: List[List[int]] = Field(default_factory=list)
-
-    # Compatibilidade com versões anteriores.
     split_subject_ids: List[int] = Field(default_factory=list)
 
 
@@ -135,17 +129,10 @@ class Period(PeriodBase):
 
 
 class SystemConfigBase(BaseModel):
-    # Pode ser reduzido pela escola, mas nunca ultrapassa o teto de 9.
     max_classes_per_day: int = Field(default=9, ge=1, le=9)
-
-    # Campo legado: a regra real de 6 aulas + 1h de descanso é fixa.
     max_consecutive_classes: int = Field(default=6, ge=1, le=6)
-
     max_high_complexity_per_day: int = Field(default=2, ge=0, le=15)
-
-    # Alunos sem janelas é regra fixa. O campo permanece por compatibilidade.
     student_gaps_hard: bool = True
-
     teacher_gaps_hard: bool = False
     min_classes_students: int = Field(default=2, ge=0, le=15)
     min_classes_teachers: int = Field(default=2, ge=0, le=15)
@@ -167,6 +154,11 @@ class SystemConfig(SystemConfigBase):
         from_attributes = True
 
 
+class LessonUpdate(BaseModel):
+    teacher_id: Optional[int] = None
+    is_fixed: bool = False
+
+
 class TimetableItemBase(BaseModel):
     classroom_id: int
     subject_id: int
@@ -174,6 +166,7 @@ class TimetableItemBase(BaseModel):
     day: int = Field(ge=0, le=4)
     period: int = Field(ge=0, le=15)
     student_group: StudentGroup = "Todos"
+    is_manual: bool = False
 
 
 class TimetableItemCreate(TimetableItemBase):
