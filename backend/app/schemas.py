@@ -8,11 +8,18 @@ Complexity = Literal["Alta", "Media", "Baixa"]
 SubjectCategory = Literal["Ensino Médio", "Técnica"]
 StudentGroup = Literal["Todos", "A", "B"]
 RuleMode = Literal["ignore", "soft", "hard"]
-GenerationScope = Literal["all", "classroom", "subject"]
+GenerationScope = Literal[
+    "all",
+    "classrooms",
+    "subject_selected",
+    "subject_all",
+]
 
 
 class TimetableGenerationRequest(BaseModel):
     scope: GenerationScope = "all"
+    classroom_ids: List[int] = Field(default_factory=list)
+    # Campo legado aceito para clientes antigos durante a transição.
     classroom_id: Optional[int] = Field(default=None, gt=0)
     subject_id: Optional[int] = Field(default=None, gt=0)
 
