@@ -2009,3 +2009,45 @@ html.dark-theme .app-brand-title .app-logo-light {
 .app-settings-section .app-fixed-rules-heading-icon {
   color: var(--an-accent) !important;
 }
+
+/* Controles de escopo para regenerar apenas a parte desejada da grade. */
+.app-generation-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 0 14px;
+}
+
+.app-generation-controls > label {
+  color: var(--an-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.app-generation-controls .app-generation-scope-select {
+  min-width: 190px;
+}
+
+.app-generation-controls .app-generation-target-select {
+  min-width: 210px;
+  max-width: 280px;
+}
+
+.app-generation-controls .app-action-primary {
+  margin-left: auto;
+}
+
+@media (max-width: 760px) {
+  .app-generation-controls .app-generation-scope-select,
+  .app-generation-controls .app-generation-target-select {
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 100%;
+  }
+
+  .app-generation-controls .app-action-primary {
+    margin-left: 0;
+    width: 100%;
+  }
+}
