@@ -169,7 +169,14 @@ def create_classroom(
     data: schemas.ClassroomCreate,
     db: Session = Depends(get_db),
 ):
-    item = models.Classroom(**data.model_dump())
+    values = data.model_dump()
+    if values["shift"] == "Noite":
+        values["has_groups"] = False
+        values["subject_settings"] = [
+            {**setting, "split": False}
+            for setting in values.get("subject_settings", [])
+        ]
+    item = models.Classroom(**values)
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -197,6 +204,8 @@ def update_classroom(
         raise HTTPException(404, "Turma não encontrada")
 
     values = data.model_dump()
+    if values["shift"] == "Noite":
+        values["has_groups"] = False
 
     valid_subject_ids = {
         subject.id
