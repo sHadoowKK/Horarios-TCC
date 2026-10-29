@@ -13,6 +13,9 @@ GenerationScope = Literal[
     "classrooms",
     "subject_selected",
     "subject_all",
+    # Compatibilidade temporária com versões antigas da interface.
+    "classroom",
+    "subject",
 ]
 
 
