@@ -400,6 +400,57 @@ def generate_schedule(
                     model.Add(occupancy == 0)
                 teacher_occupancy[(teacher["id"], day, period)] = occupancy
 
+    # Preferência para sincronizar divisões A/B com matérias diferentes.
+    # Isso ajuda a manter ambos os grupos ocupados sem duplicar a mesma matéria
+    # com um professor que só pode estar em um grupo por vez.
+    for classroom in classrooms:
+        if (
+            not classroom.get("has_groups", False)
+            or classroom.get("shift") == "Noite"
+        ):
+            continue
+
+        subjects = classroom_subjects[classroom["id"]]
+        group_a_units = [
+            subject for subject in subjects
+            if "A" in _targets_for(classroom, subject)
+        ]
+        group_b_units = [
+            subject for subject in subjects
+            if "B" in _targets_for(classroom, subject)
+        ]
+        allowed_periods = _get_allowed_periods(classroom)
+
+        for subject_a in group_a_units:
+            for subject_b in group_b_units:
+                if subject_a["id"] == subject_b["id"]:
+                    continue
+
+                for day in range(num_days):
+                    for period in allowed_periods:
+                        vars_a = vars_for_unit_at(
+                            classroom, subject_a, "A", day, period
+                        )
+                        vars_b = vars_for_unit_at(
+                            classroom, subject_b, "B", day, period
+                        )
+                        if not vars_a or not vars_b:
+                            continue
+
+                        parallel = model.NewBoolVar(
+                            f"parallel_groups_c{classroom['id']}_"
+                            f"sa{subject_a['id']}_sb{subject_b['id']}_"
+                            f"d{day}_p{period}"
+                        )
+                        occupied_a = sum(vars_a)
+                        occupied_b = sum(vars_b)
+                        model.Add(parallel <= occupied_a)
+                        model.Add(parallel <= occupied_b)
+                        model.Add(
+                            parallel >= occupied_a + occupied_b - 1
+                        )
+                        rewards.append(parallel * 1200)
+
     # Descanso mínimo de 11 horas entre jornadas em dias consecutivos.
     # Se o descanso real entre duas aulas possíveis for menor que 660 min,
     # o professor não pode ocupar ambos os períodos.
