@@ -667,7 +667,7 @@ def generate_schedule(
     for classroom, subject, target in units:
         for day in range(num_days):
             for period in range(num_periods):
-                penalties.append(no_teacher_lesson[(classroom["id"], subject["id"], target, day, period)] * 10000)
+                penalties.append(no_teacher_lesson[(classroom["id"], subject["id"], target, day, period)] * 1000000)
 
     for classroom, subject, target in units:
         unit_key = (classroom["id"], subject["id"], target)
@@ -696,8 +696,7 @@ def generate_schedule(
     # Modelos pequenos devem ser resolvidos deterministicamente com um worker;
     # para a escola inteira, o paralelismo ajuda a encontrar uma solução.
     solver.parameters.max_time_in_seconds = 60.0
-    variable_count = len(model.Proto().variables)
-    solver.parameters.num_search_workers = 8 if variable_count >= 5000 else 1
+    solver.parameters.num_search_workers = 8
     status = solver.Solve(model)
 
     if status == cp_model.INFEASIBLE:
