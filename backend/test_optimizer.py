@@ -851,7 +851,8 @@ class OptimizerTests(unittest.TestCase):
         """
         availability = empty_availability()
 
-        for period in [0, 1, 2, 3]:
+        # Dois blocos válidos; o período 2–3 tem intervalo de 20 minutos.
+        for period in [0, 1, 3, 4]:
             availability["0"][period] = True
 
         classrooms = [
@@ -931,8 +932,8 @@ class OptimizerTests(unittest.TestCase):
             {
                 (0, 0),
                 (0, 1),
-                (0, 2),
                 (0, 3),
+                (0, 4),
             },
         )
 
