@@ -152,33 +152,88 @@ def main(only_informatica=False):
                 })
                 info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
 
-        agro_settings = []
+        agro_settings_by_class = {}
         agro_class_names = []
 
         if not only_informatica:
+            # Disciplinas observadas no quadro diurno de Agro atualizado em 02/06/2026.
+            # A carga por turma vem da contagem dos períodos legíveis no quadro.
+            # Nomes/cargas em células pouco nítidas e a habilitação docente continuam
+            # provisórios; o quadro não é uma matriz oficial de cargas separada.
+            agro_general_subjects = {
+                "Arte", "Biologia", "Educação Física", "Espanhol", "Filosofia",
+                "Física", "Geografia", "História", "Inglês", "Língua Portuguesa",
+                "Matemática", "Química", "Sociologia",
+            }
             agro_subject_specs = [
-                ("M.R.N", 2, "Media", "Gilson"),
-                ("P.T.I.C", 2, "Media", "Joesley"),
+                ("C.A.E.R", 1, "Media", ["Tedo"]),
+                ("M.R.N", 2, "Media", ["Gilson"]),
+                ("P.T.I.C", 2, "Media", ["Joesley"]),
+                ("C.P.D.P.J", 2, "Media", ["Tedo"]),
+                ("G.P.D.P.J", 1, "Media", ["Tedo"]),
+                ("A.S", 2, "Media", ["Tedo", "Guilherme"]),
+                ("P.D.T.C.C", 2, "Media", ["Maickon"]),
+                ("N.V", 1, "Media", ["Gilson"]),
+                ("E.A.C.N.T", 2, "Media", ["Fabiane", "Juciane"]),
+                ("G.P.A", 1, "Media", ["Tedo"]),
+                ("A.R", 2, "Media", ["Maickon"]),
+                ("P.P.A", 2, "Media", ["Matheus", "Giovana"]),
+                ("A.P.P", 2, "Media", ["Guilherme", "Pedro K"]),
+                ("L.M.I.S", 2, "Media", ["Fabiane"]),
+                ("N.A.A.M", 2, "Media", ["Pedro K"]),
+                ("L.R.T", 2, "Media", ["Gilson"]),
+                ("E.A.M.T", 2, "Media", ["Gustavo", "Juciane"]),
+                ("L.P.C", 2, "Media", ["Fabiane"]),
+                ("C.A", 2, "Media", ["Gilson"]),
+                ("O.V/I", 2, "Media", ["Gilson"]),
+                ("C.P.R.T", 1, "Media", ["Solange"]),
+                ("S.A.B.E.A", 2, "Media", ["Pedro K"]),
+                ("M.I.A", 2, "Media", ["Guilherme"]),
+                ("E.O.E.T.R", 1, "Media", ["Guilherme"]),
+                ("P.C.P.S.P", 2, "Media", ["Tedo"]),
+                ("Língua Portuguesa", 3, "Baixa", ["Marcela", "Célia"]),
+                ("Educação Física", 2, "Media", ["Pedro Hernandes", "Rocco", "Renata"]),
+                ("Física", 2, "Media", ["Pedro Hernandes", "Rocco", "Renata"]),
+                ("Química", 2, "Media", ["Adriana"]),
+                ("Arte", 2, "Baixa", ["Solange"]),
+                ("Inglês", 2, "Baixa", ["Juliana", "Marta"]),
+                ("História", 2, "Baixa", ["Thiago Sampaio"]),
+                ("Matemática", 3, "Alta", ["Graciliano", "Kamila"]),
+                ("Geografia", 2, "Baixa", ["Thiago Hernandes", "Detto"]),
+                ("Biologia", 2, "Media", []),
+                ("Filosofia", 1, "Baixa", ["Thiago", "Aline"]),
+                ("Sociologia", 1, "Baixa", ["Cristian", "Thiago", "M. Emília"]),
+                ("Espanhol", 2, "Baixa", ["Célia"]),
             ]
-            for name, workload, complexity, teacher_name in agro_subject_specs:
-                subject = models.Subject(
-                    name=name,
-                    workload=workload,
-                    complexity=complexity,
-                    category="Técnica",
-                    course_ids=[agro_course.id],
-                )
-                db.add(subject)
-                db.flush()
-                subject_by_name[name] = subject
-                agro_settings.append({
-                    "subject_id": subject.id,
-                    "workload": workload,
-                    "split": True,
-                })
-                info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
 
-            # Seis turmas Agro confirmadas na referência; matriz parcial é provisória.
+            for name, workload, complexity, teacher_names in agro_subject_specs:
+                subject = subject_by_name.get(name)
+                if subject is None:
+                    category = "Ensino Médio" if name in agro_general_subjects else "Técnica"
+                    subject = models.Subject(
+                        name=name,
+                        workload=workload,
+                        complexity=complexity,
+                        category=category,
+                        course_ids=[agro_course.id],
+                    )
+                    db.add(subject)
+                    db.flush()
+                    subject_by_name[name] = subject
+                else:
+                    course_ids = list(subject.course_ids or [])
+                    if agro_course.id not in course_ids:
+                        subject.course_ids = course_ids + [agro_course.id]
+                    if workload > subject.workload:
+                        subject.workload = workload
+
+                for teacher_name in teacher_names:
+                    info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
+
+            # Matriz derivada da frequência semanal observada em cada coluna da grade.
+            # Número inteiro = aulas conjuntas; (A, B) = aulas separadas por subgrupo;
+            # dicionário também permite aulas conjuntas e separadas da mesma disciplina.
+            # As seis turmas são independentes, cada qual podendo ter seus próprios grupos A/B.
             agro_class_names = [
                 "1º PI AGRO A",
                 "1º PI AGRO B",
@@ -187,7 +242,91 @@ def main(only_informatica=False):
                 "3º PI AGRO A",
                 "3º PI AGRO B",
             ]
+            agro_matrix = {
+                "1º PI AGRO A": {
+                    "Língua Portuguesa": 3, "Educação Física": 2, "C.A.E.R": 1,
+                    "Matemática": 3, "História": 2, "Inglês": 2, "Filosofia": 1,
+                    "Biologia": 2, "Química": 2, "Sociologia": 1, "Geografia": 2,
+                    "C.P.R.T": 1, "Física": 2, "Arte": 2,
+                    "A.P.P": (2, 2), "P.P.A": (2, 2), "O.V/I": (2, 2),
+                    "M.R.N": (2, 2), "P.T.I.C": (2, 2),
+                },
+                "1º PI AGRO B": {
+                    "C.A.E.R": 1, "Arte": 2, "Educação Física": 2, "Filosofia": 1,
+                    "Matemática": 2, "Sociologia": 1, "Inglês": 2, "Geografia": 2,
+                    "Química": 2, "Física": 2, "Biologia": 2, "Língua Portuguesa": 3,
+                    "História": 2, "C.P.R.T": 1,
+                    "M.R.N": (2, 2), "P.T.I.C": (2, 2), "A.P.P": (2, 2),
+                    "P.P.A": (2, 2), "O.V/I": (2, 2),
+                },
+                "2º PI AGRO A": {
+                    "Inglês": 2, "Educação Física": 2, "C.P.D.P.J": 1,
+                    "E.A.C.N.T": {"joint": 1, "a": 1, "b": 1}, "L.M.I.S": 2,
+                    "Língua Portuguesa": 3, "L.P.C": 2, "Matemática": 3,
+                    "Biologia": 2, "N.V": 1, "História": 2, "Química": 2,
+                    "Física": 2, "Geografia": 2,
+                    "N.A.A.M": (2, 2), "L.R.T": (2, 2), "C.A": (2, 2),
+                    "P.P.A": (2, 2), "E.A.M.T": (1, 0),
+                },
+                "2º PI AGRO B": {
+                    "História": 3, "Língua Portuguesa": 3, "L.M.I.S": 2,
+                    "Educação Física": 2, "C.P.D.P.J": 1, "N.V": 1,
+                    "Biologia": 2, "L.P.C": 2, "Inglês": 2, "Geografia": 2,
+                    "Física": 2, "Matemática": 1, "Química": 1,
+                    "N.A.A.M": (2, 2), "L.R.T": (2, 2), "P.P.A": (2, 2),
+                    "C.A": (2, 2), "E.A.C.N.T": (1, 1),
+                },
+                "3º PI AGRO A": {
+                    "A.S": 2, "P.D.T.C.C": 2, "Inglês": 2, "Filosofia": 1,
+                    "Matemática": 2, "E.A.C.N.T": {"joint": 1, "a": 1, "b": 0},
+                    "G.P.A": 1, "A.R": 2, "M.I.A": 2, "Educação Física": 2,
+                    "C.P.D.P.J": 2, "Língua Portuguesa": 3, "Sociologia": 1,
+                    "S.A.B.E.A": 2, "E.O.E.T.R": 1, "Espanhol": 2, "Física": 2,
+                    "E.A.M.T": (0, 3),
+                },
+                "3º PI AGRO B": {
+                    "G.P.D.P.J": 1, "Educação Física": 2, "Física": 2,
+                    "E.A.C.N.T": 2, "Inglês": 2, "A.R": 2, "A.S": 2,
+                    "E.A.M.T": 3, "Matemática": 2, "Espanhol": 3,
+                    "S.A.B.E.A": 2, "M.I.A": 2, "Sociologia": 1,
+                    "Língua Portuguesa": 2, "P.C.P.S.P": 2, "P.D.T.C.C": 2,
+                    "E.O.E.T.R": 1, "Filosofia": 1,
+                },
+            }
 
+            for classroom_name, matrix in agro_matrix.items():
+                settings = []
+                for subject_name, load in matrix.items():
+                    subject = subject_by_name[subject_name]
+                    if isinstance(load, int):
+                        settings.append({
+                            "subject_id": subject.id,
+                            "workload": load,
+                            "split": False,
+                        })
+                    elif isinstance(load, tuple):
+                        load_a, load_b = load
+                        settings.append({
+                            "subject_id": subject.id,
+                            "workload": max(1, load_a, load_b),
+                            "workload_a": load_a,
+                            "workload_b": load_b,
+                            "joint_workload": 0,
+                            "split": True,
+                        })
+                    else:
+                        joint = int(load.get("joint", 0))
+                        load_a = int(load.get("a", 0))
+                        load_b = int(load.get("b", 0))
+                        settings.append({
+                            "subject_id": subject.id,
+                            "workload": max(1, joint, load_a, load_b),
+                            "workload_a": load_a,
+                            "workload_b": load_b,
+                            "joint_workload": joint,
+                            "split": True,
+                        })
+                agro_settings_by_class[classroom_name] = settings
         classrooms = [
             models.Classroom(
                 name="3º INFO",
@@ -217,7 +356,7 @@ def main(only_informatica=False):
                     shift="Integral",
                     course_id=agro_course.id,
                     has_groups=True,
-                    subject_settings=agro_settings,
+                    subject_settings=agro_settings_by_class[name],
                     split_subject_ids=[],
                 )
                 for name in agro_class_names
@@ -246,6 +385,9 @@ def main(only_informatica=False):
         }
 
         for name, subject_ids in info_teacher_assignments.items():
+            # Docentes vistos apenas no quadro de Agro recebem disponibilidade integral
+            # provisória; a grade de origem não informa a agenda semanal completa deles.
+            teacher_specs.setdefault(name, ("Integral", [0, 1, 2, 3, 4], 80))
             # No modo isolado de Informática, não inventamos dias bloqueados:
             # a disponibilidade oficial individual não ficou preservada nas imagens.
             # Liberamos o Integral de segunda a sexta para testar matéria/professor
@@ -293,16 +435,13 @@ def main(only_informatica=False):
             for setting in info_settings
         )
         night_total = sum(item[1] for item in ti_subjects)
-        agro_total_per_group = sum(item[1] for item in agro_subject_specs) if not only_informatica else 0
         if info_total != 37 or (info_total_a, info_total_b) != (37, 36):
             raise RuntimeError(
                 f"Cargas inesperadas no 3º INFO: padrão={info_total}, "
                 f"grupo A={info_total_a}, grupo B={info_total_b}"
             )
-        if not only_informatica and (night_total != 25 or agro_total_per_group != 4):
-            raise RuntimeError(
-                f"Cargas inesperadas: TI noite={night_total}, Agro={agro_total_per_group}"
-            )
+        if not only_informatica and night_total != 25:
+            raise RuntimeError(f"Carga inesperada no TI Noturno: {night_total}")
 
         print("Base de demonstração criada com sucesso.")
         print(f"Banco: {DATABASE_PATH}")
@@ -317,7 +456,8 @@ def main(only_informatica=False):
         print("SW2 e CNW2 permitem os professores vistos nos grupos A/B.")
         print("Disponibilidades docentes oficiais não constam no quadro; permanecem provisórias.")
         if not only_informatica:
-            print("Turmas adicionais: TI Noite + seis turmas Agro.")
+            print("Turmas adicionais: TI Noite + seis turmas Agro com matrizes ampliadas.")
+            print("As cargas de Agro foram inferidas da grade diurna de 02/06/2026; revisar rótulos/cargas pouco nítidos e disponibilidades docentes.")
     finally:
         db.close()
 
