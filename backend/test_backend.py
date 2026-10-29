@@ -310,7 +310,7 @@ class BackendIntegrationTests(unittest.TestCase):
             "workload": 2,
             "workload_a": 1,
             "workload_b": 1,
-            "joint_workload": 0,
+            "joint_workload": 2,
             "split": True,
         }]
         self.db.commit()
@@ -326,7 +326,7 @@ class BackendIntegrationTests(unittest.TestCase):
                 "workload": 2,
                 "workload_a": 1,
                 "workload_b": 1,
-                "joint_workload": 0,
+                "joint_workload": 2,
                 "split": True,
             }],
             split_subject_ids=[subject.id],
@@ -340,7 +340,7 @@ class BackendIntegrationTests(unittest.TestCase):
         self.assertFalse(updated.has_groups)
         self.assertEqual(updated.allowed_periods, [11, 12, 13, 14, 15])
         setting = updated.subject_settings[0]
-        self.assertEqual(setting["workload"], 2)
+        self.assertEqual(setting["workload"], 3)
         self.assertFalse(setting["split"])
         self.assertNotIn("workload_a", setting)
         self.assertNotIn("workload_b", setting)
