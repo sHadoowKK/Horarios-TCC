@@ -245,7 +245,7 @@ def ensure_database_compatibility():
                     },
                 )
 
-remove afternoon migration block        old_afternoon_count = conn.execute(
+        old_afternoon_count = conn.execute(
             text(
                 "SELECT COUNT(*) FROM classrooms "
                 "WHERE shift = 'Tarde'"
