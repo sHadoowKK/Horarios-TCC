@@ -693,10 +693,11 @@ def generate_schedule(
     model.Maximize(sum(rewards) - sum(penalties))
 
     solver = cp_model.CpSolver()
-    # O problema da escola inteira é maior; vários workers ajudam a encontrar
-    # uma solução sem alongar o modelo com restrições redundantes de janelas.
+    # Modelos pequenos devem ser resolvidos deterministicamente com um worker;
+    # para a escola inteira, o paralelismo ajuda a encontrar uma solução.
     solver.parameters.max_time_in_seconds = 60.0
-    solver.parameters.num_search_workers = 8
+    variable_count = len(model.Proto().variables)
+    solver.parameters.num_search_workers = 8 if variable_count >= 5000 else 1
     status = solver.Solve(model)
 
     if status == cp_model.INFEASIBLE:
