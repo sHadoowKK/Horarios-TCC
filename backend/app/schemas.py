@@ -33,6 +33,8 @@ class ClassroomSubjectSetting(BaseModel):
     workload_b: Optional[int] = Field(default=None, ge=0, le=25)
     joint_workload: Optional[int] = Field(default=None, ge=0, le=25)
     split: bool = False
+    # None preserva a compatibilidade: o otimizador infere preferência inicial quando a carga é 3.
+    prefer_triple_block: Optional[bool] = None
 
 
 class ClassroomBase(BaseModel):

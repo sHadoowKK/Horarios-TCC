@@ -119,6 +119,19 @@ def _subject_entries_for_classroom(classroom, subjects):
                 "B": workload_b,
             }
             item["_split"] = split
+            # Se a opção nunca foi salva, uma carga de exatamente 3 aulas
+            # começa com preferência ligada; o usuário pode desativá-la.
+            default_triple_preference = 3 in (
+                joint_workload,
+                workload_a,
+                workload_b,
+            )
+            configured_triple_preference = setting.get("prefer_triple_block")
+            item["_prefer_triple_block"] = (
+                default_triple_preference
+                if configured_triple_preference is None
+                else bool(configured_triple_preference)
+            )
             entries.append(item)
 
         return entries
@@ -892,6 +905,47 @@ def generate_schedule(
                 model.Add(paired <= second_slot)
                 model.Add(paired >= first_slot + second_slot - 1)
                 rewards.append(paired * 300)
+    # Preferência configurável por bloco completo de três aulas.
+    # Só se aplica às unidades com carga semanal exatamente 3 e opção ligada.
+    contiguous_period_triples = [
+        (period, period + 1, period + 2)
+        for period in range(min(num_periods - 2, len(PERIOD_START_MINUTES) - 2))
+        if (
+            PERIOD_END_MINUTES[period] == PERIOD_START_MINUTES[period + 1]
+            and PERIOD_END_MINUTES[period + 1] == PERIOD_START_MINUTES[period + 2]
+        )
+    ]
+
+    for classroom, subject, target in units:
+        if not subject.get("_prefer_triple_block", False):
+            continue
+        workload_by_target = subject.get("_workload_by_target", {})
+        if int(workload_by_target.get(target, 0)) != 3:
+            continue
+
+        allowed_periods = set(
+            JOURNEY_PERIODS.get(
+                classroom.get("shift", "Manhã"),
+                JOURNEY_PERIODS["Manhã"],
+            )
+        )
+        for day in range(num_days):
+            for first, second, third in contiguous_period_triples:
+                if not {first, second, third}.issubset(allowed_periods):
+                    continue
+                slots = [
+                    sum(vars_for_unit_at(classroom, subject, target, day, period))
+                    for period in (first, second, third)
+                ]
+                triple = model.NewBoolVar(
+                    f"triple_lesson_c{classroom['id']}_s{subject['id']}_"
+                    f"g{target}_d{day}_p{first}"
+                )
+                for slot in slots:
+                    model.Add(triple <= slot)
+                model.Add(triple >= sum(slots) - 2)
+                # Além da recompensa por pares, dá bônus à sequência completa.
+                rewards.append(triple * 1200)
     # Preferências por sequência entre matérias configuradas na própria turma.
     # Ex.: Filosofia seguida de Sociologia. São recompensas Soft, não restrições Hard.
     for classroom in classrooms:
