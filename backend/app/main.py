@@ -161,6 +161,44 @@ def delete_course(
     return {"detail": "Curso removido com sucesso"}
 
 
+def _normalize_night_subject_settings(settings):
+    """Transforma cargas A/B antigas em uma carga por turma noturna inteira."""
+    normalized_settings = []
+    for setting in settings or []:
+        if not isinstance(setting, dict):
+            continue
+
+        normalized = dict(setting)
+        raw_joint = setting.get("joint_workload")
+        raw_a = setting.get("workload_a")
+        raw_b = setting.get("workload_b")
+
+        if any(value is not None for value in (raw_joint, raw_a, raw_b)):
+            base_load = int(setting.get("workload", 0) or 0)
+            joint = int(raw_joint or 0)
+            load_a = (
+                base_load
+                if raw_a is None and joint == 0
+                else int(raw_a or 0)
+            )
+            load_b = (
+                base_load
+                if raw_b is None and joint == 0
+                else int(raw_b or 0)
+            )
+            combined_load = joint + max(load_a, load_b)
+            if combined_load > 0:
+                normalized["workload"] = combined_load
+
+        normalized.pop("workload_a", None)
+        normalized.pop("workload_b", None)
+        normalized.pop("joint_workload", None)
+        normalized["split"] = False
+        normalized_settings.append(normalized)
+
+    return normalized_settings
+
+
 # ----------------------------------------------------------------------
 # TURMAS
 # ----------------------------------------------------------------------
@@ -172,19 +210,9 @@ def create_classroom(
     values = data.model_dump()
     if values["shift"] == "Noite":
         values["has_groups"] = False
-        values["subject_settings"] = [
-            {
-                **{
-                    key: value
-                    for key, value in setting.items()
-                    if key not in {
-                        "workload_a", "workload_b", "joint_workload"
-                    }
-                },
-                "split": False,
-            }
-            for setting in values.get("subject_settings", [])
-        ]
+        values["subject_settings"] = _normalize_night_subject_settings(
+            values.get("subject_settings", [])
+        )
     item = models.Classroom(**values)
     db.add(item)
     db.commit()
@@ -215,19 +243,9 @@ def update_classroom(
     values = data.model_dump()
     if values["shift"] == "Noite":
         values["has_groups"] = False
-        values["subject_settings"] = [
-            {
-                **{
-                    key: value
-                    for key, value in setting.items()
-                    if key not in {
-                        "workload_a", "workload_b", "joint_workload"
-                    }
-                },
-                "split": False,
-            }
-            for setting in values.get("subject_settings", [])
-        ]
+        values["subject_settings"] = _normalize_night_subject_settings(
+            values.get("subject_settings", [])
+        )
 
     valid_subject_ids = {
         subject.id
