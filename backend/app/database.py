@@ -295,6 +295,32 @@ def ensure_database_compatibility():
                         "workload_a", "workload_b", "joint_workload"
                     }
                 }
+
+                # Se a carga antiga era conjunta + específica para A/B, converte
+                # para uma única carga por aluno antes de remover as colunas A/B.
+                raw_joint = setting.get("joint_workload")
+                raw_a = setting.get("workload_a")
+                raw_b = setting.get("workload_b")
+                if any(value is not None for value in (raw_joint, raw_a, raw_b)):
+                    try:
+                        base_load = int(setting.get("workload", 0) or 0)
+                        joint = int(raw_joint or 0)
+                        load_a = (
+                            base_load
+                            if raw_a is None and joint == 0
+                            else int(raw_a or 0)
+                        )
+                        load_b = (
+                            base_load
+                            if raw_b is None and joint == 0
+                            else int(raw_b or 0)
+                        )
+                        combined_load = joint + max(load_a, load_b)
+                        if combined_load > 0:
+                            normalized["workload"] = combined_load
+                    except (TypeError, ValueError):
+                        pass
+
                 normalized["split"] = False
                 normalized_settings.append(normalized)
 
