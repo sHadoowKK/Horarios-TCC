@@ -788,15 +788,82 @@ function App() {
                         </>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={handleGenerate}
-                        disabled={loading}
-                        className="app-action-primary disabled:opacity-50"
-                      >
-                        {loading ? <span>Gerando...</span> : "Gerar grade"}
-                      </button>
                     </div>
+                  </div>
+
+                  <div className="app-generation-controls no-print">
+                    <label htmlFor="generation-scope">Gerar novamente:</label>
+                    <select
+                      id="generation-scope"
+                      aria-label="Escopo da geração"
+                      className="app-toolbar-select app-generation-scope-select"
+                      value={generationScope}
+                      onChange={event => {
+                        setGenerationScope(event.target.value as "all" | "classroom" | "subject");
+                        setError("");
+                        setGenerationSuccess(false);
+                      }}
+                    >
+                      <option value="all">Escola inteira</option>
+                      <option value="classroom" disabled={!schedule || schedule.length === 0}>Uma turma</option>
+                      <option value="subject" disabled={!schedule || schedule.length === 0}>Uma matéria da turma</option>
+                    </select>
+
+                    {generationScope !== "all" && (
+                      <select
+                        aria-label="Turma para regeneração"
+                        className="app-toolbar-select app-generation-target-select"
+                        value={generationClassroomId}
+                        onChange={event => {
+                          const nextId = event.target.value === "" ? "" : Number(event.target.value);
+                          const nextClassroom = classrooms.find(classroom => classroom.id === nextId);
+                          setGenerationClassroomId(nextId);
+                          setGenerationSubjectId(nextClassroom?.subject_settings?.[0]?.subject_id ?? "");
+                          setError("");
+                          setGenerationSuccess(false);
+                        }}
+                      >
+                        <option value="">Selecionar turma...</option>
+                        {classrooms.map(classroom => (
+                          <option key={classroom.id} value={classroom.id}>
+                            {classroom.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {generationScope === "subject" && (
+                      <select
+                        aria-label="Matéria para regeneração"
+                        className="app-toolbar-select app-generation-target-select"
+                        value={generationSubjectId}
+                        onChange={event => {
+                          setGenerationSubjectId(event.target.value === "" ? "" : Number(event.target.value));
+                          setError("");
+                          setGenerationSuccess(false);
+                        }}
+                      >
+                        <option value="">Selecionar matéria...</option>
+                        {(classrooms.find(classroom => classroom.id === generationClassroomId)?.subject_settings || [])
+                          .map(setting => {
+                            const subject = subjects.find(item => item.id === setting.subject_id);
+                            return subject ? (
+                              <option key={subject.id} value={subject.id}>
+                                {subject.name}
+                              </option>
+                            ) : null;
+                          })}
+                      </select>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      disabled={loading}
+                      className="app-action-primary disabled:opacity-50"
+                    >
+                      {loading ? <span>Gerando...</span> : "Gerar grade"}
+                    </button>
                   </div>
 
                   {error && (
@@ -814,7 +881,7 @@ function App() {
 
                   {!error && generationSuccess && (
                     <div className="app-status-message app-status-success" role="status">
-                      Grade gerada.
+                      {generationMessage || "Grade gerada."}
                     </div>
                   )}
 
