@@ -195,6 +195,7 @@ def generate_schedule(
     # Configurações globais
     avoid_first_period = bool(sys_config.get("avoid_first_period", False))
     avoid_last_period = bool(sys_config.get("avoid_last_period", False))
+    avoid_friday = bool(sys_config.get("avoid_friday", False))
     min_classes_students = int(sys_config.get("min_classes_students", 2))
     min_classes_teachers = int(sys_config.get("min_classes_teachers", 2))
     max_high = int(sys_config.get("max_high_complexity_per_day", 2))
@@ -540,16 +541,17 @@ def generate_schedule(
             penalties.append(is_active * 600)
 
     # AGRUPAMENTO DE AULAS (PARES E TRIPLOS)
+    # Só recompensa blocos sem intervalo entre uma aula e a próxima.
+    # Há pausas entre 2ª/3ª aula da manhã, 2ª/3ª da tarde e 3ª/4ª da noite.
     contiguous_period_pairs = [
-        (0, 1), (1, 2), (2, 3), (3, 4), (4, 5),
-        (6, 7), (7, 8), (8, 9), (9, 10),
-        (11, 12), (12, 13), (13, 14), (14, 15)
+        (0, 1), (1, 2), (3, 4), (4, 5),
+        (6, 7), (8, 9), (9, 10),
+        (11, 12), (12, 13), (14, 15)
     ]
 
     contiguous_period_triples = [
-        (0, 1, 2), (1, 2, 3), (2, 3, 4), (3, 4, 5),
-        (6, 7, 8), (7, 8, 9), (8, 9, 10),
-        (11, 12, 13), (12, 13, 14), (13, 14, 15)
+        (0, 1, 2), (3, 4, 5),
+        (8, 9, 10), (11, 12, 13)
     ]
 
     for classroom, subject, target in units:
@@ -678,6 +680,15 @@ def generate_schedule(
                     key = (classroom["id"], subject["id"], target, teacher["id"], day, period)
                     if key in lesson:
                         rewards.append(score * lesson[key])
+
+    # "Evitar sexta-feira" é uma preferência, não uma proibição de horários.
+    if avoid_friday:
+        for key, variable in no_teacher_lesson.items():
+            if key[3] == 4:
+                penalties.append(variable * 200)
+        for key, variable in lesson.items():
+            if key[4] == 4:
+                penalties.append(variable * 200)
 
     model.Maximize(sum(rewards) - sum(penalties))
 
