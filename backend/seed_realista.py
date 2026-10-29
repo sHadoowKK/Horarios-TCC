@@ -232,9 +232,10 @@ def main(only_informatica=False):
                     info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
 
             # Matriz derivada da frequência semanal observada em cada coluna da grade.
-            # Número inteiro = aulas conjuntas; (A, B) = aulas separadas por subgrupo;
-            # dicionário também permite aulas conjuntas e separadas da mesma disciplina.
-            # As seis turmas são independentes, cada qual podendo ter seus próprios grupos A/B.
+            # Cada coluna é uma turma completa e independente: o sufixo A/B faz
+            # parte do nome da turma e não indica subgrupos internos.
+            # As células pouco legíveis e a carga de componentes com marcações
+            # mistas permanecem estimativas de demonstração, não dados oficiais.
             agro_class_names = [
                 "1º PI AGRO A",
                 "1º PI AGRO B",
