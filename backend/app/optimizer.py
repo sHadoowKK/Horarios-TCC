@@ -235,7 +235,7 @@ def generate_schedule(
                 no_teacher_lesson[key] = model.NewBoolVar(f"U_c{classroom['id']}_s{subject['id']}_g{target}_d{day}_p{period}")
                 model.Add(no_teacher_lesson[key] <= no_teacher_assignment[none_key])
                 
-                if period not in allowed_periods or (day == 4 and period in (6, 7, 8, 9, 10)):
+                if period not in allowed_periods:
                     model.Add(no_teacher_lesson[key] == 0)
 
         unit_key = (classroom["id"], subject["id"], target)
@@ -249,7 +249,7 @@ def generate_schedule(
                     lesson[key] = model.NewBoolVar(f"Y_c{classroom['id']}_s{subject['id']}_g{target}_t{teacher['id']}_d{day}_p{period}")
                     model.Add(lesson[key] <= assignment[assignment_key])
                     
-                    if period not in allowed_periods or (day == 4 and period in (6, 7, 8, 9, 10)):
+                    if period not in allowed_periods:
                         model.Add(lesson[key] == 0)
 
                     availability = teacher.get("availability", {})
@@ -628,16 +628,34 @@ def generate_schedule(
         if weekly_workload == 3:
             model.Add(sum(days_active) <= 2)
 
-    # Proibição de Janelas
+    # Proibição de janelas sem criar O(n³) restrições por turno.
+    # Uma sequência de aulas sem janelas tem no máximo uma transição 0 -> 1.
+    # Contar essas transições impõe a contiguidade em O(n) por dia/turma/grupo.
     for classroom in classrooms:
         allowed_periods = _get_allowed_periods(classroom)
         for audience in _audiences_for(classroom):
             for day in range(num_days):
-                day_occ = [student_occupancy[(classroom["id"], audience, day, period)] for period in allowed_periods if (classroom["id"], audience, day, period) in student_occupancy]
-                for left in range(len(day_occ) - 2):
-                    for middle in range(left + 1, len(day_occ) - 1):
-                        for right in range(middle + 1, len(day_occ)):
-                            model.Add(day_occ[left] + (1 - day_occ[middle]) + day_occ[right] <= 2)
+                day_occ = [
+                    student_occupancy[(classroom["id"], audience, day, period)]
+                    for period in allowed_periods
+                    if (classroom["id"], audience, day, period) in student_occupancy
+                ]
+                starts = []
+                for index, occupancy in enumerate(day_occ):
+                    start = model.NewBoolVar(
+                        f"starts_c{classroom['id']}_g{audience}_d{day}_i{index}"
+                    )
+                    if index == 0:
+                        model.Add(start == occupancy)
+                    else:
+                        previous = day_occ[index - 1]
+                        model.Add(start >= occupancy - previous)
+                        model.Add(start <= occupancy)
+                        model.Add(start <= 1 - previous)
+                    starts.append(start)
+
+                if starts:
+                    model.Add(sum(starts) <= 1)
 
     for teacher in teachers:
         for day in range(num_days):
@@ -664,13 +682,44 @@ def generate_schedule(
     model.Maximize(sum(rewards) - sum(penalties))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 45.0
+    # O problema da escola inteira é maior; vários workers ajudam a encontrar
+    # uma solução sem alongar o modelo com restrições redundantes de janelas.
+    solver.parameters.max_time_in_seconds = 60.0
+    solver.parameters.num_search_workers = 8
     status = solver.Solve(model)
+
+    if status == cp_model.INFEASIBLE:
+        return {
+            "status": "infeasible",
+            "message": (
+                "O modelo comprovou que esta combinação de cargas e regras é "
+                "inviável. Confira as cargas semanais e as jornadas permitidas."
+            ),
+        }
+
+    if status == cp_model.UNKNOWN:
+        return {
+            "status": "timeout",
+            "message": (
+                "O otimizador atingiu o limite de 60 segundos sem encontrar "
+                "uma grade viável. Isso não comprova que a grade seja impossível. "
+                "Tente gerar por turma ou reduza temporariamente o escopo."
+            ),
+        }
+
+    if status == cp_model.MODEL_INVALID:
+        return {
+            "status": "error",
+            "message": (
+                "O otimizador recusou o modelo por uma inconsistência interna. "
+                "Consulte o log do backend."
+            ),
+        }
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return {
-            "status": "infeasible",
-            "message": "Não foi possível gerar uma grade com todas as restrições impostas. Verifique a disponibilidade dos professores e cargas.",
+            "status": "error",
+            "message": f"O otimizador retornou um estado inesperado: {status}.",
         }
 
     schedule = []
