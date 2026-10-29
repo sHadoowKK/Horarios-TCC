@@ -685,7 +685,11 @@ def generate_schedule(
     for classroom, subject, target in units:
         for day in range(num_days):
             for period in range(num_periods):
-                penalties.append(no_teacher_lesson[(classroom["id"], subject["id"], target, day, period)] * 1000000)
+                no_teacher_key = (
+                    classroom["id"], subject["id"], target, day, period
+                )
+                if no_teacher_key in no_teacher_lesson:
+                    penalties.append(no_teacher_lesson[no_teacher_key] * 1000000)
 
     for classroom, subject, target in units:
         unit_key = (classroom["id"], subject["id"], target)
