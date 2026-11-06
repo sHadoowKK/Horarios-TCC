@@ -10,7 +10,7 @@
 - [x] Smoke test do EXE em AppData limpo: API local iniciou e encontrou 57 aulas salvas.
 - [x] Validação isolada das 8 turmas da base demonstrativa passou, sem janelas de alunos.
 - [x] Teste de carga semanal noturna de 25 aulas continua coberto pelos testes automatizados.
-- [x] Gerar a escola inteira em conjunto: 8 turmas e 291 aulas validadas pela API; 268 com professor e 23 sem professor; sem conflitos docentes, janelas de alunos ou violações das regras de disponibilidade/descanso verificadas.
+- [x] Gerar a escola inteira em conjunto: 8 turmas e 291 aulas validadas pela API; 275 com professor e 16 sem professor; sem conflitos docentes, janelas de alunos ou violações das regras de disponibilidade/descanso verificadas.
 - [ ] Executar benchmarks small, medium e large e comparar com o baseline.
 - [ ] Testar geração pela interface no computador local.
 - [ ] Testar visão por turma e por professor na interface.
@@ -29,7 +29,7 @@
 - [x] Registrar build do frontend concluído.
 - [x] Registrar empacotamento Windows concluído no runner.
 - [x] Registrar validação individual das oito turmas e suas métricas.
-- [x] Registrar geração conjunta das oito turmas: 291 aulas (250 com professor, 23 sem professor), estado feasible, 121,20 s, 39.967 variáveis e 65.790 restrições.
+- [x] Registrar geração conjunta das oito turmas: 291 aulas (250 com professor, 23 sem professor), estado feasible, 121,13 s, 39.967 variáveis e 65.790 restrições.
 - [x] Registrar validação conjunta de carga por turma, janelas dos alunos, conflitos docentes, disponibilidade, limite diário, turnos, pausas e 11 h de descanso.
 - [ ] Executar e registrar benchmarks depois das otimizações.
 - [ ] Capturar prints da gestão acadêmica, professores e regras/preferências.
