@@ -420,8 +420,9 @@ def generate_schedule(
                 teacher_occupancy[(teacher["id"], day, period)] = occupancy
 
     # Preferência para sincronizar divisões A/B com matérias diferentes.
-    # Isso ajuda a manter ambos os grupos ocupados sem duplicar a mesma matéria
-    # com um professor que só pode estar em um grupo por vez.
+    # Em cada período, a turma só pode ter uma ocupação por grupo. Portanto,
+    # não é necessário criar uma variável para cada par matéria A x matéria B:
+    # basta detectar ocupação simultânea e excluir o caso em que é a mesma matéria.
     for classroom in classrooms:
         if (
             not classroom.get("has_groups", False)
@@ -430,45 +431,79 @@ def generate_schedule(
             continue
 
         subjects = classroom_subjects[classroom["id"]]
-        group_a_units = [
-            subject for subject in subjects
-            if "A" in _targets_for(classroom, subject)
-        ]
-        group_b_units = [
-            subject for subject in subjects
-            if "B" in _targets_for(classroom, subject)
-        ]
         allowed_periods = _get_allowed_periods(classroom)
 
-        for subject_a in group_a_units:
-            for subject_b in group_b_units:
-                if subject_a["id"] == subject_b["id"]:
+        for day in range(num_days):
+            for period in allowed_periods:
+                all_a_vars = []
+                all_b_vars = []
+                same_subject_parallel_vars = []
+
+                for subject in subjects:
+                    targets = _targets_for(classroom, subject)
+                    vars_a = (
+                        vars_for_unit_at(classroom, subject, "A", day, period)
+                        if "A" in targets else []
+                    )
+                    vars_b = (
+                        vars_for_unit_at(classroom, subject, "B", day, period)
+                        if "B" in targets else []
+                    )
+
+                    all_a_vars.extend(vars_a)
+                    all_b_vars.extend(vars_b)
+
+                    if vars_a and vars_b:
+                        same_parallel = model.NewBoolVar(
+                            f"same_parallel_c{classroom['id']}_"
+                            f"s{subject['id']}_d{day}_p{period}"
+                        )
+                        occupied_a_for_subject = sum(vars_a)
+                        occupied_b_for_subject = sum(vars_b)
+                        model.Add(same_parallel <= occupied_a_for_subject)
+                        model.Add(same_parallel <= occupied_b_for_subject)
+                        model.Add(
+                            same_parallel
+                            >= occupied_a_for_subject + occupied_b_for_subject - 1
+                        )
+                        same_subject_parallel_vars.append(same_parallel)
+
+                if not all_a_vars or not all_b_vars:
                     continue
 
-                for day in range(num_days):
-                    for period in allowed_periods:
-                        vars_a = vars_for_unit_at(
-                            classroom, subject_a, "A", day, period
-                        )
-                        vars_b = vars_for_unit_at(
-                            classroom, subject_b, "B", day, period
-                        )
-                        if not vars_a or not vars_b:
-                            continue
+                occupied_a = model.NewBoolVar(
+                    f"occupied_a_c{classroom['id']}_d{day}_p{period}"
+                )
+                occupied_b = model.NewBoolVar(
+                    f"occupied_b_c{classroom['id']}_d{day}_p{period}"
+                )
+                model.AddMaxEquality(occupied_a, all_a_vars)
+                model.AddMaxEquality(occupied_b, all_b_vars)
 
-                        parallel = model.NewBoolVar(
-                            f"parallel_groups_c{classroom['id']}_"
-                            f"sa{subject_a['id']}_sb{subject_b['id']}_"
-                            f"d{day}_p{period}"
-                        )
-                        occupied_a = sum(vars_a)
-                        occupied_b = sum(vars_b)
-                        model.Add(parallel <= occupied_a)
-                        model.Add(parallel <= occupied_b)
-                        model.Add(
-                            parallel >= occupied_a + occupied_b - 1
-                        )
-                        rewards.append(parallel * 1200)
+                same_subject_parallel = model.NewBoolVar(
+                    f"same_subject_parallel_c{classroom['id']}_d{day}_p{period}"
+                )
+                if same_subject_parallel_vars:
+                    model.AddMaxEquality(
+                        same_subject_parallel,
+                        same_subject_parallel_vars,
+                    )
+                else:
+                    model.Add(same_subject_parallel == 0)
+
+                parallel_distinct_subjects = model.NewBoolVar(
+                    f"parallel_distinct_c{classroom['id']}_d{day}_p{period}"
+                )
+                model.Add(parallel_distinct_subjects <= occupied_a)
+                model.Add(parallel_distinct_subjects <= occupied_b)
+                model.Add(
+                    parallel_distinct_subjects + same_subject_parallel <= 1
+                )
+                model.Add(
+                    parallel_distinct_subjects
+                    >= occupied_a + occupied_b - same_subject_parallel - 1
+                )
+                rewards.append(parallel_distinct_subjects * 1200)
 
     # Descanso mínimo de 11 horas entre jornadas em dias consecutivos.
     # Se o descanso real entre duas aulas possíveis for menor que 660 min,
