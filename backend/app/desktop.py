@@ -140,17 +140,28 @@ def main() -> None:
             ) as response:
                 timetable = json.loads(response.read().decode("utf-8"))
 
-            if not isinstance(timetable, list) or len(timetable) < 50:
-                found = len(timetable) if isinstance(timetable, list) else "resposta inválida"
+            expected_demo_lessons = 100
+            if (
+                not isinstance(timetable, list)
+                or len(timetable) != expected_demo_lessons
+            ):
+                found = (
+                    len(timetable)
+                    if isinstance(timetable, list)
+                    else "resposta inválida"
+                )
                 raise RuntimeError(
-                    "A base inicial não contém a grade de demonstração esperada. "
+                    "A base inicial não contém a grade fictícia de apresentação "
+                    f"esperada ({expected_demo_lessons} aulas). "
                     f"Registros encontrados: {found}."
                 )
 
-            logging.info(
-                "Smoke test concluído: API local ativa e %s aulas carregadas.",
-                len(timetable),
+            message = (
+                "SMOKE TEST OK: API local ativa e "
+                f"{len(timetable)} aulas de apresentação carregadas."
             )
+            print(message, flush=True)
+            logging.info(message)
             return
 
         window = webview.create_window(
