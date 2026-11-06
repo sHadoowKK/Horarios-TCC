@@ -108,16 +108,13 @@ O 3º INFO Integral A/B também foi validado separadamente pela API:
 
 Esse cenário usa matérias e cargas recuperadas do quadro de referência, mas as disponibilidades docentes são provisórias. Pode ser mostrado como teste específico de grupos A/B, desde que fique claro que não é a base fictícia principal nem uma reconstrução oficial completa da disponibilidade dos professores.
 
-Para recriá-lo, com o Anatinus fechado, execute:
+Para recriá-lo, feche o Anatinus e execute na raiz:
 
 ```powershell
-cd backend
-.\.venv\Scripts\python.exe seed_realista.py --informatica-only
-cd ..
-.\start-demo.ps1
+.\start-informatica.ps1
 ```
 
-O último comando recria a base fictícia de apresentação. Portanto, para realmente usar o 3º INFO isolado, inicie o frontend/backend apontando para esse banco de regressão sem executar novamente o seed fictício; faça isso apenas se tiver preparado essa demonstração separada.
+Esse atalho recria o banco DEMO somente com o 3º INFO e inicia a aplicação usando o banco já preparado, sem executar o seed fictício por cima. Para voltar à demonstração principal, feche o aplicativo e execute ` .\start-demo.ps1 ` (sem espaço depois da crase inicial).
 
 ## 4. O que os resultados significam
 
