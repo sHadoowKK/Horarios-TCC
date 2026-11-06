@@ -11,6 +11,7 @@ combinadas simultaneamente sem conflitos entre professores.
 """
 
 import argparse
+from collections import defaultdict
 import os
 from pathlib import Path
 
@@ -402,6 +403,40 @@ def _validate_all_together(db) -> None:
         f"{result.get('model_variables', 0)} variáveis / "
         f"{result.get('model_constraints', 0)} restrições."
     )
+
+    if unstaffed:
+        classroom_by_id = {row.id: row.name for row in classrooms}
+        subject_by_id = {
+            row.id: row.name
+            for row in db.query(models.Subject).all()
+        }
+        eligible_by_subject = defaultdict(list)
+        for teacher in teachers:
+            for subject_id in teacher.allowed_subjects or []:
+                eligible_by_subject[subject_id].append(teacher.name)
+
+        missing_by_unit = defaultdict(int)
+        for item in schedule:
+            if item.get("teacher_id") is None:
+                key = (
+                    item["classroom_id"],
+                    item["subject_id"],
+                    item.get("student_group", "Todos"),
+                )
+                missing_by_unit[key] += 1
+
+        print("Aulas sem professor por turma/matéria/grupo:")
+        for (classroom_id, subject_id, group), count in sorted(
+            missing_by_unit.items()
+        ):
+            candidate_names = eligible_by_subject.get(subject_id, [])
+            candidates = ", ".join(candidate_names) if candidate_names else "nenhum cadastrado"
+            print(
+                f"- {classroom_by_id[classroom_id]} / "
+                f"{subject_by_id.get(subject_id, f'matéria {subject_id}')} / "
+                f"{group}: {count} aula(s); "
+                f"docentes habilitados: {candidates}"
+            )
 
 
 def main() -> None:
