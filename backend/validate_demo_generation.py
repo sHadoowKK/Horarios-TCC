@@ -23,6 +23,59 @@ from app.database import SessionLocal  # noqa: E402
 from app.optimizer import generate_schedule, get_allowed_periods  # noqa: E402
 
 
+def _validate_api_generation(db, classrooms) -> None:
+    if len(classrooms) != 1:
+        raise SystemExit(
+            "--api exige uma base com exatamente uma turma; "
+            "use seed_realista.py --informatica-only."
+        )
+
+    from app.main import generate_timetable
+
+    classroom_row = classrooms[0]
+    try:
+        result = generate_timetable(db=db)
+    except HTTPException as exc:
+        raise SystemExit(
+            f"Geração pela API falhou (HTTP {exc.status_code}): {exc.detail}"
+        ) from exc
+
+    schedule = result.get("schedule", [])
+    if result.get("status") != "success" or not schedule:
+        raise SystemExit(f"A API não produziu uma grade: {result!r}")
+
+    classroom = {
+        "name": classroom_row.name,
+        "shift": classroom_row.shift,
+        "allowed_periods": classroom_row.allowed_periods,
+        "has_groups": classroom_row.has_groups,
+    }
+    expected = _expected_lesson_count({
+        "shift": classroom_row.shift,
+        "has_groups": classroom_row.has_groups,
+        "subject_settings": classroom_row.subject_settings or [],
+    })
+    if len(schedule) != expected:
+        raise SystemExit(
+            f"API: esperadas {expected} aulas, geradas {len(schedule)}."
+        )
+
+    _assert_no_student_gaps(classroom, schedule)
+    saved_count = db.query(models.TimetableItem).count()
+    if saved_count != len(schedule):
+        raise SystemExit(
+            f"Persistência divergente: API retornou {len(schedule)} aulas, "
+            f"mas o banco salvou {saved_count}."
+        )
+
+    print("Geração pela API e persistência validadas.")
+    print(f"Turma: {classroom_row.name}")
+    print(f"Aulas: {len(schedule)}")
+    print(f"Sem professor: {result.get('unstaffed_lessons', 0)}")
+    print(f"Estado: {result.get('solution_status', 'unknown')}")
+    print(f"Solver: {result.get('solve_time_seconds', 0):.2f}s")
+
+
 def _expected_lesson_count(classroom: dict) -> int:
     total = 0
     has_internal_groups = (
@@ -205,14 +258,19 @@ def main() -> None:
         help="Valida somente a turma com esse nome exato.",
     )
     parser.add_argument(
+        "--api",
+        action="store_true",
+        help="Valida geração e persistência pela API; requer somente uma turma.",
+    )
+    parser.add_argument(
         "--all-together",
         action="store_true",
         help="Tenta gerar todas as turmas juntas, incluindo conflitos entre professores.",
     )
     args = parser.parse_args()
 
-    if args.classroom and args.all_together:
-        parser.error("--classroom e --all-together não podem ser usados juntos.")
+    if sum((bool(args.classroom), bool(args.all_together), bool(args.api))) > 1:
+        parser.error("--classroom, --api e --all-together são modos exclusivos.")
 
     db = SessionLocal()
     try:
@@ -221,6 +279,9 @@ def main() -> None:
             return
 
         classrooms = db.query(models.Classroom).order_by(models.Classroom.id).all()
+        if args.api:
+            _validate_api_generation(db, classrooms)
+            return
         if args.classroom:
             classrooms = [
                 classroom
