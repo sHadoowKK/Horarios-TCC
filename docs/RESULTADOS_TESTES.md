@@ -1,87 +1,68 @@
 # ANATINUS — REGISTRO DE TESTES E RESULTADOS
 
-Este arquivo separa **o que já foi observado** do que ainda precisa ser repetido após alterações no solver.
+Atualizado em 06/11/2026. Este documento registra somente resultados observados em CI; ele não substitui a seção de Resultados do TCC.
 
 ## 1. Testes automatizados
 
-### Execução confirmada após as otimizações e testes de integração
-
-O GitHub Actions executou automaticamente a suíte completa em 19/10/2026. A versão atual possui **22 testes**: 18 cenários do otimizador e 4 testes de integração do backend.
+Execução confirmada no GitHub Actions:
 
 ```text
-Ran 22 tests in 1.752s
+Ran 36 tests in 6.751s
 OK
 ```
 
-Os quatro testes de integração acrescentados verificam:
-- geração e salvamento automático da grade;
-- substituição da grade salva em uma nova geração;
-- exclusão de professor preservando as aulas como "Sem professor";
-- pré-validação de carga semanal acima da capacidade da turma.
+A suíte contém 29 cenários do otimizador e 7 testes de integração do backend. O tempo é do runner Linux do GitHub e não deve ser comparado diretamente com medições no computador local.
 
-O tempo acima pertence ao runner do GitHub e não deve ser comparado diretamente com medições feitas no computador local. O dado relevante é que **os 22 testes passaram na versão atual**.
+## 2. Cenário de demonstração do 3º INFO
 
-### Casos cobertos
+Foi validado o banco isolado criado por `seed_realista.py --informatica-only`, usando a própria função da API `generate_timetable` (o mesmo fluxo chamado pela interface).
 
-- turma utiliza apenas matérias selecionadas;
-- disciplina sem professor continua na grade;
-- professor válido é preferido a "Sem professor";
-- divisão A/B por turma + disciplina;
-- interjornada de 11h20 permitida;
-- interjornada de 10h40 bloqueada;
-- 7ª aula sem pausa de 1h bloqueada;
-- 7ª aula após pausa >= 1h permitida;
-- máximo de 9 aulas/dia;
-- bloco noturno de 5 aulas permitido;
-- carga diurna 4 tende a 2+2;
-- carga diurna 3 tende a 2+1;
-- bloco triplo noturno permitido;
-- triplo diurno ainda possível se necessário;
-- semana noturna completa de 25 aulas;
-- grupos A/B com matérias diferentes simultaneamente;
-- duas turmas concorrendo pelo mesmo professor;
-- cenário integrado com várias turmas e professores compartilhados.
+Resultado observado:
 
----
+- Turma: 3º INFO Integral, com grupos A/B.
+- Aulas geradas: 57 alocações de grade.
+- Aulas sem professor: 0.
+- Estado: `feasible` (solução válida; não foi comprovada como ótima).
+- Tempo do solver: 19,31 s.
+- A geração foi salva no SQLite e a quantidade de registros persistidos correspondeu à quantidade retornada pela API.
+- O teste também conferiu ausência de janelas de alunos.
 
-## 2. Build do frontend
+Esse cenário é o recomendado para a demonstração. A disponibilidade docente utilizada é provisória, pois o quadro de referência não contém a disponibilidade semanal completa de cada professor.
 
-O build local já havia sido validado em 01/10/2026. Após as alterações mais recentes, o GitHub Actions executou novamente a compilação de produção e concluiu com sucesso:
+## 3. Validação individual da base com oito turmas
 
-```text
-✓ 1988 modules transformed.
-✓ built
-```
+O validador executou cada turma separadamente, conferindo a carga esperada, a quantidade de aulas, ausência de janelas dos alunos e métricas do solver. Resultados do runner:
 
-O tempo do build depende do ambiente e não é usado como métrica de desempenho do Anatinus.
+| Turma | Aulas | Sem professor | Estado | Tempo | Variáveis | Restrições |
+|---|---:|---:|---|---:|---:|---:|
+| 3º INFO | 57 | 0 | feasible | 19,77 s | 8.085 | 15.262 |
+| TI — Noite | 25 | 0 | optimal | 0,47 s | 1.189 | 2.406 |
+| 1º PI AGRO A | 36 | 3 | feasible | 18,65 s | 7.260 | 14.340 |
+| 1º PI AGRO B | 35 | 3 | feasible | 18,89 s | 7.260 | 14.344 |
+| 2º PI AGRO A | 37 | 3 | feasible | 18,86 s | 6.911 | 13.642 |
+| 2º PI AGRO B | 33 | 5 | feasible | 18,21 s | 6.559 | 12.971 |
+| 3º PI AGRO A | 34 | 0 | feasible | 18,65 s | 6.579 | 12.636 |
+| 3º PI AGRO B | 34 | 0 | feasible | 18,79 s | 6.579 | 12.636 |
 
----
+**Limite desta validação:** as oito turmas foram testadas individualmente. Isso não verifica conflitos de professores entre turmas diferentes. As disponibilidades docentes e parte das cargas de Agro permanecem provisórias; as aulas “Sem professor” encontradas nessas turmas devem ser interpretadas dentro desse contexto.
 
-## 3. Teste manual do fluxo completo
+## 4. Geração da escola inteira
 
-Confirmado manualmente:
+A geração conjunta das oito turmas ainda não foi validada. As tentativas anteriores terminaram em timeout sem encontrar uma solução dentro do limite de busca. Timeout não prova inviabilidade, mas também não permite afirmar que a grade da escola inteira funciona.
 
-- cadastro de cursos;
-- cadastro de turmas;
-- cadastro de disciplinas;
-- categoria removida da interface;
-- matriz específica por turma;
-- professores e disponibilidade;
-- geração de grade;
-- exibição de "Sem professor";
-- visão por turma;
-- visão por professor;
-- salvamento da grade;
-- atualização de listas sem F5;
-- tema escuro.
+Não usar o resultado individual das oito turmas como evidência de uma grade escolar conjunta.
 
-Também foi observado que a grade antiga permanecia visível durante uma nova geração. A interface foi modificada para avisar explicitamente que se trata da última grade salva enquanto o cálculo está em andamento.
+## 5. Build do frontend e aplicativo Windows
 
----
+- O build de produção do frontend passou no GitHub Actions.
+- O empacotamento Windows com PyInstaller concluiu com sucesso em uma execução anterior.
+- O passo de publicação do ZIP foi pulado no fluxo de pull request para não tentar consumir mais cota de artefatos enquanto o armazenamento do GitHub Actions está esgotado.
+- O script `build-windows.ps1` foi atualizado depois para criar o banco inicial somente com o 3º INFO, gerar a grade pela API e validar sua persistência antes de empacotar. Essa versão atualizada ainda precisa concluir seu próprio workflow.
+- O executável ainda precisa ser aberto em um Windows real, extraído de um ZIP completo e testado quanto à persistência, exportação e backup/restauração.
 
-## 4. Benchmark base ANTES das otimizações
+## 6. Benchmarks
 
-Resultado do cenário sintético small informado em 01/10/2026:
+O baseline anterior às otimizações permanece:
 
 ```text
 Cenário: small
@@ -89,72 +70,23 @@ Turmas: 5
 Disciplinas no catálogo: 12
 Professores: 14
 Aulas/unidades esperadas: 105
-
 Status: success
-Tempo total medido: 19.009s
-Estado da solução: optimal
-Tempo informado pelo solver: 16.305s
+Tempo total: 19,009 s
+Tempo do solver: 16,305 s
+Estado: optimal
 Aulas geradas: 105
 Aulas sem professor: 0
 ```
 
-Esse resultado serve como **baseline anterior** às seguintes otimizações:
+Esse resultado foi medido em 01/10/2026, antes das otimizações. Os benchmarks `small`, `medium` e `large` ainda precisam ser repetidos na versão atual; nenhum ganho percentual deve ser declarado até essa comparação ser feita no mesmo ambiente.
 
-1. substituição da enumeração de combinações da regra de descanso por contadores de sequência;
-2. remoção de variáveis de professores inelegíveis.
+## 7. Testes manuais ainda pendentes
 
-### Próxima medição obrigatória
-
-Executar novamente:
-
-```powershell
-python benchmark_optimizer.py --size small
-python benchmark_optimizer.py --size medium
-python benchmark_optimizer.py --size large
-```
-
-Registrar:
-- status;
-- tempo total;
-- tempo do solver;
-- variáveis do modelo;
-- restrições do modelo;
-- objective value;
-- best objective bound;
-- aulas geradas;
-- aulas sem professor.
-
-Não comparar tempos de máquinas diferentes como se fossem equivalentes.
-
----
-
-## 5. Evidências úteis para Resultados e Discussão
-
-### Falta de professor
-A interface já demonstrou grades válidas com disciplinas exibidas como "Sem professor", sem impedir o restante do horário.
-
-### Distribuição 2+2
-Foi observado em testes que quatro aulas diurnas de uma disciplina podem ser favorecidas em distribuição 2+2 em vez de 1+1+1+1.
-
-### Visão por professor
-Foi verificado que a visualização agrega aulas de diferentes turmas e grupos sem duplicar o professor em um mesmo período.
-
-### Timeout
-Foi observado um timeout de 20 segundos quando frontend e solver possuíam limites coincidentes. Depois:
-- frontend passou a esperar 60s;
-- solver passou a ter limite de 30s;
-- timeout foi separado de infeasibilidade.
-
----
-
-## 6. O que ainda falta medir de forma séria
-
-- tempo manual para criar uma grade comparável;
-- tempo de configuração no Anatinus;
-- tempo de geração em base real completa;
-- quantidade de ajustes manuais necessários após geração;
-- opinião de quem efetivamente monta a grade;
-- taxa de "Sem professor" em dados reais;
-- comportamento com todas as turmas e professores da instituição.
-
-Esses dados são necessários antes de fazer afirmações quantitativas no TCC.
+- abrir o executável Windows em pasta limpa;
+- testar fluxo completo pela interface;
+- conferir visão por turma e por professor;
+- testar grupos A/B e a preferência Filosofia → Sociologia visualmente;
+- validar exportação Excel (.xlsx) e impressão;
+- testar backup e restauração;
+- validar no computador e projetor da apresentação;
+- obter avaliação de alguém da escola que monta horários.
