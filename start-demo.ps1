@@ -10,14 +10,26 @@ $frontend = Join-Path $root "frontend"
 $python = Join-Path $backend ".venv\Scripts\python.exe"
 $demoDb = Join-Path $backend "school_schedule_demo.db"
 
-if (-not (Test-Path $demoDb)) {
-    throw "Base realista não encontrada. Execute primeiro: cd backend; python seed_realista.py"
-}
 if (-not (Test-Path $python)) {
     throw "Ambiente Python não encontrado. Execute a configuração do backend descrita no README."
 }
 if (-not (Test-Path (Join-Path $frontend "node_modules"))) {
     throw "Dependências do frontend não encontradas. Entre em frontend e execute npm install."
+}
+
+Write-Host "Preparando a base fictícia e gerando o horário de apresentação..." -ForegroundColor Cyan
+Push-Location $backend
+try {
+    & $python (Join-Path $backend "seed_apresentacao.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Falha ao criar a base fictícia de apresentação."
+    }
+} finally {
+    Pop-Location
+}
+
+if (-not (Test-Path $demoDb)) {
+    throw "A base de apresentação não foi criada: $demoDb"
 }
 
 $databaseUrl = "sqlite:///" + $demoDb.Replace("\", "/")
@@ -49,9 +61,10 @@ if ($OpenBrowser) {
 }
 
 Write-Host ""
-Write-Host "Anatinus iniciou usando a BASE REALISTA de demonstração." -ForegroundColor Green
+Write-Host "Anatinus iniciou usando a BASE FICTÍCIA DE APRESENTAÇÃO." -ForegroundColor Green
 Write-Host "Frontend: http://localhost:5173"
 Write-Host "API:      http://localhost:8000"
 Write-Host "Banco:    $demoDb"
 Write-Host ""
+Write-Host "Todos os cadastros e horários são fictícios." -ForegroundColor Yellow
 Write-Host "Os dados ficam separados de backend\school_schedule.db." -ForegroundColor Yellow
