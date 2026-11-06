@@ -286,10 +286,14 @@ def main():
                     )
                     daily_counts.append(count)
 
-                if daily_counts != [DAILY_TARGET] * 5:
+                if (
+                    sum(daily_counts) != DAILY_TARGET * 5
+                    or max(daily_counts) - min(daily_counts) > 2
+                ):
                     raise RuntimeError(
                         f"{classroom.name} / {audience}: distribuição diária "
-                        f"inesperada {daily_counts}; esperado {DAILY_TARGET} por dia."
+                        f"muito desigual {daily_counts}; média esperada de "
+                        f"{DAILY_TARGET} por dia, com variação máxima de 2 aulas."
                     )
 
         teachers_by_id = {
@@ -323,7 +327,7 @@ def main():
             label = "A/B" if classroom.has_groups else "Todos"
             print(
                 f"- {classroom.name} ({label}): "
-                f"6 aulas por dia, de segunda a sexta."
+                f"média de {DAILY_TARGET} aulas/dia, com variação máxima de 2."
             )
         print("Todos os dados cadastrais e horários docentes são fictícios.")
     finally:
