@@ -759,7 +759,7 @@ def generate_schedule(
         # Primeira fase: encontrar qualquer solução que respeite todas as
         # restrições obrigatórias, sem gastar busca tentando melhorar o objetivo.
         feasibility_model = cp_model.CpModel()
-        feasibility_model.Proto().CopyFrom(model.Proto())
+        feasibility_model.Proto().copy_from(model.Proto())
         feasibility_model.ClearObjective()
 
         feasibility_solver = cp_model.CpSolver()
