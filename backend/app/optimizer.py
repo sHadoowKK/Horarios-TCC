@@ -758,9 +758,8 @@ def generate_schedule(
     if large_model:
         # Primeira fase: encontrar qualquer solução que respeite todas as
         # restrições obrigatórias, sem gastar busca tentando melhorar o objetivo.
-        feasibility_model = cp_model.CpModel()
-        feasibility_model.Proto().copy_from(model.Proto())
-        feasibility_model.ClearObjective()
+        feasibility_model = model.clone()
+        feasibility_model.proto.clear_objective()
 
         feasibility_solver = cp_model.CpSolver()
         feasibility_solver.parameters.max_time_in_seconds = 45.0
@@ -775,13 +774,13 @@ def generate_schedule(
             # A solução válida vira um ponto inicial completo para a segunda
             # fase. Se a otimização não melhorar, esta grade será preservada.
             solution_values = [
-                feasibility_solver.Value(
-                    feasibility_model.GetIntVarFromProtoIndex(index)
+                feasibility_solver.value(
+                    feasibility_model.get_int_var_from_proto_index(index)
                 )
                 for index in range(len(model.Proto().variables))
             ]
             for index, value in enumerate(solution_values):
-                model.AddHint(model.GetIntVarFromProtoIndex(index), value)
+                model.add_hint(model.get_int_var_from_proto_index(index), value)
 
             optimization_solver = cp_model.CpSolver()
             optimization_solver.parameters.max_time_in_seconds = 15.0
