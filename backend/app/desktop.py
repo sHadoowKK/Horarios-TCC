@@ -143,7 +143,7 @@ def main() -> None:
             if not isinstance(timetable, list) or len(timetable) < 50:
                 found = len(timetable) if isinstance(timetable, list) else "resposta inválida"
                 raise RuntimeError(
-                    "A base inicial não contém a grade esperada do 3º INFO. "
+                    "A base inicial não contém a grade de demonstração esperada. "
                     f"Registros encontrados: {found}."
                 )
 
