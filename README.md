@@ -65,7 +65,7 @@ Horarios-TCC/
 │       └── anatinus-design-system.css
 ├── build-windows.ps1           # empacota a versão desktop
 ├── start-dev.ps1               # usa o banco local normal
-├── start-demo.ps1              # abre o banco realista isolado
+├── start-demo.ps1              # recria e abre a base fictícia de apresentação
 ├── start-informatica.ps1       # recria e abre somente o 3º INFO
 ├── verify.ps1                  # testes + build do frontend
 ├── backup-db.ps1               # backup do banco local
