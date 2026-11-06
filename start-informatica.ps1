@@ -41,10 +41,11 @@ Write-Host ""
 Write-Host "Base preparada: 3º INFO, disciplinas e professores de referência." -ForegroundColor Green
 Write-Host "Aviso: cargas e disponibilidades sem confirmação completa continuam provisórias." -ForegroundColor Yellow
 
+# O seed já criou o banco DEMO. Inicie sem executar novamente o seed fictício.
 if ($OpenBrowser) {
-    & $startScript
+    & $startScript -SkipSeed
 } else {
-    & $startScript -OpenBrowser:$false
+    & $startScript -SkipSeed -OpenBrowser:$false
 }
 if ($LASTEXITCODE -ne 0) {
     throw "Falha ao iniciar a demonstração."
