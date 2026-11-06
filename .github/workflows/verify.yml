@@ -34,11 +34,13 @@ jobs:
       - name: Validar seeds de demonstração
         working-directory: backend
         run: |
-          python -m py_compile seed_realista.py validate_demo_generation.py
+          python -m py_compile seed_realista.py validate_demo_generation.py seed_apresentacao.py
           python seed_realista.py --informatica-only
           python validate_demo_generation.py --api
           python seed_realista.py
           python validate_demo_generation.py
+          python validate_demo_generation.py --all-together
+          python seed_apresentacao.py
           python validate_demo_generation.py --all-together
 
   frontend:
