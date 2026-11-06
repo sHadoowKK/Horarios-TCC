@@ -420,6 +420,36 @@ def generate_schedule(
                     model.Add(occupancy == 0)
                 teacher_occupancy[(teacher["id"], day, period)] = occupancy
 
+    # DISTRIBUIÇÃO DIÁRIA DAS AULAS DOS ALUNOS
+    # Evita concentrar a carga semanal em poucos dias. É uma preferência:
+    # a grade continua livre para se afastar da média quando outras regras
+    # obrigatórias ou a disponibilidade docente exigirem.
+    for classroom in classrooms:
+        allowed_periods = _get_allowed_periods(classroom)
+        for audience in _audiences_for(classroom):
+            weekly_load = sum(
+                int(subject.get("_workload_by_target", {}).get(
+                    target, subject["workload"]
+                ) or 0)
+                for unit_classroom, subject, target in units
+                if unit_classroom["id"] == classroom["id"]
+                and target in ("Todos", audience)
+            )
+            target_daily_load = weekly_load // num_days
+            for day in range(num_days):
+                daily_load = sum(
+                    student_occupancy[(classroom["id"], audience, day, period)]
+                    for period in allowed_periods
+                    if (classroom["id"], audience, day, period) in student_occupancy
+                )
+                deviation = model.NewIntVar(
+                    0,
+                    len(allowed_periods),
+                    f"daily_balance_c{classroom['id']}_g{audience}_d{day}",
+                )
+                model.AddAbsEquality(deviation, daily_load - target_daily_load)
+                penalties.append(deviation * 5000)
+
     # Preferência para sincronizar divisões A/B com matérias diferentes.
     # Em cada período, a turma só pode ter uma ocupação por grupo. Portanto,
     # não é necessário criar uma variável para cada par matéria A x matéria B:
