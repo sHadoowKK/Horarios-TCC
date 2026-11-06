@@ -119,6 +119,26 @@ if (-not (Test-Path $exePath)) {
     throw "O empacotamento terminou sem encontrar dist\Anatinus\Anatinus.exe."
 }
 
+Write-Host "Executando smoke test do EXE com um AppData limpo..." -ForegroundColor Cyan
+$smokeData = Join-Path $root "build\smoke-appdata"
+if (Test-Path $smokeData) {
+    Remove-Item $smokeData -Recurse -Force
+}
+New-Item -ItemType Directory -Path $smokeData -Force | Out-Null
+$previousLocalAppData = $env:LOCALAPPDATA
+$env:LOCALAPPDATA = $smokeData
+try {
+    & $exePath --smoke-test
+    if ($LASTEXITCODE -ne 0) {
+        throw "O smoke test do Anatinus.exe falhou. O pacote não será publicado."
+    }
+} finally {
+    if ($null -eq $previousLocalAppData) {
+        Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+    } else {
+        $env:LOCALAPPDATA = $previousLocalAppData
+    }
+}
 $releaseDirectory = Join-Path $root "release"
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
 $archivePath = Join-Path $releaseDirectory "Anatinus-Windows-x64.zip"
