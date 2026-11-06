@@ -287,8 +287,9 @@ def _assert_global_teacher_constraints(schedule, teachers, config) -> None:
 
             if int(config.min_classes_teachers) >= 2:
                 for turn_name, turn_periods in (
-                    ("diurno", set(range(11))),
-                    ("noturno", set(range(11, 16))),
+                    ("manhã", set(range(6))),
+                    ("tarde", set(range(6, 11))),
+                    ("noite", set(range(11, 16))),
                 ):
                     turn_count = sum(period in turn_periods for period in unique_periods)
                     if turn_count == 1:
