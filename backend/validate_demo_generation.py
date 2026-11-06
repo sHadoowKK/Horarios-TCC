@@ -1,9 +1,16 @@
-"""Smoke test of full demonstration timetable generation.
+"""Valida as grades demonstrativas sem confundir testes por turma com a escola inteira.
 
-Run from backend after seed_realista.py:
+Uso, a partir de backend, depois de seed_realista.py:
     python validate_demo_generation.py
+    python validate_demo_generation.py --classroom "3º INFO"
+    python validate_demo_generation.py --all-together
+
+O modo padrão testa cada turma isoladamente. Isso confirma a viabilidade das
+matrizes e regras individuais, mas NÃO comprova que todas as turmas possam ser
+combinadas simultaneamente sem conflitos entre professores.
 """
 
+import argparse
 import os
 from pathlib import Path
 
@@ -11,29 +18,244 @@ DEMO_DATABASE = Path(__file__).resolve().with_name("school_schedule_demo.db")
 os.environ["ANATINUS_DATABASE_URL"] = f"sqlite:///{DEMO_DATABASE.as_posix()}"
 
 from fastapi import HTTPException  # noqa: E402
+from app import models  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
-from app.main import generate_timetable  # noqa: E402
+from app.optimizer import generate_schedule, get_allowed_periods  # noqa: E402
+
+
+def _expected_lesson_count(classroom: dict) -> int:
+    total = 0
+    has_internal_groups = (
+        bool(classroom.get("has_groups"))
+        and classroom.get("shift") != "Noite"
+    )
+
+    for setting in classroom.get("subject_settings") or []:
+        base = int(setting.get("workload", 0) or 0)
+        if has_internal_groups and setting.get("split"):
+            joint = int(setting.get("joint_workload") or 0)
+            raw_a = setting.get("workload_a")
+            raw_b = setting.get("workload_b")
+            load_a = (
+                base if raw_a is None and joint == 0
+                else int(raw_a or 0)
+            )
+            load_b = (
+                base if raw_b is None and joint == 0
+                else int(raw_b or 0)
+            )
+            total += joint + load_a + load_b
+        else:
+            joint = setting.get("joint_workload")
+            total += base if joint is None else int(joint or 0)
+
+    return total
+
+
+def _assert_no_student_gaps(classroom: dict, schedule: list[dict]) -> None:
+    allowed_periods = get_allowed_periods(classroom)
+    audiences = (
+        ["A", "B"]
+        if classroom.get("has_groups") and classroom.get("shift") != "Noite"
+        else ["Todos"]
+    )
+
+    for audience in audiences:
+        for day in range(5):
+            occupied = {
+                item["period"]
+                for item in schedule
+                if item["day"] == day
+                and item["student_group"] in ("Todos", audience)
+            }
+            positions = sorted(
+                allowed_periods.index(period)
+                for period in occupied
+                if period in allowed_periods
+            )
+            if positions and positions != list(
+                range(positions[0], positions[-1] + 1)
+            ):
+                raise RuntimeError(
+                    f"Janela de aluno encontrada em {classroom['name']} "
+                    f"(grupo {audience}, dia {day + 1})."
+                )
+
+
+def _validate_one_classroom(
+    classroom_row,
+    all_subject_rows,
+    all_teacher_rows,
+    config_row,
+) -> dict:
+    settings = classroom_row.subject_settings or []
+    subject_ids = {
+        int(setting["subject_id"])
+        for setting in settings
+        if setting.get("subject_id") is not None
+    }
+    subjects = [
+        {
+            "id": subject.id,
+            "name": subject.name,
+            "course_ids": subject.course_ids or [],
+            "workload": subject.workload,
+            "complexity": subject.complexity,
+            "category": subject.category,
+        }
+        for subject in all_subject_rows
+        if subject.id in subject_ids
+    ]
+    teachers = [
+        {
+            "id": teacher.id,
+            "name": teacher.name,
+            "allowed_subjects": [
+                subject_id
+                for subject_id in (teacher.allowed_subjects or [])
+                if subject_id in subject_ids
+            ],
+            "availability": teacher.availability or {},
+            "score": teacher.score,
+        }
+        for teacher in all_teacher_rows
+        if subject_ids.intersection(teacher.allowed_subjects or [])
+    ]
+    classroom = {
+        "id": classroom_row.id,
+        "name": classroom_row.name,
+        "course_id": classroom_row.course_id,
+        "shift": classroom_row.shift,
+        "allowed_periods": classroom_row.allowed_periods,
+        "has_groups": classroom_row.has_groups,
+        "subject_settings": settings,
+        "preferred_subject_sequences": (
+            classroom_row.preferred_subject_sequences or []
+        ),
+    }
+    sys_config = {
+        "max_classes_per_day": min(config_row.max_classes_per_day, 9),
+        "max_high_complexity_per_day": config_row.max_high_complexity_per_day,
+        "teacher_gaps_hard": config_row.teacher_gaps_hard,
+        "min_classes_students": config_row.min_classes_students,
+        "min_classes_teachers": config_row.min_classes_teachers,
+        "avoid_first_period": config_row.avoid_first_period,
+        "avoid_last_period": config_row.avoid_last_period,
+        "avoid_friday": config_row.avoid_friday,
+        "max_consec_per_teacher": config_row.max_consec_per_teacher,
+        "max_consec_teacher_mode": config_row.max_consec_teacher_mode,
+    }
+
+    result = generate_schedule(
+        [classroom],
+        subjects,
+        teachers,
+        sys_config,
+    )
+    if result.get("status") != "success":
+        raise RuntimeError(
+            f"{classroom_row.name}: {result.get('message', result.get('status'))}; "
+            f"métricas={result}"
+        )
+
+    expected = _expected_lesson_count(classroom)
+    actual = len(result.get("schedule", []))
+    if actual != expected:
+        raise RuntimeError(
+            f"{classroom_row.name}: esperadas {expected} aulas, geradas {actual}."
+        )
+
+    _assert_no_student_gaps(classroom, result["schedule"])
+    return {
+        "name": classroom_row.name,
+        "lessons": actual,
+        "unstaffed": result.get("unstaffed_lessons", 0),
+        "solution_status": result.get("solution_status", "unknown"),
+        "variables": result.get("model_variables", 0),
+        "constraints": result.get("model_constraints", 0),
+        "solve_seconds": result.get("solve_time_seconds", 0),
+    }
+
+
+def _validate_all_together(db) -> None:
+    from app.main import generate_timetable
+
+    try:
+        result = generate_timetable(db=db)
+    except HTTPException as exc:
+        raise SystemExit(
+            f"Geração conjunta falhou (HTTP {exc.status_code}): {exc.detail}"
+        ) from exc
+
+    schedule = result.get("schedule", [])
+    if result.get("status") != "success" or not schedule:
+        raise SystemExit(f"Geração conjunta não produziu grade: {result!r}")
+
+    print("Grade conjunta da escola gerada com sucesso.")
+    print(f"Aulas alocadas: {len(schedule)}")
+    print(f"Aulas sem professor: {result.get('unstaffed_lessons', 0)}")
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Valida os cenários de demonstração do Anatinus."
+    )
+    parser.add_argument(
+        "--classroom",
+        help="Valida somente a turma com esse nome exato.",
+    )
+    parser.add_argument(
+        "--all-together",
+        action="store_true",
+        help="Tenta gerar todas as turmas juntas, incluindo conflitos entre professores.",
+    )
+    args = parser.parse_args()
+
+    if args.classroom and args.all_together:
+        parser.error("--classroom e --all-together não podem ser usados juntos.")
+
     db = SessionLocal()
     try:
-        try:
-            result = generate_timetable(db=db)
-        except HTTPException as exc:
-            raise SystemExit(
-                f"Geração demo falhou (HTTP {exc.status_code}): {exc.detail}"
-            ) from exc
+        if args.all_together:
+            _validate_all_together(db)
+            return
 
-        schedule = result.get("schedule", [])
-        if result.get("status") != "success" or not schedule:
-            raise SystemExit(
-                f"Geração demo não produziu uma grade: {result!r}"
+        classrooms = db.query(models.Classroom).order_by(models.Classroom.id).all()
+        if args.classroom:
+            classrooms = [
+                classroom
+                for classroom in classrooms
+                if classroom.name == args.classroom
+            ]
+            if not classrooms:
+                raise SystemExit(f"Turma não encontrada: {args.classroom}")
+
+        subjects = db.query(models.Subject).all()
+        teachers = db.query(models.Teacher).all()
+        config = db.query(models.SystemConfig).first()
+        if config is None:
+            raise SystemExit("A base demo não possui configuração do sistema.")
+
+        results = []
+        for classroom in classrooms:
+            results.append(
+                _validate_one_classroom(classroom, subjects, teachers, config)
             )
 
-        print("Grade demo gerada com sucesso.")
-        print(f"Aulas alocadas: {len(schedule)}")
-        print(f"Aulas sem professor: {result.get('unstaffed_lessons', 0)}")
+        print("Validação individual das turmas concluída.")
+        for result in results:
+            print(
+                f"- {result['name']}: {result['lessons']} aulas; "
+                f"{result['unstaffed']} sem professor; "
+                f"{result['solution_status']}; "
+                f"{result['solve_seconds']:.2f}s; "
+                f"{result['variables']} variáveis / "
+                f"{result['constraints']} restrições."
+            )
+        print(
+            "Nota: este teste verifica as matrizes individualmente; "
+            "não valida conflitos docentes entre turmas diferentes."
+        )
     finally:
         db.close()
 
