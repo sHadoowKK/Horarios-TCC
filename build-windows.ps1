@@ -72,6 +72,10 @@ try {
     & $venvPython (Join-Path $backend "validate_demo_generation.py") --api
     if ($LASTEXITCODE -ne 0) { throw "A grade do 3º INFO não foi gerada e salva; o EXE não será empacotado." }
 
+    Write-Host "Gerando banco fictício e grade da apresentação..." -ForegroundColor Cyan
+    & $venvPython (Join-Path $backend "seed_apresentacao.py")
+    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar a base fictícia de apresentação." }
+
     New-Item -ItemType Directory -Path (Join-Path $root "build\\pyinstaller") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root "build\\spec") -Force | Out-Null
 
