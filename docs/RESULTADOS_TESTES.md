@@ -1,95 +1,88 @@
 # ANATINUS — REGISTRO DE TESTES E RESULTADOS
 
-Atualizado em 06/11/2026. Este documento registra somente resultados observados em CI; ele não substitui a seção de Resultados do TCC.
+Atualizado em 06/11/2026. Este documento registra resultados observados no GitHub Actions e separa a base fictícia de apresentação da base de regressão inspirada na ETEC. Não substitui a seção de Resultados do TCC.
 
-## 1. Testes automatizados
+## 1. Testes automatizados e build
 
-Execução confirmada no GitHub Actions:
+Na execução mais recente do GitHub Actions:
 
 ```text
-Ran 36 tests in 6.751s
+Ran 36 tests in 4.776s
 OK
 ```
 
 A suíte contém 29 cenários do otimizador e 7 testes de integração do backend. O tempo é do runner Linux do GitHub e não deve ser comparado diretamente com medições no computador local.
 
-## 2. Cenário de demonstração do 3º INFO
+O build de produção do frontend passou (1.952 módulos transformados). O build Windows também concluiu o empacotamento com PyInstaller e executou o smoke test do Anatinus.exe em um AppData limpo.
 
-Foi validado o banco isolado criado por `seed_realista.py --informatica-only`, usando a própria função da API `generate_timetable` (o mesmo fluxo chamado pela interface).
+## 2. Base fictícia principal para a apresentação
 
-Resultado observado:
-
-- Turma: 3º INFO Integral, com grupos A/B.
-- Aulas geradas: 57 alocações de grade.
-- Aulas sem professor: 0.
-- Estado: `feasible` (solução válida; não foi comprovada como ótima).
-- Tempo do solver: 19,31 s.
-- A geração foi salva no SQLite e a quantidade de registros persistidos correspondeu à quantidade retornada pela API.
-- O teste também conferiu ausência de janelas de alunos.
-
-Esse cenário é o recomendado para a demonstração. A disponibilidade docente utilizada é provisória, pois o quadro de referência não contém a disponibilidade semanal completa de cada professor.
-
-## 3. Validação individual da base com oito turmas
-
-O validador executou cada turma separadamente, conferindo a carga esperada, a quantidade de aulas, ausência de janelas dos alunos e métricas do solver. Resultados do runner:
-
-| Turma | Aulas | Sem professor | Estado | Tempo | Variáveis | Restrições |
-|---|---:|---:|---|---:|---:|---:|
-| 3º INFO | 57 | 0 | feasible | 19,77 s | 8.085 | 15.262 |
-| TI — Noite | 25 | 0 | optimal | 0,47 s | 1.189 | 2.406 |
-| 1º PI AGRO A | 36 | 3 | feasible | 18,65 s | 7.260 | 14.340 |
-| 1º PI AGRO B | 35 | 3 | feasible | 18,89 s | 7.260 | 14.344 |
-| 2º PI AGRO A | 37 | 3 | feasible | 18,86 s | 6.911 | 13.642 |
-| 2º PI AGRO B | 33 | 5 | feasible | 18,21 s | 6.559 | 12.971 |
-| 3º PI AGRO A | 34 | 0 | feasible | 18,65 s | 6.579 | 12.636 |
-| 3º PI AGRO B | 34 | 0 | feasible | 18,79 s | 6.579 | 12.636 |
-
-**Limite desta validação:** as oito turmas foram testadas individualmente. Isso não verifica conflitos de professores entre turmas diferentes. As disponibilidades docentes e parte das cargas de Agro permanecem provisórias; as aulas “Sem professor” encontradas nessas turmas devem ser interpretadas dentro desse contexto.
-
-## 4. Geração da escola inteira
-
-**A geração conjunta foi concluída e validada no GitHub Actions.** O teste usa o fluxo real da API `generate_timetable`, grava o resultado no SQLite e depois verifica as oito turmas em conjunto.
+O modo de apresentação usa `backend/seed_apresentacao.py`. Os dados são inteiramente inventados e ficam em `backend/school_schedule_demo.db`, separados do banco de desenvolvimento e de qualquer cadastro real.
 
 Resultado observado em 06/11/2026:
 
 | Indicador | Resultado |
 |---|---:|
+| Cursos | 2 |
+| Turmas | 3 |
+| Disciplinas | 15 |
+| Professores | 15 |
+| Aulas geradas e salvas | 100 |
+| Aulas com professor | 100 |
+| Aulas sem professor | 0 |
+| Estado do solver | `feasible` |
+| Tempo do solver | 120,55 s |
+| Variáveis / restrições | 9.338 / 16.979 |
+
+A validação conjunta da mesma base, repetida pela API, confirmou novamente as 100 aulas, todas com professor, e persistência correspondente no SQLite. O relatório diário confirmou seis aulas por dia, de segunda a sexta, em cada turma/grupo: 1º DS Integral A, 1º DS Integral B, 2º DS Integral e 1º ADM Integral. Não foram encontrados conflitos de professores, indisponibilidades violadas, janelas de alunos ou violações das regras de descanso verificadas.
+
+A distribuição visual ficou consistente para demonstração: as aulas de duas horas aparecem majoritariamente em blocos duplos; disciplinas com três aulas semanais aparecem em combinações de uma e duas aulas. A solução é válida, mas `feasible` não significa que o solver provou optimalidade.
+
+**Este é o cenário recomendado para a apresentação.** O atalho `start-demo.ps1` recria essa base antes de abrir a interface. A recriação leva cerca de dois minutos no runner testado.
+
+## 3. Base de regressão inspirada nas grades da ETEC
+
+A base `seed_realista.py` continua existindo para exercitar o modelo com oito turmas, incluindo 3º INFO, TI Noturno e seis turmas Agro. Parte das cargas e disponibilidades de Agro permanece provisória, e essa base não é a escolhida para a demonstração principal.
+
+Resultado mais recente da geração conjunta em 06/11/2026:
+
+| Indicador | Resultado |
+|---|---:|
 | Turmas | 8 |
 | Aulas previstas e geradas | 291 |
-| Aulas com professor | 275 |
-| Aulas sem professor | 16 |
+| Aulas com professor | 234 |
+| Aulas sem professor | 57 |
 | Estado do solver | `feasible` |
-| Tempo total do solver | 121,13 s |
-| Variáveis | 39.967 |
-| Restrições | 65.790 |
+| Tempo do solver | 120,80 s |
+| Variáveis / restrições | 40.012 / 65.835 |
 
-A validação conferiu:
-- carga semanal exata das oito turmas;
-- ausência de janelas para os alunos, incluindo os grupos A/B;
-- ausência de professor em duas turmas no mesmo período;
-- respeito à disponibilidade cadastrada dos professores;
-- limite diário de aulas e mínimo por turno;
-- máximo de seis aulas seguidas sem pausa de uma hora;
-- descanso mínimo de 11 horas entre dias consecutivos;
-- correspondência entre aulas retornadas pela API e registros persistidos no SQLite.
+A validação confirmou as cargas configuradas, persistência SQLite, ausência de conflitos simultâneos de professores, ausência de janelas de alunos e respeito às disponibilidades, aos limites docentes e aos descansos verificados.
 
-O estado `feasible` significa que foi encontrada uma solução válida, não que o solver provou que ela é a melhor possível. As 16 aulas sem professor permanecem na grade conforme a regra do projeto; não devem ser interpretadas automaticamente como falha de alocação, porque parte dos cadastros de disponibilidade e da matriz de Agro ainda é provisória. Detalhamento observado das 16 aulas sem professor: Biologia em quatro turmas Agro (8 aulas) não possui nenhum docente habilitado cadastrado; PC2 no TI Noturno (5 aulas) tem Marcel como único docente habilitado; Química do 2º PI AGRO B (1 aula) tem Adriana; e S.A.B.E.A do 3º PI AGRO B (2 aulas) tem Pedro K. Os três últimos casos têm docente cadastrado, mas a alocação conjunta não os atribuiu; precisam de revisão de disponibilidade e conflito de jornada. A geração conjunta foi validada com os dados demonstrativos atuais, não com a matriz oficial final da escola.
+**Limitação importante:** essa geração ainda não é uma grade pronta para ser apresentada como horário final da escola. As 57 aulas sem professor incluem matérias sem docente habilitado cadastrado e aulas que não receberam um dos docentes candidatos na otimização conjunta. Além disso, o relatório mostrou distribuição diária bastante desigual em algumas turmas Agro. O teste atual verifica principalmente viabilidade e restrições obrigatórias; não estabelece uma nota mínima de qualidade visual para essa base. Portanto, não afirmar que a grade de regressão de oito turmas está aprovada.
 
-Uma etapa de viabilidade mais rápida para construir as grades-base foi validada depois: o tempo total caiu de 134,87 s para 121,13 s e a quantidade de aulas com professor subiu de 250 para 275 (aulas sem professor: de 41 para 16), mantendo as 291 aulas e as mesmas 39.967 variáveis / 65.790 restrições.
+## 4. 3º INFO isolado
 
-## 5. Build do frontend e aplicativo Windows
+O cenário do 3º INFO Integral A/B foi gerado pela própria função da API e persistido no SQLite:
 
-- O build de produção do frontend passou no GitHub Actions.
-- O empacotamento Windows com PyInstaller concluiu com sucesso em uma execução anterior.
-- O passo de publicação do ZIP foi pulado no fluxo de pull request para não tentar consumir mais cota de artefatos enquanto o armazenamento do GitHub Actions está esgotado.
-- O script `build-windows.ps1` cria o banco inicial somente com o 3º INFO, gera a grade pela API e valida a persistência antes de empacotar.
-- O workflow Windows iniciou o `Anatinus.exe` em um AppData limpo. O smoke test confirmou a API local ativa e 57 aulas acessíveis pela rota `/timetable/`.
-- O ZIP foi criado no runner. O upload foi pulado no evento de pull request para não tentar consumir a cota de artefatos esgotada; a retenção foi reduzida para 7 dias quando a publicação estiver habilitada.
-- Ainda falta abrir a janela gráfica em um Windows real e testar navegação, exportação, impressão e backup/restauração.
+- 57 alocações;
+- zero aulas sem professor;
+- estado `feasible`;
+- tempo aproximado de 18,70 s no runner Linux;
+- cargas e separações A/B preservadas.
+
+A disponibilidade docente utilizada é provisória, pois o quadro de referência não contém a disponibilidade semanal completa de cada professor.
+
+## 5. Aplicativo Windows
+
+- O script `build-windows.ps1` gerou `Anatinus.exe` e `release/Anatinus-Windows-x64.zip` no runner Windows.
+- O smoke test abriu o EXE com AppData limpo, iniciou a API local e confirmou 57 aulas acessíveis pela rota `/timetable/`.
+- O job Windows terminou com sucesso em 06/11/2026.
+- O upload do ZIP foi pulado no evento de pull request para evitar consumo de cota. O arquivo foi criado no runner, mas não ficou disponível como artefato para download.
+- Ainda falta abrir a janela gráfica em um Windows real e testar navegação, Excel, impressão, backup/restauração e o computador/projetor da apresentação.
 
 ## 6. Benchmarks
 
-O baseline anterior às otimizações permanece:
+O baseline conhecido antes das otimizações permanece:
 
 ```text
 Cenário: small
@@ -105,15 +98,17 @@ Aulas geradas: 105
 Aulas sem professor: 0
 ```
 
-Esse resultado foi medido em 01/10/2026, antes das otimizações. Os benchmarks `small`, `medium` e `large` ainda precisam ser repetidos na versão atual; nenhum ganho percentual deve ser declarado até essa comparação ser feita no mesmo ambiente.
+Esse resultado foi medido em 01/10/2026, antes das otimizações. Os benchmarks `small`, `medium` e `large` ainda precisam ser repetidos na mesma máquina para comparação justa. Nenhum ganho percentual deve ser declarado antes dessas medições.
 
-## 7. Testes manuais ainda pendentes
+## 7. Pendências manuais e de entrega
 
-- abrir o executável Windows em pasta limpa;
-- testar fluxo completo pela interface;
-- conferir visão por turma e por professor;
-- testar grupos A/B e a preferência Filosofia → Sociologia visualmente;
-- validar exportação Excel (.xlsx) e impressão;
-- testar backup e restauração;
-- validar no computador e projetor da apresentação;
-- obter avaliação de alguém da escola que monta horários.
+- abrir a janela gráfica do EXE em Windows real;
+- testar fluxo completo pela interface e visões por turma/professor;
+- conferir A/B e Filosofia → Sociologia visualmente;
+- validar exportação Excel (.xlsx), impressão e backup/restauração;
+- obter avaliação de alguém da escola que monta horários;
+- repetir benchmarks small, medium e large;
+- testar no computador/projetor da apresentação;
+- concluir apêndice, conclusão e referências do TCC escrito.
+
+O texto escrito do TCC não foi alterado nesta rodada.
