@@ -57,9 +57,9 @@ Resultado observado em 06/11/2026:
 | Turmas | 8 |
 | Aulas previstas e geradas | 291 |
 | Aulas com professor | 250 |
-| Aulas sem professor | 41 |
+| Aulas sem professor | 23 |
 | Estado do solver | `feasible` |
-| Tempo total do solver | 134,87 s |
+| Tempo total do solver | 121,20 s |
 | Variáveis | 39.967 |
 | Restrições | 65.790 |
 
@@ -73,9 +73,9 @@ A validação conferiu:
 - descanso mínimo de 11 horas entre dias consecutivos;
 - correspondência entre aulas retornadas pela API e registros persistidos no SQLite.
 
-O estado `feasible` significa que foi encontrada uma solução válida, não que o solver provou que ela é a melhor possível. As 41 aulas sem professor permanecem na grade conforme a regra do projeto; não devem ser interpretadas automaticamente como falha de alocação, porque parte dos cadastros de disponibilidade e da matriz de Agro ainda é provisória. A geração conjunta foi validada com os dados demonstrativos atuais, não com a matriz oficial final da escola.
+O estado `feasible` significa que foi encontrada uma solução válida, não que o solver provou que ela é a melhor possível. As 23 aulas sem professor permanecem na grade conforme a regra do projeto; não devem ser interpretadas automaticamente como falha de alocação, porque parte dos cadastros de disponibilidade e da matriz de Agro ainda é provisória. A geração conjunta foi validada com os dados demonstrativos atuais, não com a matriz oficial final da escola.
 
-A rodada seguinte acrescentou uma etapa de viabilidade mais rápida para construir as grades-base. O resultado dessa versão mais recente ainda precisa terminar sua execução de CI antes de registrar qualquer ganho de tempo.
+Uma etapa de viabilidade mais rápida para construir as grades-base foi validada depois: o tempo total caiu de 134,87 s para 121,20 s e a quantidade de aulas sem professor caiu de 41 para 23, mantendo as 291 aulas e as mesmas 39.967 variáveis / 65.790 restrições.
 
 ## 5. Build do frontend e aplicativo Windows
 
