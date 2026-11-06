@@ -151,10 +151,6 @@ def main() -> None:
                 "Smoke test concluído: API local ativa e %s aulas carregadas.",
                 len(timetable),
             )
-            print(
-                "ANATINUS_SMOKE_TEST_OK: "
-                f"API ativa; {len(timetable)} aulas carregadas."
-            )
             return
 
         window = webview.create_window(
