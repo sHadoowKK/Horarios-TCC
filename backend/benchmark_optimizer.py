@@ -280,16 +280,19 @@ def main():
 
     if result["status"] != "success":
         print(f"Mensagem: {result.get('message', 'sem mensagem')}")
-        if "model_variables" in result:
-            print(
-                "Variáveis do modelo: "
-                f"{result['model_variables']}"
-            )
-        if "model_constraints" in result:
-            print(
-                "Restrições do modelo: "
-                f"{result['model_constraints']}"
-            )
+        print(f"Tempo do solver: {result.get('solve_time_seconds', 0):.3f}s")
+        print(
+            "Tempo de busca por viabilidade: "
+            f"{result.get('feasibility_time_seconds', 0):.3f}s"
+        )
+        print(
+            "Tempo de otimização: "
+            f"{result.get('optimization_time_seconds', 0):.3f}s"
+        )
+        print(f"Variáveis do modelo: {result.get('model_variables', 'n/d')}")
+        print(f"Restrições do modelo: {result.get('model_constraints', 'n/d')}")
+        print(f"Ramificações: {result.get('solver_branches', 'n/d')}")
+        print(f"Conflitos: {result.get('solver_conflicts', 'n/d')}")
         return
 
     print(
