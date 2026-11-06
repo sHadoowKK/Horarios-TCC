@@ -56,10 +56,10 @@ Resultado observado em 06/11/2026:
 |---|---:|
 | Turmas | 8 |
 | Aulas previstas e geradas | 291 |
-| Aulas com professor | 268 |
-| Aulas sem professor | 23 |
+| Aulas com professor | 275 |
+| Aulas sem professor | 16 |
 | Estado do solver | `feasible` |
-| Tempo total do solver | 121,20 s |
+| Tempo total do solver | 121,13 s |
 | Variáveis | 39.967 |
 | Restrições | 65.790 |
 
@@ -73,9 +73,9 @@ A validação conferiu:
 - descanso mínimo de 11 horas entre dias consecutivos;
 - correspondência entre aulas retornadas pela API e registros persistidos no SQLite.
 
-O estado `feasible` significa que foi encontrada uma solução válida, não que o solver provou que ela é a melhor possível. As 23 aulas sem professor permanecem na grade conforme a regra do projeto; não devem ser interpretadas automaticamente como falha de alocação, porque parte dos cadastros de disponibilidade e da matriz de Agro ainda é provisória. A geração conjunta foi validada com os dados demonstrativos atuais, não com a matriz oficial final da escola.
+O estado `feasible` significa que foi encontrada uma solução válida, não que o solver provou que ela é a melhor possível. As 16 aulas sem professor permanecem na grade conforme a regra do projeto; não devem ser interpretadas automaticamente como falha de alocação, porque parte dos cadastros de disponibilidade e da matriz de Agro ainda é provisória. Detalhamento observado das 16 aulas sem professor: Biologia em quatro turmas Agro (8 aulas) não possui nenhum docente habilitado cadastrado; PC2 no TI Noturno (5 aulas) tem Marcel como único docente habilitado; Química do 2º PI AGRO B (1 aula) tem Adriana; e S.A.B.E.A do 3º PI AGRO B (2 aulas) tem Pedro K. Os três últimos casos têm docente cadastrado, mas a alocação conjunta não os atribuiu; precisam de revisão de disponibilidade e conflito de jornada. A geração conjunta foi validada com os dados demonstrativos atuais, não com a matriz oficial final da escola.
 
-Uma etapa de viabilidade mais rápida para construir as grades-base foi validada depois: o tempo total caiu de 134,87 s para 121,20 s e a quantidade de aulas sem professor caiu de 41 para 23, mantendo as 291 aulas e as mesmas 39.967 variáveis / 65.790 restrições.
+Uma etapa de viabilidade mais rápida para construir as grades-base foi validada depois: o tempo total caiu de 134,87 s para 121,13 s e a quantidade de aulas com professor subiu de 250 para 275 (aulas sem professor: de 41 para 16), mantendo as 291 aulas e as mesmas 39.967 variáveis / 65.790 restrições.
 
 ## 5. Build do frontend e aplicativo Windows
 
