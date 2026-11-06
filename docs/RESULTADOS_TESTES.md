@@ -57,8 +57,10 @@ Não usar o resultado individual das oito turmas como evidência de uma grade es
 - O build de produção do frontend passou no GitHub Actions.
 - O empacotamento Windows com PyInstaller concluiu com sucesso em uma execução anterior.
 - O passo de publicação do ZIP foi pulado no fluxo de pull request para não tentar consumir mais cota de artefatos enquanto o armazenamento do GitHub Actions está esgotado.
-- O script `build-windows.ps1` foi atualizado depois para criar o banco inicial somente com o 3º INFO, gerar a grade pela API e validar sua persistência antes de empacotar. Essa versão atualizada ainda precisa concluir seu próprio workflow.
-- O executável ainda precisa ser aberto em um Windows real, extraído de um ZIP completo e testado quanto à persistência, exportação e backup/restauração.
+- O script `build-windows.ps1` cria o banco inicial somente com o 3º INFO, gera a grade pela API e valida a persistência antes de empacotar.
+- O workflow Windows iniciou o `Anatinus.exe` em um AppData limpo. O smoke test confirmou a API local ativa e 57 aulas acessíveis pela rota `/timetable/`.
+- O ZIP foi criado no runner. O upload foi pulado no evento de pull request para não tentar consumir a cota de artefatos esgotada; a retenção foi reduzida para 7 dias quando a publicação estiver habilitada.
+- Ainda falta abrir a janela gráfica em um Windows real e testar navegação, exportação, impressão e backup/restauração.
 
 ## 6. Benchmarks
 

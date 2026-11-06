@@ -7,6 +7,7 @@
 - [x] 36 testes automatizados do backend passaram no GitHub Actions.
 - [x] Build de produção do frontend passou no GitHub Actions.
 - [x] Build do executável Windows terminou com sucesso no runner do GitHub.
+- [x] Smoke test do EXE em AppData limpo: API local iniciou e encontrou 57 aulas salvas.
 - [x] Validação isolada das 8 turmas da base demonstrativa passou, sem janelas de alunos.
 - [x] Teste de carga semanal noturna de 25 aulas continua coberto pelos testes automatizados.
 - [ ] Gerar a escola inteira em conjunto: ainda ocorre timeout no cenário de demonstração com 8 turmas.
@@ -24,7 +25,7 @@
 
 ## Evidências técnicas
 
-- [x] Registrar quantidade e tempo da suíte automatizada: 36 testes, 6,989 s no runner Linux do GitHub.
+- [x] Registrar quantidade e tempo da suíte automatizada: 36 testes, 6,751 s no runner Linux do GitHub.
 - [x] Registrar build do frontend concluído.
 - [x] Registrar empacotamento Windows concluído no runner.
 - [x] Registrar validação individual das oito turmas e suas métricas.
