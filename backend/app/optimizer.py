@@ -747,23 +747,84 @@ def generate_schedule(
 
     model.Maximize(sum(rewards) - sum(penalties))
 
-    solver = cp_model.CpSolver()
-    # Grades de escola inteira têm milhares de variáveis. Primeiro precisamos
-    # obter uma solução válida em vez de gastar todo o tempo provando que ela
-    # é ótima; modelos menores continuam buscando o ótimo normalmente.
-    solver.parameters.max_time_in_seconds = 60.0
-    solver.parameters.num_search_workers = 8
     large_model = len(model.Proto().variables) >= 5000
+    solution_values = None
+    feasibility_time = 0.0
+    optimization_time = 0.0
+    total_branches = 0
+    total_conflicts = 0
+    optimization_completed = True
+
     if large_model:
-        solver.parameters.stop_after_first_solution = True
-    status = solver.Solve(model)
+        # Primeira fase: encontrar qualquer solução que respeite todas as
+        # restrições obrigatórias, sem gastar busca tentando melhorar o objetivo.
+        feasibility_model = cp_model.CpModel()
+        feasibility_model.Proto().CopyFrom(model.Proto())
+        feasibility_model.ClearObjective()
+
+        feasibility_solver = cp_model.CpSolver()
+        feasibility_solver.parameters.max_time_in_seconds = 45.0
+        feasibility_solver.parameters.num_search_workers = 8
+        feasibility_solver.parameters.stop_after_first_solution = True
+        status = feasibility_solver.Solve(feasibility_model)
+        feasibility_time = feasibility_solver.WallTime()
+        total_branches += feasibility_solver.NumBranches()
+        total_conflicts += feasibility_solver.NumConflicts()
+
+        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            # A solução válida vira um ponto inicial completo para a segunda
+            # fase. Se a otimização não melhorar, esta grade será preservada.
+            solution_values = [
+                feasibility_solver.Value(
+                    feasibility_model.GetIntVarFromProtoIndex(index)
+                )
+                for index in range(len(model.Proto().variables))
+            ]
+            for index, value in enumerate(solution_values):
+                model.AddHint(model.GetIntVarFromProtoIndex(index), value)
+
+            optimization_solver = cp_model.CpSolver()
+            optimization_solver.parameters.max_time_in_seconds = 15.0
+            optimization_solver.parameters.num_search_workers = 8
+            optimization_status = optimization_solver.Solve(model)
+            optimization_time = optimization_solver.WallTime()
+            total_branches += optimization_solver.NumBranches()
+            total_conflicts += optimization_solver.NumConflicts()
+
+            if optimization_status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+                solver = optimization_solver
+                status = optimization_status
+                solution_values = None
+            else:
+                solver = feasibility_solver
+                status = cp_model.FEASIBLE
+                optimization_completed = False
+        else:
+            solver = feasibility_solver
+            optimization_completed = False
+    else:
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = 60.0
+        solver.parameters.num_search_workers = 8
+        status = solver.Solve(model)
+        optimization_time = solver.WallTime()
+        total_branches = solver.NumBranches()
+        total_conflicts = solver.NumConflicts()
+
+    def value_for_solution(variable):
+        if solution_values is not None:
+            return solution_values[variable.Index()]
+        return solver.Value(variable)
 
     model_metrics = {
         "model_variables": len(model.Proto().variables),
         "model_constraints": len(model.Proto().constraints),
-        "solve_time_seconds": solver.WallTime(),
-        "solver_branches": solver.NumBranches(),
-        "solver_conflicts": solver.NumConflicts(),
+        "solve_time_seconds": feasibility_time + optimization_time,
+        "feasibility_time_seconds": feasibility_time,
+        "optimization_time_seconds": optimization_time,
+        "solver_branches": total_branches,
+        "solver_conflicts": total_conflicts,
+        "optimization_completed": optimization_completed,
     }
 
     if status == cp_model.INFEASIBLE:
@@ -780,9 +841,9 @@ def generate_schedule(
         return {
             "status": "timeout",
             "message": (
-                "O otimizador atingiu o limite de 60 segundos sem encontrar "
+                "O otimizador atingiu o limite de busca sem encontrar "
                 "uma grade viável. Isso não comprova que a grade seja impossível. "
-                "Tente gerar por turma ou reduza temporariamente o escopo."
+                "Tente gerar por turma ou revise a combinação de cargas e docentes."
             ),
             **model_metrics,
         }
@@ -809,7 +870,7 @@ def generate_schedule(
         for day in range(num_days):
             for period in range(num_periods):
                 no_teacher_key = (classroom["id"], subject["id"], target, day, period)
-                if no_teacher_key in no_teacher_lesson and solver.Value(no_teacher_lesson[no_teacher_key]) == 1:
+                if no_teacher_key in no_teacher_lesson and value_for_solution(no_teacher_lesson[no_teacher_key]) == 1:
                     schedule.append({
                         "classroom_id": classroom["id"],
                         "subject_id": subject["id"],
@@ -822,7 +883,7 @@ def generate_schedule(
                 unit_key = (classroom["id"], subject["id"], target)
                 for teacher in eligible_teachers[unit_key]:
                     lesson_key = (classroom["id"], subject["id"], target, teacher["id"], day, period)
-                    if lesson_key in lesson and solver.Value(lesson[lesson_key]) == 1:
+                    if lesson_key in lesson and value_for_solution(lesson[lesson_key]) == 1:
                         schedule.append({
                             "classroom_id": classroom["id"],
                             "subject_id": subject["id"],
@@ -832,12 +893,18 @@ def generate_schedule(
                             "student_group": target,
                         })
 
+    objective_metrics = {}
+    if optimization_completed:
+        objective_metrics = {
+            "objective_value": solver.ObjectiveValue(),
+            "best_objective_bound": solver.BestObjectiveBound(),
+        }
+
     return {
         "status": "success",
         "solution_status": "optimal" if status == cp_model.OPTIMAL else "feasible",
         "schedule": schedule,
         "unstaffed_lessons": sum(item["teacher_id"] is None for item in schedule),
-        "objective_value": solver.ObjectiveValue(),
-        "best_objective_bound": solver.BestObjectiveBound(),
+        **objective_metrics,
         **model_metrics,
     }
