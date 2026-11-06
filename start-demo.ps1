@@ -1,5 +1,6 @@
 param(
-    [switch]$OpenBrowser = $true
+    [switch]$OpenBrowser = $true,
+    [switch]$SkipSeed
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,19 +18,26 @@ if (-not (Test-Path (Join-Path $frontend "node_modules"))) {
     throw "Dependências do frontend não encontradas. Entre em frontend e execute npm install."
 }
 
-Write-Host "Preparando a base fictícia e gerando o horário de apresentação..." -ForegroundColor Cyan
-Push-Location $backend
-try {
-    & $python (Join-Path $backend "seed_apresentacao.py")
-    if ($LASTEXITCODE -ne 0) {
-        throw "Falha ao criar a base fictícia de apresentação."
+if ($SkipSeed) {
+    if (-not (Test-Path $demoDb)) {
+        throw "Banco DEMO não encontrado: $demoDb. Execute primeiro o seed correspondente ao cenário."
     }
-} finally {
-    Pop-Location
+    Write-Host "Usando a base DEMO já preparada; nenhum cadastro será recriado." -ForegroundColor Cyan
+} else {
+    Write-Host "Preparando a base fictícia e gerando o horário de apresentação..." -ForegroundColor Cyan
+    Push-Location $backend
+    try {
+        & $python (Join-Path $backend "seed_apresentacao.py")
+        if ($LASTEXITCODE -ne 0) {
+            throw "Falha ao criar a base fictícia de apresentação."
+        }
+    } finally {
+        Pop-Location
+    }
 }
 
 if (-not (Test-Path $demoDb)) {
-    throw "A base de apresentação não foi criada: $demoDb"
+    throw "A base de demonstração não foi criada: $demoDb"
 }
 
 $databaseUrl = "sqlite:///" + $demoDb.Replace("\", "/")
@@ -61,10 +69,18 @@ if ($OpenBrowser) {
 }
 
 Write-Host ""
-Write-Host "Anatinus iniciou usando a BASE FICTÍCIA DE APRESENTAÇÃO." -ForegroundColor Green
+if ($SkipSeed) {
+    Write-Host "Anatinus iniciou usando a BASE DEMO EXISTENTE." -ForegroundColor Green
+} else {
+    Write-Host "Anatinus iniciou usando a BASE FICTÍCIA DE APRESENTAÇÃO." -ForegroundColor Green
+}
 Write-Host "Frontend: http://localhost:5173"
 Write-Host "API:      http://localhost:8000"
 Write-Host "Banco:    $demoDb"
 Write-Host ""
-Write-Host "Todos os cadastros e horários são fictícios." -ForegroundColor Yellow
+if ($SkipSeed) {
+    Write-Host "Os dados existentes do cenário selecionado foram preservados." -ForegroundColor Yellow
+} else {
+    Write-Host "Todos os cadastros e horários são fictícios." -ForegroundColor Yellow
+}
 Write-Host "Os dados ficam separados de backend\school_schedule.db." -ForegroundColor Yellow
