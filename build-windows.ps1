@@ -64,9 +64,13 @@ try {
     & $venvPython -m unittest discover -p "test_*.py"
     if ($LASTEXITCODE -ne 0) { throw "Os testes do backend falharam; o EXE não será empacotado." }
 
-    Write-Host "Gerando banco inicial de demonstração..." -ForegroundColor Cyan
-    & $venvPython (Join-Path $backend "seed_realista.py")
-    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar a base de demonstração." }
+    Write-Host "Gerando banco inicial do 3º INFO para a demonstração..." -ForegroundColor Cyan
+    & $venvPython (Join-Path $backend "seed_realista.py") --informatica-only
+    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar a base isolada do 3º INFO." }
+
+    Write-Host "Validando geração e persistência da grade antes de empacotar..." -ForegroundColor Cyan
+    & $venvPython (Join-Path $backend "validate_demo_generation.py") --api
+    if ($LASTEXITCODE -ne 0) { throw "A grade do 3º INFO não foi gerada e salva; o EXE não será empacotado." }
 
     New-Item -ItemType Directory -Path (Join-Path $root "build\\pyinstaller") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root "build\\spec") -Force | Out-Null
