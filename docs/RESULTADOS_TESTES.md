@@ -48,9 +48,34 @@ O validador executou cada turma separadamente, conferindo a carga esperada, a qu
 
 ## 4. Geração da escola inteira
 
-A geração conjunta das oito turmas ainda não foi validada. As tentativas anteriores terminaram em timeout sem encontrar uma solução dentro do limite de busca. Timeout não prova inviabilidade, mas também não permite afirmar que a grade da escola inteira funciona.
+**A geração conjunta foi concluída e validada no GitHub Actions.** O teste usa o fluxo real da API `generate_timetable`, grava o resultado no SQLite e depois verifica as oito turmas em conjunto.
 
-Não usar o resultado individual das oito turmas como evidência de uma grade escolar conjunta.
+Resultado observado em 06/11/2026:
+
+| Indicador | Resultado |
+|---|---:|
+| Turmas | 8 |
+| Aulas previstas e geradas | 291 |
+| Aulas com professor | 250 |
+| Aulas sem professor | 41 |
+| Estado do solver | `feasible` |
+| Tempo total do solver | 134,87 s |
+| Variáveis | 39.967 |
+| Restrições | 65.790 |
+
+A validação conferiu:
+- carga semanal exata das oito turmas;
+- ausência de janelas para os alunos, incluindo os grupos A/B;
+- ausência de professor em duas turmas no mesmo período;
+- respeito à disponibilidade cadastrada dos professores;
+- limite diário de aulas e mínimo por turno;
+- máximo de seis aulas seguidas sem pausa de uma hora;
+- descanso mínimo de 11 horas entre dias consecutivos;
+- correspondência entre aulas retornadas pela API e registros persistidos no SQLite.
+
+O estado `feasible` significa que foi encontrada uma solução válida, não que o solver provou que ela é a melhor possível. As 41 aulas sem professor permanecem na grade conforme a regra do projeto; não devem ser interpretadas automaticamente como falha de alocação, porque parte dos cadastros de disponibilidade e da matriz de Agro ainda é provisória. A geração conjunta foi validada com os dados demonstrativos atuais, não com a matriz oficial final da escola.
+
+A rodada seguinte acrescentou uma etapa de viabilidade mais rápida para construir as grades-base. O resultado dessa versão mais recente ainda precisa terminar sua execução de CI antes de registrar qualquer ganho de tempo.
 
 ## 5. Build do frontend e aplicativo Windows
 
