@@ -56,7 +56,7 @@ Resultado observado em 06/11/2026:
 |---|---:|
 | Turmas | 8 |
 | Aulas previstas e geradas | 291 |
-| Aulas com professor | 250 |
+| Aulas com professor | 268 |
 | Aulas sem professor | 23 |
 | Estado do solver | `feasible` |
 | Tempo total do solver | 121,20 s |
