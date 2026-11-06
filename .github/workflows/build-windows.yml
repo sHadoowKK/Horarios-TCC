@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - design/anatinus-dark-workspace
+      - gemini-atualizado-20261029-1451
   pull_request:
     branches:
       - main
@@ -32,7 +33,7 @@ jobs:
 
       - name: Testar e empacotar
         shell: pwsh
-        run: .\build-windows.ps1
+        run: .\\build-windows.ps1
 
       - name: Publicar pacote como artefato
         if: github.event_name != 'pull_request'
