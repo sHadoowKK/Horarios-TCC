@@ -114,7 +114,7 @@ Para recriá-lo, feche o Anatinus e execute na raiz:
 .\start-informatica.ps1
 ```
 
-Esse atalho recria o banco DEMO somente com o 3º INFO e inicia a aplicação usando o banco já preparado, sem executar o seed fictício por cima. Para voltar à demonstração principal, feche o aplicativo e execute ` .\start-demo.ps1 ` (sem espaço depois da crase inicial).
+Esse atalho recria o banco DEMO somente com o 3º INFO e inicia a aplicação usando o banco já preparado, sem executar o seed fictício por cima. Para voltar à demonstração principal, feche o aplicativo e execute `.\start-demo.ps1`.
 
 ## 4. O que os resultados significam
 
