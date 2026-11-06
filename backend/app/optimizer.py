@@ -618,13 +618,11 @@ def generate_schedule(
             model.Add(day_sum == 0).OnlyEnforceIf(is_active_day.Not())
             days_active.append(is_active_day)
 
-            for i in range(len(allowed_periods) - 2):
-                p_a = allowed_periods[i]
-                for j in range(i + 1, len(allowed_periods) - 1):
-                    p_m = allowed_periods[j]
-                    for k in range(j + 1, len(allowed_periods)):
-                        p_b = allowed_periods[k]
-                        model.Add(slot_vars[p_a] + slot_vars[p_b] - 1 <= slot_vars[p_m])
+            # A contiguidade dos horários dos alunos é garantida globalmente
+            # por student_occupancy e pela restrição de início de sequência abaixo.
+            # Os blocos da própria disciplina já são incentivados por pares/triplos.
+            # Evitamos enumerar todas as combinações p_a < p_m < p_b, que criavam
+            # O(n³) restrições por disciplina/dia sem acrescentar outra regra obrigatória.
 
             if classroom.get("shift") == "Noite":
                 # No noturno são válidos blocos de 3, 4 ou 5 aulas.
@@ -725,6 +723,14 @@ def generate_schedule(
         solver.parameters.stop_after_first_solution = True
     status = solver.Solve(model)
 
+    model_metrics = {
+        "model_variables": len(model.Proto().variables),
+        "model_constraints": len(model.Proto().constraints),
+        "solve_time_seconds": solver.WallTime(),
+        "solver_branches": solver.NumBranches(),
+        "solver_conflicts": solver.NumConflicts(),
+    }
+
     if status == cp_model.INFEASIBLE:
         return {
             "status": "infeasible",
@@ -732,6 +738,7 @@ def generate_schedule(
                 "O modelo comprovou que esta combinação de cargas e regras é "
                 "inviável. Confira as cargas semanais e as jornadas permitidas."
             ),
+            **model_metrics,
         }
 
     if status == cp_model.UNKNOWN:
@@ -742,6 +749,7 @@ def generate_schedule(
                 "uma grade viável. Isso não comprova que a grade seja impossível. "
                 "Tente gerar por turma ou reduza temporariamente o escopo."
             ),
+            **model_metrics,
         }
 
     if status == cp_model.MODEL_INVALID:
@@ -751,12 +759,14 @@ def generate_schedule(
                 "O otimizador recusou o modelo por uma inconsistência interna. "
                 "Consulte o log do backend."
             ),
+            **model_metrics,
         }
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return {
             "status": "error",
             "message": f"O otimizador retornou um estado inesperado: {status}.",
+            **model_metrics,
         }
 
     schedule = []
@@ -792,4 +802,7 @@ def generate_schedule(
         "solution_status": "optimal" if status == cp_model.OPTIMAL else "feasible",
         "schedule": schedule,
         "unstaffed_lessons": sum(item["teacher_id"] is None for item in schedule),
+        "objective_value": solver.ObjectiveValue(),
+        "best_objective_bound": solver.BestObjectiveBound(),
+        **model_metrics,
     }
