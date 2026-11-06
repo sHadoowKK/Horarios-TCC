@@ -747,6 +747,68 @@ def generate_schedule(
 
     model.Maximize(sum(rewards) - sum(penalties))
 
+    # Semente construtiva para a geração conjunta:
+    # cada turma é resolvida primeiro sem professores. Como a ausência de
+    # professor é permitida pelo modelo, a união dessas grades é uma solução
+    # global válida para todas as restrições dos alunos. Isso evita obrigar o
+    # CP-SAT a descobrir do zero, ao mesmo tempo, centenas de horários e a
+    # distribuição dos docentes entre turmas.
+    feasibility_seed_schedule = None
+    seed_solve_time = 0.0
+    seed_branches = 0
+    seed_conflicts = 0
+    seed_slot_keys = set()
+
+    if len(classrooms) > 1 and not fixed_schedule:
+        candidate_seed = []
+        seed_is_valid = True
+
+        for classroom in classrooms:
+            seed_result = generate_schedule(
+                [classroom],
+                subjects,
+                [],
+                sys_config,
+                num_days=num_days,
+                num_periods=num_periods,
+            )
+            seed_solve_time += float(seed_result.get("solve_time_seconds", 0) or 0)
+            seed_branches += int(seed_result.get("solver_branches", 0) or 0)
+            seed_conflicts += int(seed_result.get("solver_conflicts", 0) or 0)
+
+            if seed_result.get("status") != "success":
+                seed_is_valid = False
+                break
+
+            candidate_seed.extend(seed_result.get("schedule", []))
+
+        if seed_is_valid:
+            feasibility_seed_schedule = candidate_seed
+            seed_slot_keys = {
+                (
+                    item["classroom_id"],
+                    item["subject_id"],
+                    item.get("student_group", "Todos"),
+                    item["day"],
+                    item["period"],
+                )
+                for item in candidate_seed
+            }
+
+            # Hint completo para as decisões principais: todas as aulas ficam
+            # alocadas, inicialmente sem professor. A fase de otimização pode
+            # então atribuir docentes e reorganizar horários sem perder a
+            # solução viável que já foi construída.
+            for variable in assignment.values():
+                model.add_hint(variable, 0)
+            for variable in no_teacher_assignment.values():
+                model.add_hint(variable, 1)
+            for variable in lesson.values():
+                model.add_hint(variable, 0)
+            for key, variable in no_teacher_lesson.items():
+                seed_key = (key[0], key[1], key[2], key[3], key[4])
+                model.add_hint(variable, int(seed_key in seed_slot_keys))
+
     large_model = len(model.Proto().variables) >= 5000
     solution_values = None
     feasibility_time = 0.0
@@ -754,8 +816,30 @@ def generate_schedule(
     total_branches = 0
     total_conflicts = 0
     optimization_completed = True
+    seed_fallback = False
 
-    if large_model:
+    if feasibility_seed_schedule is not None:
+        # A semente já satisfaz todas as restrições obrigatórias de turma.
+        # A busca global fica dedicada a distribuir professores e melhorar a
+        # qualidade, em vez de procurar primeiro uma combinação de horários.
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = 120.0
+        solver.parameters.num_search_workers = 8
+        status = solver.Solve(model)
+        optimization_time = solver.WallTime()
+        total_branches = seed_branches + solver.NumBranches()
+        total_conflicts = seed_conflicts + solver.NumConflicts()
+        feasibility_time = seed_solve_time
+        optimization_completed = status == cp_model.OPTIMAL
+
+        if status == cp_model.UNKNOWN:
+            # CP-SAT pode não conseguir melhorar a semente dentro do limite.
+            # Nesse caso, preservamos a grade completa já validada, em vez de
+            # devolver erro ou deixar a escola sem horário.
+            seed_fallback = True
+            status = cp_model.FEASIBLE
+            optimization_completed = False
+    elif large_model:
         # Primeira fase: encontrar qualquer solução que respeite todas as
         # restrições obrigatórias, sem gastar busca tentando melhorar o objetivo.
         feasibility_model = model.clone()
@@ -771,8 +855,6 @@ def generate_schedule(
         total_conflicts += feasibility_solver.NumConflicts()
 
         if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-            # A solução válida vira um ponto inicial completo para a segunda
-            # fase. Se a otimização não melhorar, esta grade será preservada.
             solution_values = [
                 feasibility_solver.value(
                     feasibility_model.get_int_var_from_proto_index(index)
@@ -819,6 +901,8 @@ def generate_schedule(
         "model_variables": len(model.Proto().variables),
         "model_constraints": len(model.Proto().constraints),
         "solve_time_seconds": feasibility_time + optimization_time,
+        "seed_solve_time_seconds": seed_solve_time,
+        "used_feasibility_seed": feasibility_seed_schedule is not None,
         "feasibility_time_seconds": feasibility_time,
         "optimization_time_seconds": optimization_time,
         "solver_branches": total_branches,
@@ -864,8 +948,12 @@ def generate_schedule(
             **model_metrics,
         }
 
-    schedule = []
-    for classroom, subject, target in units:
+    schedule = (
+        [dict(item) for item in feasibility_seed_schedule]
+        if seed_fallback and feasibility_seed_schedule is not None
+        else []
+    )
+    for classroom, subject, target in ([] if seed_fallback else units):
         for day in range(num_days):
             for period in range(num_periods):
                 no_teacher_key = (classroom["id"], subject["id"], target, day, period)
