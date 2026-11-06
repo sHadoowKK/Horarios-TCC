@@ -20,7 +20,12 @@ os.environ["ANATINUS_DATABASE_URL"] = f"sqlite:///{DEMO_DATABASE.as_posix()}"
 from fastapi import HTTPException  # noqa: E402
 from app import models  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
-from app.optimizer import generate_schedule, get_allowed_periods  # noqa: E402
+from app.optimizer import (  # noqa: E402
+    PERIOD_END_MINUTES,
+    PERIOD_START_MINUTES,
+    generate_schedule,
+    get_allowed_periods,
+)
 
 
 def _validate_api_generation(db, classrooms) -> None:
@@ -230,8 +235,104 @@ def _validate_one_classroom(
     }
 
 
+def _assert_global_teacher_constraints(schedule, teachers, config) -> None:
+    teacher_by_id = {teacher.id: teacher for teacher in teachers}
+    occupied_slots = {}
+    by_teacher = {}
+
+    for item in schedule:
+        teacher_id = item.get("teacher_id")
+        if teacher_id is None:
+            continue
+
+        slot_key = (teacher_id, item["day"], item["period"])
+        if slot_key in occupied_slots:
+            previous = occupied_slots[slot_key]
+            raise RuntimeError(
+                f"Professor {teacher_id} alocado simultaneamente às turmas "
+                f"{previous['classroom_id']} e {item['classroom_id']} "
+                f"(dia {item['day'] + 1}, período {item['period']})."
+            )
+        occupied_slots[slot_key] = item
+        by_teacher.setdefault(teacher_id, {}).setdefault(item["day"], []).append(
+            item["period"]
+        )
+
+        teacher = teacher_by_id.get(teacher_id)
+        if teacher is None:
+            raise RuntimeError(f"Professor inexistente na grade: {teacher_id}.")
+
+        day_availability = (teacher.availability or {}).get(str(item["day"]))
+        if (
+            day_availability is not None
+            and (
+                item["period"] >= len(day_availability)
+                or not day_availability[item["period"]]
+            )
+        ):
+            raise RuntimeError(
+                f"{teacher.name} foi alocado fora da disponibilidade "
+                f"(dia {item['day'] + 1}, período {item['period']})."
+            )
+
+    for teacher_id, days in by_teacher.items():
+        teacher = teacher_by_id[teacher_id]
+        for day, periods in days.items():
+            unique_periods = sorted(periods)
+            if len(unique_periods) > min(int(config.max_classes_per_day), 9):
+                raise RuntimeError(
+                    f"{teacher.name} ultrapassou o máximo diário de aulas "
+                    f"no dia {day + 1}."
+                )
+
+            if int(config.min_classes_teachers) >= 2:
+                for turn_name, turn_periods in (
+                    ("diurno", set(range(11))),
+                    ("noturno", set(range(11, 16))),
+                ):
+                    turn_count = sum(period in turn_periods for period in unique_periods)
+                    if turn_count == 1:
+                        raise RuntimeError(
+                            f"{teacher.name} ficou com somente uma aula no "
+                            f"turno {turn_name}, dia {day + 1}."
+                        )
+
+            for index in range(len(unique_periods) - 6):
+                window = unique_periods[index:index + 7]
+                if all(
+                    PERIOD_START_MINUTES[right] - PERIOD_END_MINUTES[left] < 60
+                    for left, right in zip(window, window[1:])
+                ):
+                    raise RuntimeError(
+                        f"{teacher.name} ultrapassou seis aulas consecutivas "
+                        f"sem descanso de uma hora no dia {day + 1}."
+                    )
+
+        for day in range(4):
+            previous_periods = days.get(day, [])
+            next_periods = days.get(day + 1, [])
+            for previous_period in previous_periods:
+                for next_period in next_periods:
+                    rest_minutes = (
+                        1440
+                        + PERIOD_START_MINUTES[next_period]
+                        - PERIOD_END_MINUTES[previous_period]
+                    )
+                    if rest_minutes < 11 * 60:
+                        raise RuntimeError(
+                            f"{teacher.name} não teve 11 horas de descanso "
+                            f"entre os dias {day + 1} e {day + 2}."
+                        )
+
+
 def _validate_all_together(db) -> None:
     from app.main import generate_timetable
+
+    classrooms = db.query(models.Classroom).order_by(models.Classroom.id).all()
+    teachers = db.query(models.Teacher).all()
+    config = db.query(models.SystemConfig).first()
+    if config is None:
+        raise SystemExit("A base demo não possui configuração do sistema.")
 
     try:
         result = generate_timetable(db=db)
@@ -244,9 +345,62 @@ def _validate_all_together(db) -> None:
     if result.get("status") != "success" or not schedule:
         raise SystemExit(f"Geração conjunta não produziu grade: {result!r}")
 
-    print("Grade conjunta da escola gerada com sucesso.")
-    print(f"Aulas alocadas: {len(schedule)}")
-    print(f"Aulas sem professor: {result.get('unstaffed_lessons', 0)}")
+    expected_total = 0
+    for classroom_row in classrooms:
+        classroom = {
+            "name": classroom_row.name,
+            "shift": classroom_row.shift,
+            "allowed_periods": classroom_row.allowed_periods,
+            "has_groups": classroom_row.has_groups,
+            "subject_settings": classroom_row.subject_settings or [],
+        }
+        expected = _expected_lesson_count(classroom)
+        actual = sum(
+            item["classroom_id"] == classroom_row.id for item in schedule
+        )
+        expected_total += expected
+
+        if actual != expected:
+            raise RuntimeError(
+                f"{classroom_row.name}: esperadas {expected} aulas, geradas {actual}."
+            )
+        _assert_no_student_gaps(classroom, [
+            item for item in schedule
+            if item["classroom_id"] == classroom_row.id
+        ])
+
+    if len(schedule) != expected_total:
+        raise RuntimeError(
+            f"Esperadas {expected_total} aulas na escola, geradas {len(schedule)}."
+        )
+
+    _assert_global_teacher_constraints(schedule, teachers, config)
+
+    unstaffed = sum(item.get("teacher_id") is None for item in schedule)
+    if unstaffed == len(schedule):
+        raise RuntimeError(
+            "A grade foi montada, mas nenhuma aula recebeu professor. "
+            "A distribuição docente global ainda não foi resolvida."
+        )
+
+    saved_count = db.query(models.TimetableItem).count()
+    if saved_count != len(schedule):
+        raise RuntimeError(
+            f"Persistência divergente: API retornou {len(schedule)} aulas, "
+            f"mas o banco salvou {saved_count}."
+        )
+
+    print("Grade conjunta da escola gerada e validada.")
+    print(f"Turmas: {len(classrooms)}")
+    print(f"Aulas: {len(schedule)}")
+    print(f"Com professor: {len(schedule) - unstaffed}")
+    print(f"Sem professor: {unstaffed}")
+    print(f"Estado: {result.get('solution_status', 'unknown')}")
+    print(
+        f"Solver: {result.get('solve_time_seconds', 0):.2f}s; "
+        f"{result.get('model_variables', 0)} variáveis / "
+        f"{result.get('model_constraints', 0)} restrições."
+    )
 
 
 def main() -> None:
