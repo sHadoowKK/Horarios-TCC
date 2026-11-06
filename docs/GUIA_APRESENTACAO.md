@@ -68,11 +68,29 @@ Frase:
 
 ### Etapa 7 — Exportação
 Mostrar:
-- Exportar CSV;
+- Exportar Excel (.xlsx);
 - Imprimir.
 
 ---
 
+## Preparação do cenário principal de demonstração
+
+A geração conjunta da base com oito turmas ainda não está validada: o teste atual termina por timeout. Para a apresentação, use o banco isolado do **3º INFO**, que mantém os grupos A/B e a preferência Filosofia → Sociologia.
+
+Na raiz do projeto, execute:
+
+```powershell
+cd backend
+.\\.venv\\Scripts\\python.exe seed_realista.py --informatica-only
+cd ..
+.\\start-demo.ps1
+```
+
+O script recria somente `backend/school_schedule_demo.db`; não altera o banco normal `school_schedule.db`. O CI também valida a geração do 3º INFO pela API e o salvamento da grade.
+
+Não apresente a geração das oito turmas como concluída. O modo completo permanece uma limitação em investigação. Tenha screenshots da grade do 3º INFO como plano de contingência.
+
+---
 ## 2. Explicação simples do CP-SAT
 
 Versão de 20 segundos:
