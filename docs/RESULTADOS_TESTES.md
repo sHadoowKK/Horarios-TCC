@@ -15,6 +15,8 @@ A suíte contém 29 cenários do otimizador e 7 testes de integração do backen
 
 O build de produção do frontend passou (1.952 módulos transformados). O build Windows também concluiu o empacotamento com PyInstaller e executou o smoke test do Anatinus.exe em um AppData limpo.
 
+Durante o `npm install` do CI, o npm reportou três vulnerabilidades de alta severidade nas dependências do frontend. Elas ainda não foram triadas nem corrigidas nesta rodada; não apliquei `npm audit fix` automaticamente para evitar atualizações potencialmente incompatíveis sem validação.
+
 ## 2. Base fictícia principal para a apresentação
 
 O modo de apresentação usa `backend/seed_apresentacao.py`. Os dados são inteiramente inventados e ficam em `backend/school_schedule_demo.db`, separados do banco de desenvolvimento e de qualquer cadastro real.
