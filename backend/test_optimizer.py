@@ -1667,5 +1667,52 @@ class OptimizerTests(unittest.TestCase):
         )
         self.assertEqual(regenerated_other_subject, original_other_subject)
 
+
+    def test_student_gap_remains_hard_after_compacting_subject_constraints(self):
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [
+                    {"subject_id": 1, "workload": 1, "split": False},
+                    {"subject_id": 2, "workload": 1, "split": False},
+                ],
+            )
+        ]
+        subjects = [
+            subject(1, "Matemática", workload=1),
+            subject(2, "História", workload=1),
+        ]
+        teachers = [teacher(1, [1]), teacher(2, [2])]
+        fixed_schedule = [
+            {
+                "classroom_id": 1,
+                "subject_id": 1,
+                "teacher_id": 1,
+                "day": 0,
+                "period": 0,
+                "student_group": "Todos",
+            },
+            {
+                "classroom_id": 1,
+                "subject_id": 2,
+                "teacher_id": 2,
+                "day": 0,
+                "period": 2,
+                "student_group": "Todos",
+            },
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+            fixed_schedule=fixed_schedule,
+        )
+
+        self.assertEqual(result["status"], "infeasible")
+
 if __name__ == "__main__":
     unittest.main()
