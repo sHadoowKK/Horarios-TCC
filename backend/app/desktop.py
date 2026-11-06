@@ -1,5 +1,6 @@
 """Inicializador desktop do Anatinus para Windows."""
 
+import argparse
 import json
 import logging
 import os
@@ -80,6 +81,14 @@ def _wait_for_server(server_thread: Thread) -> bool:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Inicializador desktop do Anatinus.")
+    parser.add_argument(
+        "--smoke-test",
+        action="store_true",
+        help="inicia a API local e verifica a grade demo sem abrir a janela gráfica.",
+    )
+    args = parser.parse_args()
+
     _configure_logging()
     logging.info("Inicializando Anatinus desktop.")
 
@@ -89,43 +98,65 @@ def main() -> None:
 
     if _is_port_open():
         if _is_anatinus_running():
-            _show_error(
-                "O Anatinus já está aberto. Verifique as janelas em execução."
-            )
+            message = "O Anatinus já está aberto. Verifique as janelas em execução."
         else:
-            _show_error(
+            message = (
                 "A porta local necessária pelo Anatinus já está ocupada. "
                 "Feche o programa que está usando essa porta e tente novamente."
             )
+        if args.smoke_test:
+            raise RuntimeError(message)
+        _show_error(message)
         return
-    else:
-        config = uvicorn.Config(
-            app,
-            host=HOST,
-            port=PORT,
-            log_level="warning",
-            access_log=False,
-            log_config=None,
-        )
-        server = uvicorn.Server(config)
-        server_thread = Thread(
-            target=server.run,
-            name="AnatinusAPI",
-            daemon=True,
-        )
-        server_thread.start()
-        owns_server = True
 
+    config = uvicorn.Config(
+        app,
+        host=HOST,
+        port=PORT,
+        log_level="warning",
+        access_log=False,
+        log_config=None,
+    )
+    server = uvicorn.Server(config)
+    server_thread = Thread(
+        target=server.run,
+        name="AnatinusAPI",
+        daemon=True,
+    )
+    server_thread.start()
+    owns_server = True
+
+    try:
         if not _wait_for_server(server_thread):
-            logging.error("A API não iniciou dentro do tempo esperado.")
-            server.should_exit = True
-            _show_error(
-                "O Anatinus não conseguiu iniciar o serviço local. "
+            raise RuntimeError(
+                "A API local não iniciou dentro do tempo esperado. "
                 "Consulte o log em %LOCALAPPDATA%\\Anatinus\\logs\\desktop.log."
+            )
+
+        if args.smoke_test:
+            with urllib.request.urlopen(
+                f"{BASE_URL}/timetable/",
+                timeout=10,
+            ) as response:
+                timetable = json.loads(response.read().decode("utf-8"))
+
+            if not isinstance(timetable, list) or len(timetable) < 50:
+                found = len(timetable) if isinstance(timetable, list) else "resposta inválida"
+                raise RuntimeError(
+                    "A base inicial não contém a grade esperada do 3º INFO. "
+                    f"Registros encontrados: {found}."
+                )
+
+            logging.info(
+                "Smoke test concluído: API local ativa e %s aulas carregadas.",
+                len(timetable),
+            )
+            print(
+                "ANATINUS_SMOKE_TEST_OK: "
+                f"API ativa; {len(timetable)} aulas carregadas."
             )
             return
 
-    try:
         window = webview.create_window(
             "Anatinus",
             BASE_URL,
@@ -135,16 +166,16 @@ def main() -> None:
             background_color="#08090a",
         )
 
-        if owns_server and server is not None:
-            def stop_local_server(*_args) -> None:
-                logging.info("Janela fechada; encerrando a API local.")
-                server.should_exit = True
+        def stop_local_server(*_args) -> None:
+            logging.info("Janela fechada; encerrando a API local.")
+            server.should_exit = True
 
-            window.events.closed += stop_local_server
-
+        window.events.closed += stop_local_server
         webview.start(debug=False)
     except Exception:
-        logging.exception("Falha ao abrir a janela do Anatinus.")
+        logging.exception("Falha ao iniciar o Anatinus.")
+        if args.smoke_test:
+            raise
         _show_error(
             "Não foi possível abrir a janela do Anatinus. "
             "Verifique se o WebView2 do Microsoft Edge está instalado. "
