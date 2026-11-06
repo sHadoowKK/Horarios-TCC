@@ -39,6 +39,7 @@ jobs:
           python validate_demo_generation.py --api
           python seed_realista.py
           python validate_demo_generation.py
+          python validate_demo_generation.py --all-together
 
   frontend:
     name: Build do frontend
