@@ -51,6 +51,7 @@ Horarios-TCC/
 │   ├── requirements-desktop.txt
 │   ├── seed.py
 │   ├── seed_realista.py          # base de teste inspirada nas grades ETEC
+│   ├── seed_apresentacao.py      # base fictícia com grade pronta para apresentação
 │   ├── test_backend.py
 │   ├── test_optimizer.py
 │   └── benchmark_optimizer.py
@@ -105,6 +106,24 @@ python seed.py
 
 O seed pequeno não deve ser executado repetidamente no mesmo banco, pois ele cria novos cadastros.
 
+### Base fictícia para a apresentação
+
+Na raiz do projeto, execute:
+
+```powershell
+.\start-demo.ps1
+```
+
+O atalho recria `backend/school_schedule_demo.db`, cadastra dois cursos, três turmas, quinze disciplinas e quinze professores fictícios, define as disponibilidades semanais e gera/salva automaticamente uma grade completa. A demonstração inclui uma turma integral com divisão A/B. Cada grupo tem seis aulas por dia, de segunda a sexta, sem aulas sem professor.
+
+A base é inteiramente inventada e serve apenas para demonstrar o funcionamento do Anatinus. Ela não representa uma escola real nem deve ser usada como cadastro oficial. O banco normal `backend/school_schedule.db` permanece separado.
+
+Para recriar manualmente apenas essa base, feche o Anatinus e execute dentro de `backend`:
+
+```powershell
+.\.venv\Scripts\python.exe seed_apresentacao.py
+```
+
 ### Base realista inspirada nas grades da ETEC
 
 ### Testar somente a turma de Informática
@@ -144,18 +163,18 @@ A captura mostra cargas de 37 aulas para A e 36 para B, porque SW2 tem cargas di
 O modo isolado usa o banco de demonstração e substitui somente os dados DEMO; não altera `backend/school_schedule.db`. Como a imagem não contém a disponibilidade semanal completa dos professores, o teste só de Informática deixa os docentes disponíveis nos períodos do Integral de segunda a sexta. O gerador deve reorganizar os horários respeitando as cargas, as matérias e as preferências, não copiar cada posição do quadro original.
 
 
-Para testar turmas, grupos e professores com um conjunto maior, há um segundo script. Ele cria **um banco separado**, `backend/school_schedule_demo.db`, e nunca apaga `school_schedule.db`.
+### Base de regressão inspirada em grades da ETEC
 
-Feche as janelas do Anatinus antes de recriar essa base e execute, na raiz do projeto:
+Além da base fictícia, `seed_realista.py` continua disponível para testar as matrizes recuperadas durante o desenvolvimento. Esse seed não é o usado pelo modo de apresentação; ele recria o mesmo arquivo DEMO e, por isso, deve ser executado apenas para testes técnicos, com o Anatinus fechado.
+
+Para validar as oito turmas dessa base de regressão, execute dentro de `backend`:
 
 ```powershell
-cd backend
 .\.venv\Scripts\python.exe seed_realista.py
-cd ..
-.\start-demo.ps1
+.\.venv\Scripts\python.exe validate_demo_generation.py --all-together
 ```
 
-O `start-demo.ps1` inicia frontend e backend usando somente o banco realista. O banco normal continua separado.
+Depois, execute novamente `start-demo.ps1` para reconstruir a base fictícia antes da apresentação. O banco normal `school_schedule.db` continua separado.
 
 A base inclui:
 - **3º INFO Integral**, com os nomes de disciplinas/professores que conseguimos recuperar e grupos A/B: disciplinas técnicas separadas e disciplinas do ensino médio compartilhadas;
