@@ -438,6 +438,109 @@ def _validate_all_together(db) -> None:
                 f"docentes habilitados: {candidates}"
             )
 
+    # Relatório de qualidade visual/lógica: distribuição semanal e blocos.
+    subject_rows = db.query(models.Subject).all()
+    subject_by_id = {row.id: row.name for row in subject_rows}
+    teacher_name_by_id = {row.id: row.name for row in teachers}
+    contiguous_pairs = {
+        (0, 1), (1, 2), (3, 4), (4, 5),
+        (6, 7), (8, 9), (9, 10),
+        (11, 12), (12, 13), (14, 15),
+    }
+    weekday_names = ["Seg", "Ter", "Qua", "Qui", "Sex"]
+
+    print("RELATÓRIO DE DISTRIBUIÇÃO SEMANAL")
+    for classroom_row in classrooms:
+        class_schedule = [
+            item for item in schedule
+            if item["classroom_id"] == classroom_row.id
+        ]
+        audiences = (
+            ["A", "B"]
+            if classroom_row.has_groups and classroom_row.shift != "Noite"
+            else ["Todos"]
+        )
+        for audience in audiences:
+            print(
+                f"{classroom_row.name} — grupo {audience}"
+                if audience != "Todos" else classroom_row.name
+            )
+            daily_counts = []
+            for day, weekday in enumerate(weekday_names):
+                day_items = [
+                    item for item in class_schedule
+                    if item["day"] == day
+                    and item.get("student_group", "Todos") in ("Todos", audience)
+                ]
+                day_items.sort(key=lambda item: item["period"])
+                daily_counts.append(len(day_items))
+                cells = []
+                for item in day_items:
+                    subject_name = subject_by_id.get(
+                        item["subject_id"], f"#{item['subject_id']}"
+                    )
+                    teacher_name = (
+                        teacher_name_by_id.get(item["teacher_id"], "?")
+                        if item.get("teacher_id") is not None
+                        else "SEM DOC"
+                    )
+                    cells.append(
+                        f"{item['period'] + 1}:{subject_name} [{teacher_name}]"
+                    )
+                print(
+                    f"  {weekday}: {len(day_items)} aulas — "
+                    + (" | ".join(cells) if cells else "sem aulas")
+                )
+            if daily_counts:
+                spread = max(daily_counts) - min(daily_counts)
+                print(
+                    f"  Distribuição diária: {daily_counts}; "
+                    f"diferença entre maior/menor dia: {spread}."
+                )
+
+            # Blocos por matéria: destaca cargas de 2+ aulas quebradas em
+            # ocorrências isoladas ou espalhadas por muitos dias.
+            units_for_audience = defaultdict(list)
+            for item in class_schedule:
+                target = item.get("student_group", "Todos")
+                if target in ("Todos", audience):
+                    units_for_audience[(
+                        item["subject_id"],
+                        target,
+                    )].append(item)
+
+            for (subject_id, target), items in sorted(
+                units_for_audience.items(),
+                key=lambda pair: subject_by_id.get(pair[0][0], "")
+            ):
+                per_day = defaultdict(list)
+                for item in items:
+                    per_day[item["day"]].append(item["period"])
+                daily_blocks = []
+                for day, periods in sorted(per_day.items()):
+                    periods = sorted(periods)
+                    blocks = []
+                    current = [periods[0]]
+                    for period in periods[1:]:
+                        if (current[-1], period) in contiguous_pairs:
+                            current.append(period)
+                        else:
+                            blocks.append(current)
+                            current = [period]
+                    blocks.append(current)
+                    daily_blocks.append(
+                        f"{weekday_names[day]}:" + "+".join(
+                            str(len(block)) for block in blocks
+                        )
+                    )
+                total = len(items)
+                if total >= 2:
+                    print(
+                        f"  Matéria {subject_by_id.get(subject_id, subject_id)}"
+                        f" ({target}, {total} aulas): "
+                        + ", ".join(daily_blocks)
+                    )
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
