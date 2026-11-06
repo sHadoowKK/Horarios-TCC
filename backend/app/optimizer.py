@@ -187,6 +187,7 @@ def generate_schedule(
     mutable_classroom_id: int | None = None,
     mutable_classroom_ids: List[int] | None = None,
     mutable_subject_id: int | None = None,
+    _feasibility_only: bool = False,
 ):
     model = cp_model.CpModel()
     penalties = []
@@ -771,6 +772,7 @@ def generate_schedule(
                 sys_config,
                 num_days=num_days,
                 num_periods=num_periods,
+                _feasibility_only=True,
             )
             seed_solve_time += float(seed_result.get("solve_time_seconds", 0) or 0)
             seed_branches += int(seed_result.get("solver_branches", 0) or 0)
@@ -818,7 +820,31 @@ def generate_schedule(
     optimization_completed = True
     seed_fallback = False
 
-    if feasibility_seed_schedule is not None:
+    if _feasibility_only:
+        # As grades-base só precisam demonstrar viabilidade. Não gastamos tempo
+        # otimizando preferências que serão resolvidas na etapa global.
+        feasibility_model = model.clone()
+        feasibility_model.proto.clear_objective()
+
+        feasibility_solver = cp_model.CpSolver()
+        feasibility_solver.parameters.max_time_in_seconds = 20.0
+        feasibility_solver.parameters.num_search_workers = 8
+        feasibility_solver.parameters.stop_after_first_solution = True
+        status = feasibility_solver.Solve(feasibility_model)
+        feasibility_time = feasibility_solver.WallTime()
+        total_branches = feasibility_solver.NumBranches()
+        total_conflicts = feasibility_solver.NumConflicts()
+        optimization_completed = False
+
+        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            solution_values = [
+                feasibility_solver.value(
+                    feasibility_model.get_int_var_from_proto_index(index)
+                )
+                for index in range(len(model.Proto().variables))
+            ]
+        solver = feasibility_solver
+    elif feasibility_seed_schedule is not None:
         # A semente já satisfaz todas as restrições obrigatórias de turma.
         # A busca global fica dedicada a distribuir professores e melhorar a
         # qualidade, em vez de procurar primeiro uma combinação de horários.
