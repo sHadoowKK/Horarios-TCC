@@ -824,6 +824,7 @@ def generate_schedule(
     if len(classrooms) > 1 and not fixed_schedule:
         candidate_seed = []
         seed_is_valid = True
+        seed_class_diagnostics = []
 
         for classroom in classrooms:
             # A grade-base usa os mesmos docentes habilitados e disponibilidades
@@ -860,6 +861,13 @@ def generate_schedule(
             seed_solve_time += float(seed_result.get("solve_time_seconds", 0) or 0)
             seed_branches += int(seed_result.get("solver_branches", 0) or 0)
             seed_conflicts += int(seed_result.get("solver_conflicts", 0) or 0)
+            seed_items = seed_result.get("schedule", []) or []
+            seed_class_diagnostics.append({
+                "classroom": classroom.get("name", str(classroom["id"])),
+                "status": seed_result.get("status"),
+                "lessons": len(seed_items),
+                "message": seed_result.get("message", ""),
+            })
 
             if seed_result.get("status") != "success":
                 seed_is_valid = False
@@ -897,7 +905,7 @@ def generate_schedule(
                     **item,
                     "teacher_id": None,
                 }
-                for item in seed_result.get("schedule", [])
+                for item in seed_items
             )
 
         if seed_is_valid:
@@ -1233,6 +1241,7 @@ def generate_schedule(
                     f"{details}. Diagnóstico interno: status_solver={status}, "
                     f"seed_aulas={seed_actual_total}/{seed_expected_total}, "
                     f"falha_na_seed={seed_failure_diagnostic}, "
+                    f"turmas_na_seed={seed_class_diagnostics}, "
                     f"divergências_na_seed={seed_mismatches[:8]}."
                 ),
                 "schedule_integrity_error": incomplete_units,
