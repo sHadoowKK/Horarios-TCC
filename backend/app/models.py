@@ -21,6 +21,8 @@ class Classroom(Base):
     # Índices de períodos permitidos para esta jornada específica.
     # None mantém o padrão do turno para compatibilidade com bancos antigos.
     allowed_periods = Column(JSON, nullable=True, default=None)
+    # Overrides allowed periods by weekday (0=Monday ... 4=Friday).
+    allowed_periods_by_day = Column(JSON, nullable=True, default=None)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     has_groups = Column(Boolean, default=False)
 
