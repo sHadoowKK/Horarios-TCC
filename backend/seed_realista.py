@@ -1,19 +1,27 @@
-"""Cria uma base separada e repetível para demonstrar o Anatinus.
+"""Base realista do Anatinus, transcrita da planilha escolar de 03/09/2026.
 
-Executar de dentro de backend:
-    python seed_realista.py
+Uso (a partir de backend/):
+    python seed_realista.py                 # diurno + noturno técnico
+    python seed_realista.py --diurno-only
+    python seed_realista.py --noturno-only
+    python seed_realista.py --informatica-only
 
-Este script recria SOMENTE backend/school_schedule_demo.db.
-Nunca apaga nem altera school_schedule.db, que é o banco normal do usuário.
+O script recria SOMENTE school_schedule_demo.db. Nunca altera school_schedule.db.
+As células mescladas do quadro representam aula conjunta; colunas A/B não
+mescladas representam cargas independentes dos grupos. Os nomes dos docentes
+são anonimizados. A planilha contém os horários existentes, não a disponibilidade
+semanal completa: por isso a disponibilidade criada aqui é ampla e sintética.
 
-O 3º INFO usa os nomes e exemplos A/B extraídos das imagens; as cargas não
-documentadas integralmente são estimativas de teste. O TI Noturno usa as cargas
-semanais anotadas na conversa e totaliza 25. O recorte Agro inclui seis turmas
-com nomes reais, mas os dois componentes conhecidos só são cargas provisórias.
+Os dois quadros MTEC (18h30) e as aulas síncronas mensais são preservados como
+referência documental, mas não entram no solver semanal: a jornada 18h30 e os
+eventos em datas específicas ainda não são representados pelo modelo atual.
 """
 
 import argparse
 import os
+import re
+import unicodedata
+from collections import defaultdict
 from pathlib import Path
 
 DATABASE_PATH = Path(__file__).resolve().with_name("school_schedule_demo.db")
@@ -23,417 +31,629 @@ from app import models  # noqa: E402
 from app.database import Base, SessionLocal, engine, ensure_database_compatibility  # noqa: E402
 
 
-# Índices de períodos da ETEC; intervalos/almoço não são aulas.
-# A disponibilidade de demonstração é ampla; cada turma restringe sua própria jornada.
-INTEGRAL_AVAILABILITY_PERIODS = tuple(range(11))
-NIGHT_PERIODS = (11, 12, 13, 14, 15)
+# Linhas: turma | disciplina | aulas conjuntas | aulas A | aulas B
+MATRIX_ROWS = r"""
+1º PI AGRO A|A.P.P.|0|2|2
+1º PI AGRO A|ARTE|2|0|0
+1º PI AGRO A|BIOLOGIA|2|0|0
+1º PI AGRO A|C.P.R.T|1|0|0
+1º PI AGRO A|COOP|1|0|0
+1º PI AGRO A|EDUCAÇÃO FÍSICA|2|0|0
+1º PI AGRO A|FILOSOFIA|1|0|0
+1º PI AGRO A|FÍSICA|2|0|0
+1º PI AGRO A|GEOGRAFIA|2|0|0
+1º PI AGRO A|HISTÓRIA|2|0|0
+1º PI AGRO A|INGLÊS|2|0|0
+1º PI AGRO A|LÍNGUA PORTUGUESA|3|0|0
+1º PI AGRO A|M.R.N|0|2|2
+1º PI AGRO A|MATEMÁTICA|3|0|0
+1º PI AGRO A|O.V /|0|2|2
+1º PI AGRO A|P.P.A|0|2|2
+1º PI AGRO A|P.T.I.C|0|2|2
+1º PI AGRO A|QUÍMICA|2|0|0
+1º PI AGRO A|SOCIOLOGIA|1|0|0
+1º PI AGRO B|A.P.P|0|2|2
+1º PI AGRO B|ARTE|2|0|0
+1º PI AGRO B|BIOLOGIA|2|0|0
+1º PI AGRO B|C.P.R.T|1|0|0
+1º PI AGRO B|COOP|1|0|0
+1º PI AGRO B|EDUCAÇÃO FÍSICA|2|0|0
+1º PI AGRO B|FILOSOFIA|1|0|0
+1º PI AGRO B|FÍSICA|2|0|0
+1º PI AGRO B|GEOGRAFIA|2|0|0
+1º PI AGRO B|HISTÓRIA|2|0|0
+1º PI AGRO B|INGLÊS|2|0|0
+1º PI AGRO B|LÍNGUA PORTUGUESA|3|0|0
+1º PI AGRO B|M.R.N|0|2|2
+1º PI AGRO B|MATEMÁTICA|3|0|0
+1º PI AGRO B|O.V /|0|2|2
+1º PI AGRO B|P.P.A A|0|2|2
+1º PI AGRO B|P.T.I.C|0|2|2
+1º PI AGRO B|QUÍMICA|2|0|0
+1º PI AGRO B|SOCIOLOGIA|1|0|0
+2º PI AGRO A|BIOLOGIA|2|0|0
+2º PI AGRO A|C.A|0|2|2
+2º PI AGRO A|C.P.D.P.J.|1|0|0
+2º PI AGRO A|E.A.C.N.T|0|0|1
+2º PI AGRO A|E.A.M.T|0|2|1
+2º PI AGRO A|EDUCAÇÃO FÍSICA|2|0|0
+2º PI AGRO A|FÍSICA|2|0|0
+2º PI AGRO A|GEOGRAFIA|2|0|0
+2º PI AGRO A|HISTÓRIA|2|0|0
+2º PI AGRO A|INGLÊS|2|0|0
+2º PI AGRO A|L.M.I.S|2|0|0
+2º PI AGRO A|L.P.C|2|0|0
+2º PI AGRO A|L.R.T|0|2|2
+2º PI AGRO A|LÍNGUA PORTUGUESA|3|0|0
+2º PI AGRO A|MATEMÁTICA|3|0|0
+2º PI AGRO A|N.A.A.N|0|2|2
+2º PI AGRO A|N.V|1|0|0
+2º PI AGRO A|P.P.A|0|2|2
+2º PI AGRO A|QUÍMICA|2|0|0
+2º PI AGRO B|BIOLOGIA|2|0|0
+2º PI AGRO B|C.A|0|2|2
+2º PI AGRO B|CPDPI|1|0|0
+2º PI AGRO B|E.A.C.N.T|0|1|1
+2º PI AGRO B|E.A.M.T|0|1|1
+2º PI AGRO B|EDUCAÇÃO FÍSICA|2|0|0
+2º PI AGRO B|FÍSICA|2|0|0
+2º PI AGRO B|GEOGRAFIA|2|0|0
+2º PI AGRO B|HISTÓRIA|2|0|0
+2º PI AGRO B|INGLÊS|2|0|0
+2º PI AGRO B|L.M.I.S|2|0|0
+2º PI AGRO B|L.P.C|2|0|0
+2º PI AGRO B|L.R.T|0|2|2
+2º PI AGRO B|LÍNGUA PORTUGUESA|3|0|0
+2º PI AGRO B|MATEMÁTICA|3|0|0
+2º PI AGRO B|N.A.A.M|0|2|2
+2º PI AGRO B|N.V|1|0|0
+2º PI AGRO B|P.P.A|0|2|2
+2º PI AGRO B|QUÍMICA|2|0|0
+3º PI AGRO A|A.R|2|0|0
+3º PI AGRO A|A.S|1|0|0
+3º PI AGRO A|A.S,|1|0|0
+3º PI AGRO A|C.P.|2|0|0
+3º PI AGRO A|E.A.C.M.T|2|0|0
+3º PI AGRO A|E.A.C.N.T|3|0|0
+3º PI AGRO A|E.A.M.T|1|0|0
+3º PI AGRO A|E.O.E.T.R|1|0|0
+3º PI AGRO A|EDUCAÇÃO FÍSICA|2|0|0
+3º PI AGRO A|ESPANHOL|2|0|0
+3º PI AGRO A|FILOSOFIA|1|0|0
+3º PI AGRO A|FÍSICA|2|0|0
+3º PI AGRO A|G.P.A|1|0|0
+3º PI AGRO A|INGLÊS|2|0|0
+3º PI AGRO A|LÍNGUA PORTUGUESA|3|0|0
+3º PI AGRO A|M.I.A|2|0|0
+3º PI AGRO A|MATEMÁTICA|3|0|0
+3º PI AGRO A|P.D.T.C.C|2|0|0
+3º PI AGRO A|S.A.B.E.A|2|0|0
+3º PI AGRO A|SOCIOLOGIA|1|0|0
+3º PI AGRO B|A.R|2|0|0
+3º PI AGRO B|A.S|2|0|0
+3º PI AGRO B|E.A.C.N.T|3|0|0
+3º PI AGRO B|E.A.M.T|3|0|0
+3º PI AGRO B|E.O.E.T.R|1|0|0
+3º PI AGRO B|EDUCAÇÃO FÍSICA|2|0|0
+3º PI AGRO B|ESPANHOL|2|0|0
+3º PI AGRO B|FILOSOFIA|1|0|0
+3º PI AGRO B|FÍSICA|2|0|0
+3º PI AGRO B|G.P.A.|1|0|0
+3º PI AGRO B|INGLÊS|2|0|0
+3º PI AGRO B|LÍNGUA PORTUGUESA|3|0|0
+3º PI AGRO B|M.I.A|2|0|0
+3º PI AGRO B|MATEMÁTICA|3|0|0
+3º PI AGRO B|P.C.|2|0|0
+3º PI AGRO B|P.D.T.C.C|2|0|0
+3º PI AGRO B|S.A.B.E.A|2|0|0
+3º PI AGRO B|SOCIOLOGIA|1|0|0
+3º INFORMÁTICA|CNW2|0|2|2
+3º INFORMÁTICA|DDM2|0|2|2
+3º INFORMÁTICA|E.A.M.T|3|0|0
+3º INFORMÁTICA|EACNT|3|0|0
+3º INFORMÁTICA|ESPANHOL|2|0|0
+3º INFORMÁTICA|FILOSOFIA|1|0|0
+3º INFORMÁTICA|GCW|0|2|2
+3º INFORMÁTICA|GEOGRAFIA|2|0|0
+3º INFORMÁTICA|HISTÓRIA|2|0|0
+3º INFORMÁTICA|INGLÊS|2|0|0
+3º INFORMÁTICA|IR|0|2|2
+3º INFORMÁTICA|LÍNGUA PORTUGUESA|3|0|0
+3º INFORMÁTICA|MATEMÁTICA|3|0|0
+3º INFORMÁTICA|PDTCC|0|2|2
+3º INFORMÁTICA|SOCIOLOGIA|1|0|0
+3º INFORMÁTICA|SW2|0|2|2
+3º INFORMÁTICA|UDA|0|2|2
+1º ITINERÁRIO|A.C.P.S.|0|3|3
+1º ITINERÁRIO|ARTE|2|0|0
+1º ITINERÁRIO|BIOLOGIA|2|0|0
+1º ITINERÁRIO|EDUCAÇÃO FÍSICA|2|0|0
+1º ITINERÁRIO|FILOSOFIA|1|0|0
+1º ITINERÁRIO|FÍSICA|2|0|0
+1º ITINERÁRIO|GEOGRAFIA|2|0|0
+1º ITINERÁRIO|HISTÓRIA|2|0|0
+1º ITINERÁRIO|INGLÊS|1|0|0
+1º ITINERÁRIO|LÍNGUA PORTUGUESA|4|0|0
+1º ITINERÁRIO|MATEMÁTICA|3|0|0
+1º ITINERÁRIO|P.T.I.C.|0|3|3
+1º ITINERÁRIO|QUÍMICA|2|0|0
+1º ITINERÁRIO|SOCIOLOGIA|1|0|0
+2º ITINERÁRIO|BIOLOGIA|2|0|0
+2º ITINERÁRIO|E.A.|0|6|6
+2º ITINERÁRIO|EDUCAÇÃO FÍSICA|2|0|0
+2º ITINERÁRIO|FÍSICA|2|0|0
+2º ITINERÁRIO|GEOGRAFIA|2|0|0
+2º ITINERÁRIO|HISTÓRIA|2|0|0
+2º ITINERÁRIO|INGLÊS|2|0|0
+2º ITINERÁRIO|L.P.C|0|5|5
+2º ITINERÁRIO|LÍNGUA PORTUGUESA|2|0|0
+2º ITINERÁRIO|MATEMÁTICA|2|0|0
+2º ITINERÁRIO|P.E.|0|1|1
+2º ITINERÁRIO|QUÍMICA|2|0|0
+3º ITINERÁRIO|BIOLOGIA|2|0|0
+3º ITINERÁRIO|E.A.|0|6|6
+3º ITINERÁRIO|ESPANHOL|2|0|0
+3º ITINERÁRIO|FÍSICA|2|0|0
+3º ITINERÁRIO|INGLÊS|2|0|0
+3º ITINERÁRIO|L.M.I.S|0|5|5
+3º ITINERÁRIO|LÍNGUA PORTUGUESA|4|0|0
+3º ITINERÁRIO|MATEMÁTICA|4|0|0
+3º ITINERÁRIO|P.E.|0|1|1
+3º ITINERÁRIO|QUÍMICA|2|0|0
+1º ALIMENTOS|A.F.Q.A.|0|2|2
+1º ALIMENTOS|A.M.A|0|2|2
+1º ALIMENTOS|A.S.A|0|2|2
+1º ALIMENTOS|ARTE|2|0|0
+1º ALIMENTOS|BIOLOGIA|2|0|0
+1º ALIMENTOS|EDUCAÇÃO FÍSICA|2|0|0
+1º ALIMENTOS|FÍSICA|2|0|0
+1º ALIMENTOS|GEOGRAFIA|2|0|0
+1º ALIMENTOS|H.S.I.A.|0|2|2
+1º ALIMENTOS|HISTÓRIA|2|0|0
+1º ALIMENTOS|INGLÊS|2|0|0
+1º ALIMENTOS|LÍNGUA PORTUGUESA|2|0|0
+1º ALIMENTOS|MATEMÁTICA|2|0|0
+1º ALIMENTOS|QUÍMICA|2|0|0
+1º ALIMENTOS|T.P.A.|0|2|2
+1º ALIMENTOS|TI|0|2|2
+1º INFO|GSO 1|0|15|10
+1º INFO|PC 1|0|10|15
+1º LOGÍSTICA|AI|3|0|0
+1º LOGÍSTICA|ECO|2|0|0
+1º LOGÍSTICA|LTT|2|0|0
+1º LOGÍSTICA|MCS|3|0|0
+1º LOGÍSTICA|OIMA|5|0|0
+1º LOGÍSTICA|POL|5|0|0
+1º LOGÍSTICA|QAL|2|0|0
+1º LOGÍSTICA|SÃO|3|0|0
+2º LOGÍSTICA|CL|3|0|0
+2º LOGÍSTICA|ECI|3|0|0
+2º LOGÍSTICA|II|2|0|0
+2º LOGÍSTICA|LT|2|0|0
+2º LOGÍSTICA|OT|2|0|0
+2º LOGÍSTICA|PDTCC|5|0|0
+2º LOGÍSTICA|PPCP|5|0|0
+2º LOGÍSTICA|TIAL|3|0|0
+3º ADMINISTRAÇÃO|AFO|4|0|0
+3º ADMINISTRAÇÃO|AP|3|0|0
+3º ADMINISTRAÇÃO|CI|3|0|0
+3º ADMINISTRAÇÃO|DTCC|3|0|0
+3º ADMINISTRAÇÃO|II|2|0|0
+3º ADMINISTRAÇÃO|PLE|4|0|0
+3º ADMINISTRAÇÃO|PPBS|3|0|0
+3º ADMINISTRAÇÃO|TIAA|3|0|0
+2º INFORMÁTICA|DSE|2|0|0
+2º INFORMÁTICA|GSO2|3|0|0
+2º INFORMÁTICA|PC2|5|0|0
+2º INFORMÁTICA|PTCC|3|0|0
+2º INFORMÁTICA|RDS|5|0|0
+2º INFORMÁTICA|SBD|5|0|0
+2º INFORMÁTICA|SI|2|0|0
+2º AGRONEGÓCIO|AF|3|0|0
+2º AGRONEGÓCIO|GA|3|0|0
+2º AGRONEGÓCIO|GPAII|5|0|0
+2º AGRONEGÓCIO|GPVII|5|0|0
+2º AGRONEGÓCIO|LTT|2|0|0
+2º AGRONEGÓCIO|PNAI|2|0|0
+2º AGRONEGÓCIO|PPA|3|0|0
+2º AGRONEGÓCIO|PTCC|2|0|0
+2º AÇÚCAR E ÁLCOOL|ACP|5|0|0
+2º AÇÚCAR E ÁLCOOL|AI|2|0|0
+2º AÇÚCAR E ÁLCOOL|ECO|2|0|0
+2º AÇÚCAR E ÁLCOOL|HST|3|0|0
+2º AÇÚCAR E ÁLCOOL|OEPII|5|0|0
+2º AÇÚCAR E ÁLCOOL|PTCC|2|0|0
+2º AÇÚCAR E ÁLCOOL|SUE|3|0|0
+2º AÇÚCAR E ÁLCOOL|TPC|3|0|0
+3º AÇÚCAR E ÁLCOOL|AIAPAA|3|0|0
+3º AÇÚCAR E ÁLCOOL|CQ|5|0|0
+3º AÇÚCAR E ÁLCOOL|DTCC|3|0|0
+3º AÇÚCAR E ÁLCOOL|II|2|0|0
+3º AÇÚCAR E ÁLCOOL|TFA|5|0|0
+3º AÇÚCAR E ÁLCOOL|TFAL|5|0|0
+3º AÇÚCAR E ÁLCOOL|TSAA|2|0|0
+"""
+
+# Docente | disciplinas habilitadas conforme o quadro
+TEACHER_ROWS = r"""
+ADRIANA|DTCC;PTCC;QUÍMICA
+ALINE|E.A.;FILOSOFIA;HISTÓRIA
+ALISSON|GEOGRAFIA
+ANDRÉIA|AI;L.P.C;P.E.;PC 1
+AUGUSTO|CNW2;DSE;GSO2;SW2;UDA
+CAMILA|AI;SBD
+CÉLIA|ECO;ESPANHOL;LTT;LÍNGUA PORTUGUESA
+DETTO|A.C.P.S.;GEOGRAFIA
+ELIANA|ACP;HST
+ERIKA|UDA
+FABIANE|BIOLOGIA;E.A.C.N.T;EACNT;L.M.I.S;L.P.C
+FABIO|A.S.A
+FAUSTO|E.O.E.T.R
+GILSON|C.A;L.R.T;M.R.N;N.V;O.V /
+GIOVANA|H.S.I.A.;P.P.A;T.P.A.
+GRACILIANO|E.A.M.T;MATEMÁTICA;P.E.;PDTCC
+GUILHERME|A.P.P;FÍSICA;PNAI;TPC
+GUSTAVO|E.A.M.T
+HIGOR|GCW;RDS
+IGOR|MCS;OIMA
+JANINE|FÍSICA
+JOESLEY|AIAPAA;IR;P.T.I.C;P.T.I.C.;TFA;TI
+JUCIANE|E.A.M.T
+JUCIANI|AFO;E.A.C.M.T;E.A.M.T;ECI;FÍSICA;OT;PPBS;SÃO
+JULIANA|INGLÊS;LÍNGUA PORTUGUESA
+JULIANE|CI;CL;DTCC;PLE;POL;QAL
+KAMILA|MATEMÁTICA
+LEONARDO|SI;TIAA;TIAL
+M. EMILIA|FILOSOFIA;HISTÓRIA;L.M.I.S;SOCIOLOGIA
+MAICKON|A.M.A;A.P.P.;A.R;BIOLOGIA;G.P.A;G.P.A.;MATEMÁTICA;P.D.T.C.C
+MARCEL|CNW2;DDM2;GSO 1;PC2;PDTCC;PTCC;SW2
+MARCELA|ECO;II;LTT;LÍNGUA PORTUGUESA
+MARTA|INGLÊS;LÍNGUA PORTUGUESA
+MATHEUS|A.F.Q.A.;MATEMÁTICA;P.P.A;P.P.A A;PPA;PPCP;T.P.A.
+PATRÍCIA|OEPII;TFAL;TSAA
+PAULO|AF;GA
+PEDRO HERNANDES|EDUCAÇÃO FÍSICA
+PEDRO K|A.P.P.;E.O.E.T.R;GPAII;GPVII;N.A.A.M;N.A.A.N;S.A.B.E.A
+RAPHAEL|CQ;PTCC;SUE
+RENATA|FÍSICA
+SANDY|BIOLOGIA;QUÍMICA
+SILVIO|MATEMÁTICA
+SOLANGE|ARTE;C.P.R.T;P.E.
+SÉRGIO|AP;LT
+TEDO|A.S;A.S,;C.P.;C.P.D.P.I.;COOP;CPDPI;M.I.A;P.C.
+THI SOUZA|A.C.P.S.
+THIAGO HERNANDES|GEOGRAFIA
+THIAGO SAM|E.A.;L.M.I.S
+THIAGO SAMP|E.A.
+THIAGO SAMPAIO|HISTÓRIA
+THIAGO SOUZA|FILOSOFIA;SOCIOLOGIA
+"""
+
+# Docente | jornadas observadas. Isto não é a disponibilidade real por dia/período.
+TEACHER_SHIFTS = r"""
+ADRIANA|Integral;Noite
+ALINE|Integral
+ALISSON|Integral
+ANDRÉIA|Integral;Noite
+AUGUSTO|Integral;Noite
+CAMILA|Noite
+CÉLIA|Integral;Noite
+DETTO|Integral
+ELIANA|Noite
+ERIKA|Integral
+FABIANE|Integral
+FABIO|Integral
+FAUSTO|Integral
+GILSON|Integral
+GIOVANA|Integral
+GRACILIANO|Integral;Noite
+GUILHERME|Integral;Noite
+GUSTAVO|Integral
+HIGOR|Integral;Noite
+IGOR|Noite
+JANINE|Integral
+JOESLEY|Integral;Noite
+JUCIANE|Integral
+JUCIANI|Integral;Noite
+JULIANA|Integral
+JULIANE|Noite
+KAMILA|Integral
+LEONARDO|Noite
+M. EMILIA|Integral
+MAICKON|Integral
+MARCEL|Integral;Noite
+MARCELA|Integral;Noite
+MARTA|Integral
+MATHEUS|Integral;Noite
+PATRÍCIA|Noite
+PAULO|Noite
+PEDRO HERNANDES|Integral
+PEDRO K|Integral;Noite
+RAPHAEL|Noite
+RENATA|Integral
+SANDY|Integral
+SILVIO|Integral
+SOLANGE|Integral
+SÉRGIO|Noite
+TEDO|Integral
+THI SOUZA|Integral
+THIAGO HERNANDES|Integral
+THIAGO SAM|Integral
+THIAGO SAMP|Integral
+THIAGO SAMPAIO|Integral
+THIAGO SOUZA|Integral
+"""
 
 
-def make_availability(shifts, available_days=range(5)):
+GENERAL_SUBJECTS = {
+    "ARTE", "ARTES", "BIOLOGIA", "EDUCACAO FISICA", "ESPANHOL",
+    "FILOSOFIA", "FISICA", "GEOGRAFIA", "HISTORIA", "INGLES",
+    "LINGUA PORTUGUESA", "MATEMATICA", "QUIMICA", "SOCIOLOGIA",
+}
+
+DAY_CLASS_NAMES = {
+    "1º PI AGRO A", "1º PI AGRO B", "2º PI AGRO A", "2º PI AGRO B",
+    "3º PI AGRO A", "3º PI AGRO B", "3º INFORMÁTICA",
+    "1º ITINERÁRIO", "2º ITINERÁRIO", "3º ITINERÁRIO", "1º ALIMENTOS",
+}
+NIGHT_CLASS_NAMES = {
+    "1º INFO", "1º LOGÍSTICA", "2º LOGÍSTICA", "3º ADMINISTRAÇÃO",
+    "2º INFORMÁTICA", "2º AGRONEGÓCIO",
+    "2º AÇÚCAR E ÁLCOOL", "3º AÇÚCAR E ÁLCOOL",
+}
+
+
+def norm(value):
+    value = unicodedata.normalize("NFKD", str(value))
+    value = "".join(char for char in value if not unicodedata.combining(char))
+    return re.sub(r"[^A-Z0-9]", "", value.upper())
+
+
+def parse_pair_rows(raw, value_count):
+    parsed = {}
+    for line_number, line in enumerate(raw.strip().splitlines(), start=1):
+        parts = [part.strip() for part in line.split("|")]
+        if len(parts) != value_count:
+            raise ValueError(f"Linha de dados inválida ({line_number}): {line}")
+        parsed[parts[0]] = parts[1:]
+    return parsed
+
+
+def parse_matrix():
+    matrix = defaultdict(list)
+    for line_number, line in enumerate(MATRIX_ROWS.strip().splitlines(), start=1):
+        parts = [part.strip() for part in line.split("|")]
+        if len(parts) != 5:
+            raise ValueError(f"Linha da matriz inválida ({line_number}): {line}")
+        classroom, subject, joint, load_a, load_b = parts
+        matrix[classroom].append({
+            "subject": subject,
+            "joint": int(joint),
+            "a": int(load_a),
+            "b": int(load_b),
+        })
+    return dict(matrix)
+
+
+def course_name(classroom_name):
+    name = classroom_name.upper()
+    if "AGRO" in name or "AGRONEGÓCIO" in name:
+        return "Técnico em Agropecuária" if "PI AGRO" in name else "Técnico em Agronegócio"
+    if "INFORMÁTICA" in name or name.startswith("1º INFO"):
+        return "Técnico em Informática"
+    if "ITINERÁRIO" in name:
+        return "Itinerário Formativo"
+    if "ALIMENTOS" in name:
+        return "Técnico em Alimentos"
+    if "LOGÍSTICA" in name:
+        return "Técnico em Logística"
+    if "ADMINISTRAÇÃO" in name:
+        return "Técnico em Administração"
+    if "AÇÚCAR E ÁLCOOL" in name:
+        return "Técnico em Açúcar e Álcool"
+    raise ValueError(f"Curso não identificado para {classroom_name}")
+
+
+def subject_category(subject_name):
+    key = norm(subject_name)
+    return "Ensino Médio" if key in {norm(item) for item in GENERAL_SUBJECTS} else "Técnica"
+
+
+def broad_availability(shifts):
     allowed = set()
-    for shift in shifts:
-        allowed.update(
-            INTEGRAL_AVAILABILITY_PERIODS if shift == "Integral"
-            else NIGHT_PERIODS if shift == "Noite"
-            else range(6)
-        )
-
+    if "Integral" in shifts:
+        allowed.update(range(11))
+    if "Noite" in shifts:
+        allowed.update(range(11, 16))
     return {
-        str(day): [period in allowed and day in available_days for period in range(16)]
+        str(day): [period in allowed for period in range(16)]
         for day in range(5)
     }
 
 
-def main(only_informatica=False):
-    print("Preparando banco DEMO independente...")
+def parse_selected_scenario(mode):
+    matrix = parse_matrix()
+    original_class_names = list(matrix)
+    if mode == "informatica":
+        selected = ["3º INFORMÁTICA"]
+    elif mode == "diurno":
+        selected = [name for name in original_class_names if name in DAY_CLASS_NAMES]
+    elif mode == "noturno":
+        selected = [name for name in original_class_names if name in NIGHT_CLASS_NAMES]
+    else:
+        selected = [name for name in original_class_names if name in DAY_CLASS_NAMES | NIGHT_CLASS_NAMES]
+
+    missing = (DAY_CLASS_NAMES | NIGHT_CLASS_NAMES) - set(original_class_names)
+    if missing:
+        raise RuntimeError(f"Turmas esperadas ausentes na matriz: {sorted(missing)}")
+
+    expanded = []
+    for name in selected:
+        if name == "1º INFO":
+            rows = matrix[name]
+            for group in ("A", "B"):
+                group_index = group.lower()
+                settings = []
+                for row in rows:
+                    workload = row[group_index]
+                    if workload:
+                        settings.append({
+                            "subject": row["subject"],
+                            "joint": 0,
+                            "a": workload,
+                            "b": 0,
+                            "night_cohort": group,
+                        })
+                expanded.append((f"1º INFO {group}", "Noite", False, settings))
+            continue
+
+        shift = "Integral" if name in DAY_CLASS_NAMES else "Noite"
+        rows = matrix[name]
+        has_internal_groups = shift == "Integral" and any(row["a"] or row["b"] for row in rows)
+        expanded.append((name, shift, has_internal_groups, rows))
+
+    return expanded
+
+
+def main(mode):
+    selected_classes = parse_selected_scenario(mode)
+    active_shifts = {shift for _, shift, _, _ in selected_classes}
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     ensure_database_compatibility()
 
     db = SessionLocal()
     try:
-        info_course = models.Course(name="Informática")
-        night_course = None
-        agro_course = None
-        db.add(info_course)
-
-        if not only_informatica:
-            night_course = models.Course(name="TI — curso noturno")
-            agro_course = models.Course(name="Agropecuária")
-            db.add_all([night_course, agro_course])
-
+        course_models = {}
+        for class_name, _, _, _ in selected_classes:
+            name = course_name(class_name)
+            if name not in course_models:
+                course_models[name] = models.Course(name=name)
+        db.add_all(course_models.values())
         db.flush()
 
-        # Cargas transcritas do quadro original do 3º INFO Integral.
-        # São 37 aulas por aluno/semana no recorte da grade de referência.
-        # Almoço: 11:40–13:00. Nenhuma aula do Integral é alocada nesse intervalo.
-        info_subjects = [
-            ("UDA", 2, "Alta", "Técnica", True, "Erika"),
-            ("SW2", 3, "Media", "Técnica", True, "Marcel"),
-            ("CNW2", 2, "Media", "Técnica", True, "Erika"),
-            ("Filosofia", 1, "Baixa", "Ensino Médio", False, "M. Emília"),
-            ("Sociologia", 1, "Baixa", "Ensino Médio", False, "M. Emília"),
-            ("Espanhol", 2, "Baixa", "Ensino Médio", False, "Célia"),
-            ("História", 2, "Baixa", "Ensino Médio", False, "M. Emília"),
-            ("DDM2", 2, "Alta", "Técnica", True, "Marcel"),
-            ("IRS", 2, "Media", "Técnica", True, "Joesley"),
-            ("Matemática", 3, "Alta", "Ensino Médio", False, "Kamila"),
-            ("Inglês", 2, "Baixa", "Ensino Médio", False, "Marta"),
-            ("EAMT", 3, "Media", "Técnica", True, "Gustavo"),
-            ("Português", 3, "Baixa", "Ensino Médio", False, "Marta"),
-            ("EACNT", 3, "Media", "Técnica", True, "Fabiane"),
-            ("PDTCC", 2, "Media", "Técnica", True, "Marcel"),
-            ("GCW", 2, "Media", "Técnica", True, "Higor"),
-            ("Geografia", 2, "Baixa", "Ensino Médio", False, "Thiago"),
-        ]
+        subjects_by_key = {}
+        subject_courses = defaultdict(set)
+        class_subject_keys = {}
+        for class_name, shift, has_groups, rows in selected_classes:
+            keys = set()
+            for row in rows:
+                key = norm(row["subject"])
+                if not key:
+                    raise RuntimeError(f"Disciplina vazia em {class_name}")
+                keys.add(key)
+                subject_courses[key].add(course_models[course_name(class_name)].id)
+                if key not in subjects_by_key:
+                    subjects_by_key[key] = {
+                        "name": row["subject"],
+                        "category": subject_category(row["subject"]),
+                        "workload": 1,
+                    }
+                effective = (
+                    row["joint"] + max(row["a"], row["b"])
+                    if shift == "Integral" and has_groups
+                    else row["a"] if row.get("night_cohort") == "A"
+                    else row["b"] if row.get("night_cohort") == "B"
+                    else row["joint"]
+                )
+                subjects_by_key[key]["workload"] = max(
+                    subjects_by_key[key]["workload"], effective, 1
+                )
+            class_subject_keys[class_name] = keys
 
-        # O noturno de TI foi extraído do horário conversado: 25 aulas/semana.
-        ti_subjects = [
-            ("SBD", 5, "Alta", "Camila"),
-            ("PTCC", 3, "Media", "Marcel"),
-            ("PC2", 5, "Alta", "Marcel"),
-            ("RDS", 5, "Media", "Higor"),
-            ("GSO2", 3, "Media", "Augusto"),
-            ("SI", 2, "Media", "Leonardo"),
-            ("DSE", 2, "Media", "Augusto"),
-        ]
-
-        subject_by_name = {}
-        info_settings = []
-        info_teacher_assignments = {}
-        for name, workload, complexity, category, split, teacher_name in info_subjects:
-            subject = models.Subject(
-                name=name,
-                workload=workload,
-                complexity=complexity,
-                category=category,
-                course_ids=[info_course.id],
+        subject_models = {}
+        for key, data in subjects_by_key.items():
+            item = models.Subject(
+                name=data["name"],
+                workload=data["workload"],
+                complexity="Media",
+                category=data["category"],
+                course_ids=sorted(subject_courses[key]),
             )
-            db.add(subject)
-            db.flush()
-            subject_by_name[name] = subject
-            info_settings.append({
-                "subject_id": subject.id,
-                "workload": workload,
-                "split": split,
-            })
-            info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
+            db.add(item)
+            subject_models[key] = item
+        db.flush()
 
-        # O quadro mostra SW2 com 3 aulas no grupo A e 2 no grupo B.
-        for setting in info_settings:
-            if setting["subject_id"] == subject_by_name["SW2"].id:
-                setting["workload_a"] = 3
-                setting["workload_b"] = 2
-
-        # SW2 e CNW2 aparecem com professores diferentes entre os grupos A/B.
-        info_teacher_assignments.setdefault("Higor", []).append(
-            subject_by_name["SW2"].id
-        )
-        info_teacher_assignments.setdefault("Marcel", []).append(
-            subject_by_name["CNW2"].id
-        )
-
-        night_settings = []
-        if not only_informatica:
-            for name, workload, complexity, teacher_name in ti_subjects:
-                subject = models.Subject(
-                    name=name,
-                    workload=workload,
-                    complexity=complexity,
-                    category="Técnica",
-                    course_ids=[night_course.id],
-                )
-                db.add(subject)
-                db.flush()
-                subject_by_name[name] = subject
-                night_settings.append({
-                    "subject_id": subject.id,
-                    "workload": workload,
-                    "split": False,
-                })
-                info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
-
-        agro_settings_by_class = {}
-        agro_class_names = []
-
-        if not only_informatica:
-            # Disciplinas observadas no quadro diurno de Agro atualizado em 02/06/2026.
-            # A carga por turma vem da contagem dos períodos legíveis no quadro.
-            # Nomes/cargas em células pouco nítidas e a habilitação docente continuam
-            # provisórios; o quadro não é uma matriz oficial de cargas separada.
-            agro_general_subjects = {
-                "Arte", "Biologia", "Educação Física", "Espanhol", "Filosofia",
-                "Física", "Geografia", "História", "Inglês", "Língua Portuguesa",
-                "Matemática", "Química", "Sociologia",
-            }
-            agro_subject_specs = [
-                ("C.A.E.R", 1, "Media", ["Tedo"]),
-                ("M.R.N", 2, "Media", ["Gilson"]),
-                ("P.T.I.C", 2, "Media", ["Joesley"]),
-                ("C.P.D.P.J", 2, "Media", ["Tedo"]),
-                ("G.P.D.P.J", 1, "Media", ["Tedo"]),
-                ("A.S", 2, "Media", ["Tedo", "Guilherme"]),
-                ("P.D.T.C.C", 2, "Media", ["Maickon"]),
-                ("N.V", 1, "Media", ["Gilson"]),
-                ("E.A.C.N.T", 2, "Media", ["Fabiane", "Juciane"]),
-                ("G.P.A", 1, "Media", ["Tedo"]),
-                ("A.R", 2, "Media", ["Maickon"]),
-                ("P.P.A", 2, "Media", ["Matheus", "Giovana"]),
-                ("A.P.P", 2, "Media", ["Guilherme", "Pedro K"]),
-                ("L.M.I.S", 2, "Media", ["Fabiane"]),
-                ("N.A.A.M", 2, "Media", ["Pedro K"]),
-                ("L.R.T", 2, "Media", ["Gilson"]),
-                ("E.A.M.T", 2, "Media", ["Gustavo", "Juciane"]),
-                ("L.P.C", 2, "Media", ["Fabiane"]),
-                ("C.A", 2, "Media", ["Gilson"]),
-                ("O.V/I", 2, "Media", ["Gilson"]),
-                ("C.P.R.T", 1, "Media", ["Solange"]),
-                ("S.A.B.E.A", 2, "Media", ["Pedro K"]),
-                ("M.I.A", 2, "Media", ["Guilherme"]),
-                ("E.O.E.T.R", 1, "Media", ["Guilherme"]),
-                ("P.C.P.S.P", 2, "Media", ["Tedo"]),
-                ("Língua Portuguesa", 3, "Baixa", ["Marcela", "Célia"]),
-                ("Educação Física", 2, "Media", ["Pedro Hernandes", "Rocco", "Renata"]),
-                ("Física", 2, "Media", ["Pedro Hernandes", "Rocco", "Renata"]),
-                ("Química", 2, "Media", ["Adriana"]),
-                ("Arte", 2, "Baixa", ["Solange"]),
-                ("Inglês", 2, "Baixa", ["Juliana", "Marta"]),
-                ("História", 2, "Baixa", ["Thiago Sampaio"]),
-                ("Matemática", 3, "Alta", ["Graciliano", "Kamila"]),
-                ("Geografia", 2, "Baixa", ["Thiago Hernandes", "Detto"]),
-                ("Biologia", 2, "Media", []),
-                ("Filosofia", 1, "Baixa", ["Thiago", "Aline"]),
-                ("Sociologia", 1, "Baixa", ["Cristian", "Thiago", "M. Emília"]),
-                ("Espanhol", 2, "Baixa", ["Célia"]),
-            ]
-
-            for name, workload, complexity, teacher_names in agro_subject_specs:
-                subject = subject_by_name.get(name)
-                if subject is None:
-                    category = "Ensino Médio" if name in agro_general_subjects else "Técnica"
-                    subject = models.Subject(
-                        name=name,
-                        workload=workload,
-                        complexity=complexity,
-                        category=category,
-                        course_ids=[agro_course.id],
-                    )
-                    db.add(subject)
-                    db.flush()
-                    subject_by_name[name] = subject
-                else:
-                    course_ids = list(subject.course_ids or [])
-                    if agro_course.id not in course_ids:
-                        subject.course_ids = course_ids + [agro_course.id]
-                    if workload > subject.workload:
-                        subject.workload = workload
-
-                for teacher_name in teacher_names:
-                    info_teacher_assignments.setdefault(teacher_name, []).append(subject.id)
-
-            # Matriz derivada da frequência semanal observada em cada coluna da grade.
-            # Cada coluna é uma turma completa e independente: o sufixo A/B faz
-            # parte do nome da turma e não indica subgrupos internos.
-            # As células pouco legíveis e a carga de componentes com marcações
-            # mistas permanecem estimativas de demonstração, não dados oficiais.
-            agro_class_names = [
-                "1º PI AGRO A",
-                "1º PI AGRO B",
-                "2º PI AGRO A",
-                "2º PI AGRO B",
-                "3º PI AGRO A",
-                "3º PI AGRO B",
-            ]
-            agro_matrix = {
-                "1º PI AGRO A": {
-                    "Língua Portuguesa": 3, "Educação Física": 2, "C.A.E.R": 1,
-                    "Matemática": 3, "História": 2, "Inglês": 2, "Filosofia": 1,
-                    "Biologia": 2, "Química": 2, "Sociologia": 1, "Geografia": 2,
-                    "C.P.R.T": 1, "Física": 2, "Arte": 2,
-                    "A.P.P": (2, 2), "P.P.A": (2, 2), "O.V/I": (2, 2),
-                    "M.R.N": (2, 2), "P.T.I.C": (2, 2),
-                },
-                "1º PI AGRO B": {
-                    "C.A.E.R": 1, "Arte": 2, "Educação Física": 2, "Filosofia": 1,
-                    "Matemática": 2, "Sociologia": 1, "Inglês": 2, "Geografia": 2,
-                    "Química": 2, "Física": 2, "Biologia": 2, "Língua Portuguesa": 3,
-                    "História": 2, "C.P.R.T": 1,
-                    "M.R.N": (2, 2), "P.T.I.C": (2, 2), "A.P.P": (2, 2),
-                    "P.P.A": (2, 2), "O.V/I": (2, 2),
-                },
-                "2º PI AGRO A": {
-                    "Inglês": 2, "Educação Física": 2, "C.P.D.P.J": 1,
-                    "E.A.C.N.T": {"joint": 1, "a": 1, "b": 1}, "L.M.I.S": 2,
-                    "Língua Portuguesa": 3, "L.P.C": 2, "Matemática": 3,
-                    "Biologia": 2, "N.V": 1, "História": 2, "Química": 2,
-                    "Física": 2, "Geografia": 2,
-                    "N.A.A.M": (2, 2), "L.R.T": (2, 2), "C.A": (2, 2),
-                    "P.P.A": (2, 2), "E.A.M.T": (1, 0),
-                },
-                "2º PI AGRO B": {
-                    "História": 3, "Língua Portuguesa": 3, "L.M.I.S": 2,
-                    "Educação Física": 2, "C.P.D.P.J": 1, "N.V": 1,
-                    "Biologia": 2, "L.P.C": 2, "Inglês": 2, "Geografia": 2,
-                    "Física": 2, "Matemática": 1, "Química": 1,
-                    "N.A.A.M": (2, 2), "L.R.T": (2, 2), "P.P.A": (2, 2),
-                    "C.A": (2, 2), "E.A.C.N.T": (1, 1),
-                },
-                "3º PI AGRO A": {
-                    "A.S": 2, "P.D.T.C.C": 2, "Inglês": 2, "Filosofia": 1,
-                    "Matemática": 2, "E.A.C.N.T": {"joint": 1, "a": 1, "b": 0},
-                    "G.P.A": 1, "A.R": 2, "M.I.A": 2, "Educação Física": 2,
-                    "C.P.D.P.J": 2, "Língua Portuguesa": 3, "Sociologia": 1,
-                    "S.A.B.E.A": 2, "E.O.E.T.R": 1, "Espanhol": 2, "Física": 2,
-                    "E.A.M.T": (0, 3),
-                },
-                "3º PI AGRO B": {
-                    "G.P.D.P.J": 1, "Educação Física": 2, "Física": 2,
-                    "E.A.C.N.T": 2, "Inglês": 2, "A.R": 2, "A.S": 2,
-                    "E.A.M.T": 3, "Matemática": 2, "Espanhol": 3,
-                    "S.A.B.E.A": 2, "M.I.A": 2, "Sociologia": 1,
-                    "Língua Portuguesa": 2, "P.C.P.S.P": 2, "P.D.T.C.C": 2,
-                    "E.O.E.T.R": 1, "Filosofia": 1,
-                },
-            }
-
-            for classroom_name, matrix in agro_matrix.items():
-                settings = []
-                for subject_name, load in matrix.items():
-                    subject = subject_by_name[subject_name]
-
-                    # Os sufixos A/B identificam turmas completas diferentes,
-                    # não grupos internos de uma mesma turma.
-                    if isinstance(load, int):
-                        weekly_load = load
-                    elif isinstance(load, tuple):
-                        # A matriz anterior codificava os sufixos como grupos.
-                        # Em cada turma separada, conta-se uma única carga semanal.
-                        weekly_load = max(int(load[0]), int(load[1]))
-                    else:
-                        joint = int(load.get("joint", 0))
-                        load_a = int(load.get("a", 0))
-                        load_b = int(load.get("b", 0))
-                        # Colapsa a carga comum + a carga específica em uma só carga.
-                        weekly_load = joint + max(load_a, load_b)
-
-                    if weekly_load <= 0:
-                        continue
-
-                    settings.append({
-                        "subject_id": subject.id,
-                        "workload": weekly_load,
-                        "split": False,
-                    })
-                agro_settings_by_class[classroom_name] = settings
-        classrooms = [
-            models.Classroom(
-                name="3º INFO",
-                shift="Integral",
-                course_id=info_course.id,
-                has_groups=True,
-                allowed_periods=[0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
-                subject_settings=info_settings,
-                preferred_subject_sequences=[[
-                    subject_by_name["Filosofia"].id,
-                    subject_by_name["Sociologia"].id,
-                ]],
-                split_subject_ids=[],
-            ),
-        ]
-        if not only_informatica:
-            classrooms.append(models.Classroom(
-                name="TI — Noite",
-                shift="Noite",
-                course_id=night_course.id,
-                has_groups=False,
-                allowed_periods=[11, 12, 13, 14, 15],
-                subject_settings=night_settings,
-                split_subject_ids=[],
-            ))
-            classrooms.extend(
-                models.Classroom(
-                    name=name,
-                    shift="Integral",
-                    course_id=agro_course.id,
-                    has_groups=False,
-                    allowed_periods=list(range(11)),
-                    subject_settings=agro_settings_by_class[name],
-                    split_subject_ids=[],
-                )
-                for name in agro_class_names
-            )
-        if not only_informatica:
-            agro_classrooms = [
-                classroom for classroom in classrooms
-                if classroom.course_id == agro_course.id
-            ]
-            if len(agro_classrooms) != 6:
-                raise RuntimeError(
-                    f"Esperadas 6 turmas Agro independentes; encontradas {len(agro_classrooms)}"
-                )
-            for classroom in agro_classrooms:
-                if classroom.has_groups:
-                    raise RuntimeError(
-                        f"{classroom.name} não deve ter subgrupos A/B internos"
-                    )
-                if classroom.allowed_periods != list(range(11)):
-                    raise RuntimeError(
-                        f"Jornada diurna incompleta em {classroom.name}"
-                    )
-                if any(
-                    setting.get("split")
-                    for setting in classroom.subject_settings
-                ):
-                    raise RuntimeError(
-                        f"{classroom.name} contém divisão interna indevida"
-                    )
-
-        db.add_all(classrooms)
-
-        # Nomes mantidos conforme os exemplos da imagem/conversa.
-        # Disponibilidades distintas são de demonstração, não um registro
-        # confirmado da escala real de cada docente.
-        teacher_specs = {
-            "Erika": ("Integral", [0, 1, 2, 3], 90),
-            "Marcel": ("Integral+Noite", [0, 1, 2, 3, 4], 95),
-            "M. Emília": ("Integral", [0, 1, 2, 3, 4], 85),
-            "Célia": ("Integral", [0, 1, 2, 3, 4], 80),
-            "Joesley": ("Integral", [0, 1, 2, 4], 80),
-            "Kamila": ("Integral", [0, 1, 2, 3, 4], 90),
-            "Marta": ("Integral", [0, 1, 2, 3, 4], 85),
-            "Gustavo": ("Integral", [0, 1, 2, 3], 80),
-            "Fabiane": ("Integral", [0, 1, 2, 3, 4], 80),
-            "Higor": ("Integral+Noite", [0, 1, 2, 3, 4], 95),
-            "Thiago": ("Integral", [0, 1, 2, 3, 4], 85),
-            "Gilson": ("Integral", [0, 1, 2, 3], 90),
-            "Camila": ("Noite", [0, 1, 2, 3, 4], 85),
-            "Augusto": ("Noite", [0, 1, 2, 3, 4], 90),
-            "Leonardo": ("Noite", [0, 1, 2, 3, 4], 85),
+        teacher_subjects = parse_pair_rows(TEACHER_ROWS, 2)
+        teacher_shift_rows = parse_pair_rows(TEACHER_SHIFTS, 2)
+        shift_by_teacher = {
+            norm(name): {part.strip() for part in shifts.split(";")}
+            for name, shifts in teacher_shift_rows.items()
         }
 
-        for name, subject_ids in info_teacher_assignments.items():
-            # Docentes vistos apenas no quadro de Agro recebem disponibilidade integral
-            # provisória; a grade de origem não informa a agenda semanal completa deles.
-            teacher_specs.setdefault(name, ("Integral", [0, 1, 2, 3, 4], 80))
-            # No modo isolado de Informática, não inventamos dias bloqueados:
-            # a disponibilidade oficial individual não ficou preservada nas imagens.
-            # Liberamos o Integral de segunda a sexta para testar matéria/professor
-            # e a preferência por aulas em pares sem restrições arbitrárias.
-            if only_informatica:
-                days = list(range(5))
-                shift_names = ["Integral"]
-                score = teacher_specs[name][2]
-            else:
-                shifts, days, score = teacher_specs[name]
-                shift_names = shifts.split("+")
+        selected_subject_keys = set(subjects_by_key)
+        teacher_specs = []
+        for source_teacher, raw_subjects in teacher_subjects.items():
+            teacher_key = norm(source_teacher)
+            shifts = shift_by_teacher.get(teacher_key, set()) & active_shifts
+            allowed_keys = {norm(item) for item in raw_subjects.split(";")}
+            allowed_keys &= selected_subject_keys
+            if not shifts or not allowed_keys:
+                continue
+            teacher_specs.append((source_teacher, shifts, allowed_keys))
 
-            db.add(models.Teacher(
-                name=name,
-                allowed_subjects=sorted(set(subject_ids)),
-                availability=make_availability(shift_names, days),
-                score=score,
+        teacher_specs.sort(key=lambda item: norm(item[0]))
+        teacher_models = []
+        for index, (_, shifts, allowed_keys) in enumerate(teacher_specs, start=1):
+            teacher_models.append(models.Teacher(
+                name=f"Docente {index:02d}",
+                allowed_subjects=sorted(subject_models[key].id for key in allowed_keys),
+                availability=broad_availability(shifts),
+                score=0,
+            ))
+        db.add_all(teacher_models)
+
+        classroom_models = []
+        for class_name, shift, has_groups, rows in selected_classes:
+            settings = []
+            for row in rows:
+                subject_id = subject_models[norm(row["subject"])].id
+
+                if shift == "Noite":
+                    workload = (
+                        row["a"] if row.get("night_cohort") == "A"
+                        else row["b"] if row.get("night_cohort") == "B"
+                        else row["joint"]
+                    )
+                    if workload <= 0:
+                        continue
+                    settings.append({
+                        "subject_id": subject_id,
+                        "workload": workload,
+                        "split": False,
+                    })
+                elif has_groups and (row["a"] or row["b"]):
+                    settings.append({
+                        "subject_id": subject_id,
+                        "workload": max(row["a"], row["b"], 1),
+                        "joint_workload": row["joint"],
+                        "workload_a": row["a"],
+                        "workload_b": row["b"],
+                        "split": True,
+                    })
+                else:
+                    workload = row["joint"]
+                    if workload <= 0:
+                        continue
+                    settings.append({
+                        "subject_id": subject_id,
+                        "workload": workload,
+                        "split": False,
+                    })
+
+            classroom_models.append(models.Classroom(
+                name=class_name,
+                shift=shift,
+                allowed_periods=list(range(11)) if shift == "Integral" else list(range(11, 16)),
+                course_id=course_models[course_name(class_name)].id,
+                has_groups=has_groups if shift == "Integral" else False,
+                subject_settings=settings,
+                preferred_subject_sequences=[],
+                split_subject_ids=[],
             ))
 
+        db.add_all(classroom_models)
         db.add(models.SystemConfig(
             max_classes_per_day=9,
             max_consecutive_classes=6,
@@ -450,53 +670,53 @@ def main(only_informatica=False):
         ))
         db.commit()
 
-        info_total = sum(item[1] for item in info_subjects)
-        info_total_a = sum(
-            int(setting.get("workload_a") or setting["workload"])
-            if setting.get("split") else setting["workload"]
-            for setting in info_settings
-        )
-        info_total_b = sum(
-            int(setting.get("workload_b") or setting["workload"])
-            if setting.get("split") else setting["workload"]
-            for setting in info_settings
-        )
-        night_total = sum(item[1] for item in ti_subjects)
-        if info_total != 37 or (info_total_a, info_total_b) != (37, 36):
-            raise RuntimeError(
-                f"Cargas inesperadas no 3º INFO: padrão={info_total}, "
-                f"grupo A={info_total_a}, grupo B={info_total_b}"
-            )
-        if not only_informatica and night_total != 25:
-            raise RuntimeError(f"Carga inesperada no TI Noturno: {night_total}")
+        class_count = db.query(models.Classroom).count()
+        subject_count = db.query(models.Subject).count()
+        teacher_count = db.query(models.Teacher).count()
+        lesson_units = 0
+        for classroom in classroom_models:
+            for setting in classroom.subject_settings:
+                if classroom.has_groups and setting.get("split"):
+                    joint = int(setting.get("joint_workload", 0) or 0)
+                    lesson_units += joint * 2
+                    lesson_units += int(setting.get("workload_a", 0) or 0)
+                    lesson_units += int(setting.get("workload_b", 0) or 0)
+                else:
+                    lesson_units += int(setting["workload"])
 
-        print("Base de demonstração criada com sucesso.")
+        if mode == "all" and (class_count != 20 or subject_count != 110):
+            raise RuntimeError(
+                f"Contagem diferente da transcrição esperada: "
+                f"{class_count} turmas, {subject_count} disciplinas"
+            )
+
+        print("Base realista criada em banco isolado.")
         print(f"Banco: {DATABASE_PATH}")
+        print(f"Cenário: {mode}")
         print(f"Cursos: {db.query(models.Course).count()}")
-        print(f"Turmas: {db.query(models.Classroom).count()}")
-        print(f"Disciplinas: {db.query(models.Subject).count()}")
-        print(f"Professores: {db.query(models.Teacher).count()}")
-        print("Turma de referência: 3º INFO Integral, com A/B.")
-        print(f"Cargas do quadro do 3º INFO: grupo A={info_total_a}, grupo B={info_total_b} aulas/semana.")
-        print("Matérias técnicas separadas por grupo; matérias do Ensino Médio compartilhadas.")
-        print("Preferência cadastrada: Filosofia seguida de Sociologia.")
-        print("SW2 e CNW2 permitem os professores vistos nos grupos A/B.")
-        print("Disponibilidades docentes oficiais não constam no quadro; permanecem provisórias.")
-        if not only_informatica:
-            print("Turmas adicionais: TI Noite + seis turmas Agro independentes, sem subgrupos internos A/B.")
-            print("As cargas de Agro foram inferidas da grade diurna de 02/06/2026; revisar rótulos/cargas pouco nítidos e disponibilidades docentes.")
+        print(f"Turmas: {class_count}")
+        print(f"Disciplinas: {subject_count}")
+        print(f"Professores anonimizados: {teacher_count}")
+        print(f"Aulas/unidades semanais configuradas: {lesson_units}")
+        print("Disponibilidade: ampla e sintética, não foi fornecida pela planilha.")
+        print("Complexidade das disciplinas: neutra (média), pois não consta no quadro.")
+        print("Dois quadros MTEC e 7 eventos síncronos mensais não entram no solver semanal.")
+        print("A base criada fica separada de school_schedule.db.")
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Cria uma base de demonstração isolada do Anatinus."
+    parser = argparse.ArgumentParser(description="Monta base de testes a partir da planilha escolar.")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--informatica-only", action="store_true", help="somente 3º INFORMÁTICA diurno")
+    group.add_argument("--diurno-only", action="store_true", help="somente as 11 turmas diurnas")
+    group.add_argument("--noturno-only", action="store_true", help="somente os cursos técnicos modulares noturnos")
+    args = parser.parse_args()
+    selected_mode = (
+        "informatica" if args.informatica_only
+        else "diurno" if args.diurno_only
+        else "noturno" if args.noturno_only
+        else "all"
     )
-    parser.add_argument(
-        "--informatica-only",
-        action="store_true",
-        help="cria somente a turma de referência 3º INFO e seus professores/matérias",
-    )
-    arguments = parser.parse_args()
-    main(only_informatica=arguments.informatica_only)
+    main(selected_mode)
