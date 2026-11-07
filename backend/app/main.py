@@ -931,7 +931,8 @@ def generate_timetable(
     if scope == "all":
         result["generation_scope"] = "all"
         result["preserved_lessons"] = 0
-        result["message"] = "Grade da escola inteira gerada."
+        if not result.get("schedule_integrity_fallback"):
+            result["message"] = "Grade da escola inteira gerada."
     else:
         preserved = [
             row for row in saved_schedule
