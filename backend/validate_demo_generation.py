@@ -26,6 +26,7 @@ from app.optimizer import (  # noqa: E402
     PERIOD_START_MINUTES,
     generate_schedule,
     get_allowed_periods,
+    get_allowed_periods_for_day,
 )
 
 
@@ -54,6 +55,7 @@ def _validate_api_generation(db, classrooms) -> None:
         "name": classroom_row.name,
         "shift": classroom_row.shift,
         "allowed_periods": classroom_row.allowed_periods,
+        "allowed_periods_by_day": classroom_row.allowed_periods_by_day,
         "has_groups": classroom_row.has_groups,
     }
     expected = _expected_lesson_count({
@@ -112,7 +114,6 @@ def _expected_lesson_count(classroom: dict) -> int:
 
 
 def _assert_no_student_gaps(classroom: dict, schedule: list[dict]) -> None:
-    allowed_periods = get_allowed_periods(classroom)
     audiences = (
         ["A", "B"]
         if classroom.get("has_groups") and classroom.get("shift") != "Noite"
@@ -121,12 +122,19 @@ def _assert_no_student_gaps(classroom: dict, schedule: list[dict]) -> None:
 
     for audience in audiences:
         for day in range(5):
+            allowed_periods = get_allowed_periods_for_day(classroom, day)
             occupied = {
                 item["period"]
                 for item in schedule
                 if item["day"] == day
                 and item["student_group"] in ("Todos", audience)
             }
+            outside_allowed = occupied - set(allowed_periods)
+            if outside_allowed:
+                raise RuntimeError(
+                    f"Período não permitido em {classroom['name']} "
+                    f"(grupo {audience}, dia {day + 1}): {sorted(outside_allowed)}."
+                )
             positions = sorted(
                 allowed_periods.index(period)
                 for period in occupied
@@ -353,6 +361,7 @@ def _validate_all_together(db) -> None:
             "name": classroom_row.name,
             "shift": classroom_row.shift,
             "allowed_periods": classroom_row.allowed_periods,
+            "allowed_periods_by_day": classroom_row.allowed_periods_by_day,
             "has_groups": classroom_row.has_groups,
             "subject_settings": classroom_row.subject_settings or [],
         }
