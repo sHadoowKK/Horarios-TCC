@@ -427,10 +427,9 @@ def generate_schedule(
     # Ocupação de Estudantes e Professores
     student_occupancy = {}
     for classroom in classrooms:
-        allowed_periods = _get_allowed_periods(classroom)
         for audience in _audiences_for(classroom):
             for day in range(num_days):
-                for period in allowed_periods:
+                for period in _get_allowed_periods_for_day(classroom, day):
                     occupancy = model.NewBoolVar(f"occ_c{classroom['id']}_g{audience}_d{day}_p{period}")
                     values = vars_for_audience(classroom, audience, day, period)
                     if values:
@@ -456,7 +455,6 @@ def generate_schedule(
     # a grade continua livre para se afastar da média quando outras regras
     # obrigatórias ou a disponibilidade docente exigirem.
     for classroom in classrooms:
-        allowed_periods = _get_allowed_periods(classroom)
         for audience in _audiences_for(classroom):
             weekly_load = sum(
                 int(subject.get("_workload_by_target", {}).get(
@@ -468,14 +466,15 @@ def generate_schedule(
             )
             target_daily_load = weekly_load // num_days
             for day in range(num_days):
+                allowed_today = _get_allowed_periods_for_day(classroom, day)
                 daily_load = sum(
                     student_occupancy[(classroom["id"], audience, day, period)]
-                    for period in allowed_periods
+                    for period in allowed_today
                     if (classroom["id"], audience, day, period) in student_occupancy
                 )
                 deviation = model.NewIntVar(
                     0,
-                    len(allowed_periods),
+                    len(allowed_today),
                     f"daily_balance_c{classroom['id']}_g{audience}_d{day}",
                 )
                 model.AddAbsEquality(deviation, daily_load - target_daily_load)
@@ -493,10 +492,9 @@ def generate_schedule(
             continue
 
         subjects = classroom_subjects[classroom["id"]]
-        allowed_periods = _get_allowed_periods(classroom)
 
         for day in range(num_days):
-            for period in allowed_periods:
+            for period in _get_allowed_periods_for_day(classroom, day):
                 all_a_vars = []
                 all_b_vars = []
                 same_subject_parallel_vars = []
@@ -596,20 +594,20 @@ def generate_schedule(
     # Equilíbrio diário entre Grupo A e Grupo B
     for classroom in classrooms:
         if classroom.get("has_groups", False) and classroom.get("shift") != "Noite":
-            allowed_periods = _get_allowed_periods(classroom)
             for day in range(num_days):
-                sum_a = sum(student_occupancy[(classroom["id"], "A", day, p)] for p in allowed_periods if (classroom["id"], "A", day, p) in student_occupancy)
-                sum_b = sum(student_occupancy[(classroom["id"], "B", day, p)] for p in allowed_periods if (classroom["id"], "B", day, p) in student_occupancy)
+                allowed_today = _get_allowed_periods_for_day(classroom, day)
+                sum_a = sum(student_occupancy[(classroom["id"], "A", day, p)] for p in allowed_today if (classroom["id"], "A", day, p) in student_occupancy)
+                sum_b = sum(student_occupancy[(classroom["id"], "B", day, p)] for p in allowed_today if (classroom["id"], "B", day, p) in student_occupancy)
                 model.Add(sum_a - sum_b <= 2)
                 model.Add(sum_b - sum_a <= 2)
 
     # MÍNIMO DE 2 AULAS POR TURNO
     for classroom in classrooms:
-        allowed_periods = _get_allowed_periods(classroom)
         for audience in _audiences_for(classroom):
             for day in range(num_days):
+                allowed_today = set(_get_allowed_periods_for_day(classroom, day))
                 for turn_name, turn_periods in TURNS_DEFINITIONS.items():
-                    valid_turn_periods = [p for p in turn_periods if p in allowed_periods]
+                    valid_turn_periods = [p for p in turn_periods if p in allowed_today]
                     if valid_turn_periods and min_classes_students >= 2:
                         turn_sum = sum(student_occupancy[(classroom["id"], audience, day, p)] for p in valid_turn_periods if (classroom["id"], audience, day, p) in student_occupancy)
                         model.Add(turn_sum != 1)
@@ -670,15 +668,15 @@ def generate_schedule(
     ]
 
     for classroom, subject, target in units:
-        allowed_periods = _get_allowed_periods(classroom)
-        allowed_set = set(allowed_periods)
         weekly_workload = int(subject.get("_workload_by_target", {}).get(target, subject["workload"]))
 
         days_active = []
 
         for day in range(num_days):
+            allowed_today = _get_allowed_periods_for_day(classroom, day)
+            allowed_set = set(allowed_today)
             slot_vars = {}
-            for period in allowed_periods:
+            for period in allowed_today:
                 sv = model.NewBoolVar(f"slot_c{classroom['id']}_s{subject['id']}_g{target}_d{day}_p{period}")
                 unit_vars = vars_for_unit_at(classroom, subject, target, day, period)
                 if unit_vars:
@@ -747,12 +745,12 @@ def generate_schedule(
     # Uma sequência de aulas sem janelas tem no máximo uma transição 0 -> 1.
     # Contar essas transições impõe a contiguidade em O(n) por dia/turma/grupo.
     for classroom in classrooms:
-        allowed_periods = _get_allowed_periods(classroom)
         for audience in _audiences_for(classroom):
             for day in range(num_days):
+                allowed_today = _get_allowed_periods_for_day(classroom, day)
                 day_occ = [
                     student_occupancy[(classroom["id"], audience, day, period)]
-                    for period in allowed_periods
+                    for period in allowed_today
                     if (classroom["id"], audience, day, period) in student_occupancy
                 ]
                 starts = []
