@@ -714,6 +714,11 @@ html.dark-theme .app-brand-title .app-logo-light {
   max-width: min(360px, 34vw);
 }
 
+.app-toolbar-filter {
+  min-width: 150px;
+  max-width: 190px;
+}
+
 .app-toolbar-actions {
   flex: 0 0 auto;
   justify-content: flex-end;
@@ -1571,7 +1576,8 @@ html.dark-theme .app-brand-title .app-logo-light {
     width: 100%;
   }
 
-  .app-view-controls > select {
+  .app-view-controls > select,
+  .app-view-controls > input {
     flex: 1 1 0;
     max-width: none;
   }
