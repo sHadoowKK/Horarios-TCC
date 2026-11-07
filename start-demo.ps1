@@ -18,6 +18,11 @@ if (-not (Test-Path (Join-Path $frontend "node_modules"))) {
     throw "Dependências do frontend não encontradas. Entre em frontend e execute npm install."
 }
 
+$apiListener = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+if ($apiListener) {
+    throw "A API já está aberta na porta 8000. Feche as instâncias atuais do Anatinus antes de iniciar outra demonstração."
+}
+
 if ($SkipSeed) {
     if (-not (Test-Path $demoDb)) {
         throw "Banco DEMO não encontrado: $demoDb. Execute primeiro o seed correspondente ao cenário."
