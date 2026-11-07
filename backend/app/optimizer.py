@@ -722,7 +722,7 @@ def generate_schedule(
             if classroom.get("shift") == "Noite":
                 # No noturno são válidos blocos de 3, 4 ou 5 aulas.
                 # O agrupamento é incentivado por bônus, não limitado a pares.
-                model.Add(day_sum <= min(5, len(allowed_periods)))
+                model.Add(day_sum <= min(5, len(allowed_today)))
             elif weekly_workload in (2, 4):
                 if pair_vars:
                     model.Add(day_sum == 2 * sum(pair_vars))
