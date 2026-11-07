@@ -902,7 +902,9 @@ def generate_schedule(
         feasibility_model.proto.clear_objective()
 
         feasibility_solver = cp_model.CpSolver()
-        feasibility_solver.parameters.max_time_in_seconds = 45.0
+        # A base escolar real tem centenas de aulas e muitas colisões possíveis.
+        # 45s encerrava a busca antes de encontrar soluções que existem.
+        feasibility_solver.parameters.max_time_in_seconds = 240.0
         feasibility_solver.parameters.num_search_workers = 8
         feasibility_solver.parameters.stop_after_first_solution = True
         status = feasibility_solver.Solve(feasibility_model)
@@ -921,7 +923,7 @@ def generate_schedule(
                 model.add_hint(model.get_int_var_from_proto_index(index), value)
 
             optimization_solver = cp_model.CpSolver()
-            optimization_solver.parameters.max_time_in_seconds = 15.0
+            optimization_solver.parameters.max_time_in_seconds = 30.0
             optimization_solver.parameters.num_search_workers = 8
             optimization_status = optimization_solver.Solve(model)
             optimization_time = optimization_solver.WallTime()
@@ -981,9 +983,9 @@ def generate_schedule(
         return {
             "status": "timeout",
             "message": (
-                "O otimizador atingiu o limite de busca sem encontrar "
-                "uma grade viável. Isso não comprova que a grade seja impossível. "
-                "Tente gerar por turma ou revise a combinação de cargas e docentes."
+                "O otimizador encerrou a busca de viabilidade após 4 minutos sem "
+                "encontrar uma grade. Isso não comprova que a grade seja impossível. "
+                "Tente gerar por turma ou revise cargas, jornadas e docentes."
             ),
             **model_metrics,
         }
