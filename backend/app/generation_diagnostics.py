@@ -38,6 +38,7 @@ def build_unstaffed_diagnostics(
     teachers,
     schedule,
     fixed_schedule=None,
+    teacher_assignment_fallback=False,
 ):
     """Explica por que as unidades que ficaram sem docente não receberam professor.
 
@@ -139,22 +140,38 @@ def build_unstaffed_diagnostics(
                 "reason_code": "insufficient_availability",
                 "message": (
                     f"A carga exige {lesson_count} aulas semanais, mas o professor "
-                    f"habilitado com mais disponibilidade ({best_teacher['name']}) "
-                    f"tem apenas {best_count} períodos livres nesta turma. "
-                    "Ajuste a disponibilidade ou habilite outro docente."
+                    f"habilitado com mais janelas marcadas como disponíveis "
+                    f"({best_teacher['name']}) tem apenas {best_count} na jornada "
+                    f"de {classroom_name}. Revise a disponibilidade cadastrada "
+                    "ou habilite outro docente."
+                ),
+            })
+        elif teacher_assignment_fallback:
+            diagnostic.update({
+                "reason_code": "teacher_search_timeout",
+                "message": (
+                    f"O otimizador atingiu o limite interno de busca enquanto "
+                    f"tentava distribuir professores para {lesson_count} aulas "
+                    f"de {subject_name}. A grade da turma foi mantida, mas a "
+                    "atribuição docente não foi concluída. Isso não comprova "
+                    "que os professores sejam incompatíveis ou estejam sem "
+                    "horários; tente gerar turmas menores ou revisar a carga "
+                    "de processamento. Os períodos abaixo são apenas os que "
+                    "estão marcados como disponíveis no cadastro."
                 ),
             })
         else:
             diagnostic.update({
                 "reason_code": "global_constraints",
                 "message": (
-                    f"Existe professor habilitado com {best_count} períodos "
-                    f"disponíveis para {lesson_count} aulas de {subject_name}, "
-                    "mas o modelo não conseguiu atribuir a carga inteira. "
-                    "O conflito pode envolver choque com outras turmas, limite "
-                    "diário, descanso entre jornadas ou outras regras. A análise "
-                    "não isolou uma causa única; confira também os horários dos "
-                    "professores listados abaixo."
+                    f"O cadastro mostra {best_count} períodos marcados como "
+                    f"disponíveis para os professores habilitados para {lesson_count} "
+                    f"aulas de {subject_name} na jornada de {classroom_name}, mas "
+                    "isso não garante que esses horários estejam livres após "
+                    "considerar as demais turmas e regras. O conflito pode envolver "
+                    "choque com outras aulas, limite diário, descanso entre jornadas "
+                    "ou outras regras. A análise não isolou uma causa única; "
+                    "confira também os horários dos professores listados abaixo."
                 ),
             })
 
