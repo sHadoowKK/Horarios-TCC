@@ -238,8 +238,9 @@ def _validate_one_classroom(
     return {
         "name": classroom_row.name,
         "lessons": actual,
-        "unstaffed": result.get("unstaffed_lessons", 0),
+        "unstaffed_in_feasibility_search": result.get("unstaffed_lessons", 0),
         "solution_status": result.get("solution_status", "unknown"),
+        "validation_mode": "feasibility_only",
         "variables": result.get("model_variables", 0),
         "constraints": result.get("model_constraints", 0),
         "solve_seconds": result.get("solve_time_seconds", 0),
