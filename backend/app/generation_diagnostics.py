@@ -40,6 +40,7 @@ def build_unstaffed_diagnostics(
     schedule,
     fixed_schedule=None,
     teacher_assignment_fallback=False,
+    schedule_integrity_fallback=False,
 ):
     """Explica por que as unidades que ficaram sem docente não receberam professor.
 
@@ -144,6 +145,18 @@ def build_unstaffed_diagnostics(
                     f"({best_teacher['name']}) tem apenas {best_count} na jornada "
                     f"de {classroom_name}. Revise a disponibilidade cadastrada "
                     "ou habilite outro docente."
+                ),
+            })
+        elif schedule_integrity_fallback:
+            diagnostic.update({
+                "reason_code": "schedule_integrity_fallback",
+                "message": (
+                    f"A matéria {subject_name} teve suas {lesson_count} aulas "
+                    f"preservadas na grade da turma {classroom_name}, mas a "
+                    "distribuição conjunta não conseguiu manter a atribuição "
+                    "de professores em todos os componentes. Os períodos "
+                    "permanecem reservados; confira os docentes habilitados "
+                    "antes de considerar a grade finalizada."
                 ),
             })
         elif teacher_assignment_fallback:
