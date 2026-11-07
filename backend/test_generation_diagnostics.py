@@ -78,7 +78,8 @@ class GenerationDiagnosticsTests(unittest.TestCase):
         result = self.diagnose([teacher(availability=availability)])
 
         self.assertEqual(result["reason_code"], "insufficient_availability")
-        self.assertIn("apenas 2 períodos livres", result["message"])
+        self.assertIn("apenas 2", result["message"])
+        self.assertIn("marcadas como disponíveis", result["message"])
 
     def test_reports_global_constraints_without_claiming_a_unique_cause(self):
         result = self.diagnose([teacher()])
@@ -95,6 +96,20 @@ class GenerationDiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(result["reason_code"], "preserved_unstaffed")
         self.assertIn("fixada ou foi preservada", result["message"])
+
+    def test_reports_teacher_search_timeout_without_claiming_teacher_shortage(self):
+        result = build_unstaffed_diagnostics(
+            [classroom()],
+            [subject()],
+            [teacher()],
+            unstaffed_schedule(4),
+            teacher_assignment_fallback=True,
+        )[0]
+
+        self.assertEqual(result["reason_code"], "teacher_search_timeout")
+        self.assertIn("limite interno de busca", result["message"])
+        self.assertIn("não comprova", result["message"])
+        self.assertEqual(result["teachers"][0]["available_periods"], 10)
 
 
 if __name__ == "__main__":
