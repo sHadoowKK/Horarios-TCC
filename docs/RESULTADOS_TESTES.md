@@ -70,6 +70,12 @@ O quadro técnico noturno usa os períodos 19:00–19:45, 19:45–20:30 e 20:30�
 
 A jornada por turma pode incluir um mapa de períodos permitido por dia. Essa regra é usada no 1º Alimentos para não permitir que o solver coloque aulas à tarde em dias nos quais o quadro não apresenta aulas vespertinas. O mesmo mapa é respeitado no pré-diagnóstico, na validação e na visualização/Excel.
 
+### Regra de distribuição para matérias com 2 aulas semanais
+
+A validação da planilha encontrou uma inviabilidade real na turma 1º Alimentos. Cada grupo tem 32 aulas semanais em 16 componentes de duas aulas. A jornada permite 6 períodos de manhã por dia e mais 2 períodos na quarta-feira à tarde. Como a manhã tem dois blocos de três aulas separados pelo intervalo, não existem blocos consecutivos suficientes para obrigar as 16 matérias a ocorrerem sempre em pares no mesmo dia.
+
+A regra antiga transformava a preferência por duas aulas consecutivas em uma obrigação matemática. Ela foi alterada: o solver continua **favorecendo** pares consecutivos, mas pode colocar as duas aulas em dias diferentes quando a estrutura da jornada não comportar todos os pares. Cargas semanais, períodos disponíveis, intervalos e limites diários não foram reduzidos.
+
 As células mescladas dos quadros diurnos representam aulas para a turma toda. Células independentes nas colunas A/B representam cargas próprias dos grupos. Exemplos conferidos:
 
 | Turma | Aulas conjuntas | Específicas A | Específicas B | Carga de cada grupo |
