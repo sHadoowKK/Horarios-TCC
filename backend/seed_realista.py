@@ -422,19 +422,27 @@ def parse_pair_rows(raw, value_count):
 
 
 def parse_matrix():
-    matrix = defaultdict(list)
+    # Soma linhas da mesma disciplina quando a planilha só varia pontuação/acentos.
+    matrix = defaultdict(dict)
     for line_number, line in enumerate(MATRIX_ROWS.strip().splitlines(), start=1):
         parts = [part.strip() for part in line.split("|")]
         if len(parts) != 5:
             raise ValueError(f"Linha da matriz inválida ({line_number}): {line}")
         classroom, subject, joint, load_a, load_b = parts
-        matrix[classroom].append({
+        key = norm(subject)
+        entry = matrix[classroom].setdefault(key, {
             "subject": subject,
-            "joint": int(joint),
-            "a": int(load_a),
-            "b": int(load_b),
+            "joint": 0,
+            "a": 0,
+            "b": 0,
         })
-    return dict(matrix)
+        entry["joint"] += int(joint)
+        entry["a"] += int(load_a)
+        entry["b"] += int(load_b)
+    return {
+        classroom: list(subjects.values())
+        for classroom, subjects in matrix.items()
+    }
 
 
 def course_name(classroom_name):
