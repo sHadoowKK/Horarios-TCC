@@ -819,6 +819,7 @@ def generate_schedule(
     seed_branches = 0
     seed_conflicts = 0
     seed_slot_keys = set()
+    seed_failure_diagnostic = None
 
     if len(classrooms) > 1 and not fixed_schedule:
         candidate_seed = []
@@ -840,6 +841,33 @@ def generate_schedule(
 
             if seed_result.get("status") != "success":
                 seed_is_valid = False
+                target_loads = {"Todos": 0, "A": 0, "B": 0}
+                for unit_classroom, unit_subject, target in units:
+                    if unit_classroom["id"] != classroom["id"]:
+                        continue
+                    target_loads[target] += int(
+                        unit_subject.get("_workload_by_target", {}).get(
+                            target, unit_subject["workload"]
+                        ) or 0
+                    )
+                weekly_capacity = sum(
+                    len(_get_allowed_periods_for_day(classroom, day))
+                    for day in range(num_days)
+                )
+                if classroom.get("has_groups") and classroom.get("shift") != "Noite":
+                    load_detail = (
+                        f"A={target_loads['Todos'] + target_loads['A']}, "
+                        f"B={target_loads['Todos'] + target_loads['B']}"
+                    )
+                else:
+                    load_detail = str(target_loads["Todos"])
+                seed_failure_diagnostic = {
+                    "classroom": classroom.get("name", f"Turma {classroom['id']}"),
+                    "status": seed_result.get("status"),
+                    "weekly_load": load_detail,
+                    "weekly_capacity_per_group": weekly_capacity,
+                    "solver_message": seed_result.get("message", ""),
+                }
                 break
 
             candidate_seed.extend(seed_result.get("schedule", []))
@@ -1000,12 +1028,36 @@ def generate_schedule(
     }
 
     if status == cp_model.INFEASIBLE:
+        if seed_failure_diagnostic:
+            classroom_name = seed_failure_diagnostic["classroom"]
+            load_detail = seed_failure_diagnostic["weekly_load"]
+            capacity = seed_failure_diagnostic["weekly_capacity_per_group"]
+            if seed_failure_diagnostic["status"] == "infeasible":
+                detail = (
+                    f"A turma {classroom_name} já é inviável quando analisada "
+                    f"sozinha, sem considerar professores. Carga semanal por "
+                    f"grupo: {load_detail}; capacidade da jornada: {capacity} "
+                    "períodos. Revise a distribuição das matérias e as regras "
+                    "de blocos/intervalos dessa turma."
+                )
+            else:
+                detail = (
+                    f"Não foi possível validar individualmente a turma "
+                    f"{classroom_name} antes da geração conjunta "
+                    f"({seed_failure_diagnostic['status']}). Carga semanal por "
+                    f"grupo: {load_detail}; capacidade da jornada: {capacity} "
+                    "períodos. Isso não identifica uma impossibilidade por si só."
+                )
+        else:
+            detail = (
+                "O modelo comprovou que esta combinação de cargas e regras é "
+                "inviável. Confira as cargas semanais, as jornadas permitidas "
+                "e eventuais aulas marcadas como fixas."
+            )
         return {
             "status": "infeasible",
-            "message": (
-                "O modelo comprovou que esta combinação de cargas e regras é "
-                "inviável. Confira as cargas semanais e as jornadas permitidas."
-            ),
+            "message": detail,
+            "infeasibility_diagnostic": seed_failure_diagnostic,
             **model_metrics,
         }
 
