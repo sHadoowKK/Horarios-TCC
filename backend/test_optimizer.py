@@ -740,6 +740,70 @@ class OptimizerTests(unittest.TestCase):
         )
 
 
+    def test_joint_school_generation_preserves_split_group_loads(self):
+        classrooms = [
+            classroom(
+                1,
+                "1º PI AGRO A",
+                "Integral",
+                [
+                    {"subject_id": 1, "workload": 2, "split": False},
+                    {
+                        "subject_id": 2,
+                        "workload": 2,
+                        "joint_workload": 0,
+                        "workload_a": 2,
+                        "workload_b": 2,
+                        "split": True,
+                    },
+                    {"subject_id": 3, "workload": 2, "split": False},
+                ],
+                has_groups=True,
+                allowed_periods=[0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
+            ),
+            classroom(
+                2,
+                "2º PI AGRO A",
+                "Integral",
+                [{"subject_id": 4, "workload": 2, "split": False}],
+                allowed_periods=[0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
+            ),
+        ]
+        subjects = [
+            subject(1, "Arte", workload=2),
+            subject(2, "A.P.P.", workload=2),
+            subject(3, "História", workload=2),
+            subject(4, "Matemática", workload=2),
+        ]
+
+        # Sem docentes: este teste percorre o mesmo caminho de semente
+        # individual seguido da geração conjunta da escola.
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            [],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(len(result["schedule"]), 10)
+        first_class = [
+            item for item in result["schedule"]
+            if item["classroom_id"] == 1
+        ]
+        self.assertEqual(len(first_class), 8)
+        self.assertEqual(
+            {
+                group: sum(item["student_group"] == group for item in first_class)
+                for group in ("Todos", "A", "B")
+            },
+            {"Todos": 4, "A": 2, "B": 2},
+        )
+        self.assertEqual(
+            sum(item["classroom_id"] == 2 for item in result["schedule"]),
+            2,
+        )
+
     def test_small_school_multiple_classrooms_and_shared_teachers(self):
         """
         Cenário integrado de uma pequena escola.
