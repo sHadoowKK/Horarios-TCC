@@ -767,12 +767,14 @@ class OptimizerTests(unittest.TestCase):
             subject(4, "Matemática", workload=2),
         ]
 
-        # Sem docentes: este teste percorre o mesmo caminho de semente
-        # individual seguido da geração conjunta da escola.
+        # Um docente habilitado para todas as matérias cria disputas reais
+        # entre as turmas; a geração deve manter cada aula mesmo quando um
+        # choque de professor exige deixar uma unidade sem docente.
+        teachers = [teacher(1, [1, 2, 3, 4], full_availability())]
         result = generate_schedule(
             classrooms,
             subjects,
-            [],
+            teachers,
             default_config(),
         )
 
@@ -794,6 +796,12 @@ class OptimizerTests(unittest.TestCase):
             sum(item["classroom_id"] == 2 for item in result["schedule"]),
             2,
         )
+        teacher_slots = [
+            (item["day"], item["period"])
+            for item in result["schedule"]
+            if item["teacher_id"] == 1
+        ]
+        self.assertEqual(len(teacher_slots), len(set(teacher_slots)))
 
     def test_small_school_multiple_classrooms_and_shared_teachers(self):
         """
