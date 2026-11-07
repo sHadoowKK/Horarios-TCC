@@ -38,8 +38,8 @@ try {
 }
 
 Write-Host ""
-Write-Host "Base preparada: 3º INFO, disciplinas e professores de referência." -ForegroundColor Green
-Write-Host "Aviso: cargas e disponibilidades sem confirmação completa continuam provisórias." -ForegroundColor Yellow
+Write-Host "Base preparada: matriz do 3º INFO extraída da planilha, com aulas conjuntas e grupos A/B." -ForegroundColor Green
+Write-Host "Aviso: a disponibilidade docente por dia/período é sintética; a planilha não informa esses bloqueios." -ForegroundColor Yellow
 
 # O seed já criou o banco DEMO. Inicie sem executar novamente o seed fictício.
 if ($OpenBrowser) {
