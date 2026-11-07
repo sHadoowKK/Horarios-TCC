@@ -1204,10 +1204,12 @@ def generate_schedule(
                     "incompleta. A quantidade de aulas não bate com a matriz: "
                     f"{details}. Diagnóstico interno: status_solver={status}, "
                     f"seed_aulas={seed_actual_total}/{seed_expected_total}, "
+                    f"falha_na_seed={seed_failure_diagnostic}, "
                     f"divergências_na_seed={seed_mismatches[:8]}."
                 ),
                 "schedule_integrity_error": incomplete_units,
                 "seed_integrity_error": seed_mismatches,
+                "seed_failure_diagnostic": seed_failure_diagnostic,
                 **model_metrics,
             }
 
