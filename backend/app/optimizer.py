@@ -724,10 +724,11 @@ def generate_schedule(
                 # O agrupamento é incentivado por bônus, não limitado a pares.
                 model.Add(day_sum <= min(5, len(allowed_today)))
             elif weekly_workload in (2, 4):
-                if pair_vars:
-                    model.Add(day_sum == 2 * sum(pair_vars))
-                else:
-                    model.Add(day_sum == 0)
+                # Aulas em pares são uma preferência, não uma obrigação.
+                # A recompensa de pair_vars acima favorece blocos consecutivos,
+                # mas turmas com muitos componentes de 2 aulas precisam poder
+                # distribuir parte deles em dias diferentes quando a grade não
+                # comporta todos os pares (por exemplo, jornadas em blocos 3+3).
                 model.Add(day_sum <= 2)
 
             elif weekly_workload in (3, 5):
