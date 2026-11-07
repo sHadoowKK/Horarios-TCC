@@ -947,6 +947,7 @@ def generate_schedule(
         optimization_time = solver.WallTime()
         total_branches = solver.NumBranches()
         total_conflicts = solver.NumConflicts()
+        optimization_completed = status == cp_model.OPTIMAL
 
     def value_for_solution(variable):
         if solution_values is not None:
