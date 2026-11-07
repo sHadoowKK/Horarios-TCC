@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from . import models, schemas
 from .database import engine, ensure_database_compatibility, get_db
-from .optimizer import generate_schedule, get_allowed_periods, get_allowed_periods_for_day
+from .optimizer import generate_schedule, get_allowed_periods_for_day
 from .generation_diagnostics import build_unstaffed_diagnostics
 
 models.Base.metadata.create_all(bind=engine)
