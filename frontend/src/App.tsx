@@ -105,6 +105,7 @@ function App() {
 
   const [viewMode, setViewMode] = useState<"turma" | "professor">("turma");
   const [selectedId, setSelectedId] = useState<number | "">("");
+  const [classroomSearch, setClassroomSearch] = useState("");
 
   // Estado para controle da aula selecionada na edição manual
   const [editingLesson, setEditingLesson] = useState<any | null>(null);
@@ -435,6 +436,14 @@ function App() {
 
   const getClassroomName = (id: number) =>
     classrooms.find(classroom => classroom.id === id)?.name || "N/A";
+
+  const filteredClassrooms = classrooms.filter(classroom => {
+    const query = classroomSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!query) return true;
+    return `${classroom.name} ${classroom.shift}`
+      .toLocaleLowerCase("pt-BR")
+      .includes(query);
+  });
 
   const regenerationSubjectOptions = subjects.filter(subject =>
     classrooms.some(classroom =>
@@ -838,6 +847,28 @@ function App() {
                         <option value="professor">Por professor</option>
                       </select>
 
+                      {viewMode === "turma" && (
+                        <input
+                          type="search"
+                          aria-label="Filtrar turmas"
+                          placeholder="Filtrar turma ou turno..."
+                          className="app-toolbar-select app-toolbar-filter"
+                          value={classroomSearch}
+                          onChange={event => {
+                            const query = event.target.value;
+                            setClassroomSearch(query);
+                            const normalized = query.trim().toLocaleLowerCase("pt-BR");
+                            const matches = classrooms.filter(classroom =>
+                              `${classroom.name} ${classroom.shift}`
+                                .toLocaleLowerCase("pt-BR")
+                                .includes(normalized),
+                            );
+                            if (!matches.some(classroom => classroom.id === selectedId)) {
+                              setSelectedId(matches[0]?.id ?? "");
+                            }
+                          }}
+                        />
+                      )}
                       <select
                         aria-label={viewMode === "turma" ? "Selecionar turma" : "Selecionar professor"}
                         className="app-toolbar-select app-toolbar-select-target"
@@ -845,7 +876,7 @@ function App() {
                         onChange={event => setSelectedId(event.target.value === "" ? "" : Number(event.target.value))}
                       >
                         <option value="">Selecionar...</option>
-                        {viewMode === "turma" && classrooms.map(classroom => (
+                        {viewMode === "turma" && filteredClassrooms.map(classroom => (
                           <option key={classroom.id} value={classroom.id}>
                             {classroom.name} ({classroom.shift}{classroom.has_groups ? " · Grupos A/B" : ""})
                           </option>
