@@ -9,6 +9,26 @@ $backend = Join-Path $root "backend"
 $frontend = Join-Path $root "frontend"
 $venvPython = Join-Path $backend ".venv\Scripts\python.exe"
 
+Write-Host "Validando sintaxe dos scripts PowerShell..." -ForegroundColor Cyan
+$scriptPaths = @(
+    (Join-Path $root "build-windows.ps1"),
+    (Join-Path $root "start-demo.ps1"),
+    (Join-Path $root "start-informatica.ps1")
+)
+foreach ($scriptPath in $scriptPaths) {
+    $parseTokens = $null
+    $parseErrors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile(
+        $scriptPath,
+        [ref]$parseTokens,
+        [ref]$parseErrors
+    )
+    if ($parseErrors.Count -gt 0) {
+        $details = ($parseErrors | ForEach-Object { $_.Message }) -join "; "
+        throw "Erro de sintaxe em $(Split-Path $scriptPath -Leaf): $details"
+    }
+}
+
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw "Python não foi encontrado. Instale Python 3.12 e marque a opção para adicioná-lo ao PATH."
 }
@@ -64,17 +84,9 @@ try {
     & $venvPython -m unittest discover -p "test_*.py"
     if ($LASTEXITCODE -ne 0) { throw "Os testes do backend falharam; o EXE não será empacotado." }
 
-    Write-Host "Gerando banco inicial do 3º INFO para a demonstração..." -ForegroundColor Cyan
-    & $venvPython (Join-Path $backend "seed_realista.py") --informatica-only
-    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar a base isolada do 3º INFO." }
-
-    Write-Host "Validando geração e persistência da grade antes de empacotar..." -ForegroundColor Cyan
-    & $venvPython (Join-Path $backend "validate_demo_generation.py") --api
-    if ($LASTEXITCODE -ne 0) { throw "A grade do 3º INFO não foi gerada e salva; o EXE não será empacotado." }
-
-    Write-Host "Gerando banco fictício e grade da apresentação..." -ForegroundColor Cyan
+    Write-Host "Gerando banco fictício e grade de 100 aulas para a apresentação..." -ForegroundColor Cyan
     & $venvPython (Join-Path $backend "seed_apresentacao.py")
-    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar a base fictícia de apresentação." }
+    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar e validar a base fictícia de apresentação." }
 
     New-Item -ItemType Directory -Path (Join-Path $root "build\\pyinstaller") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root "build\\spec") -Force | Out-Null
