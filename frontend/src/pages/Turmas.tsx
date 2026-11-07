@@ -49,30 +49,14 @@ interface Subject {
   course_ids: number[];
 }
 
-type IntegralProfile = "standard" | "extended";
-
 const STANDARD_INTEGRAL_PERIODS = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10];
-const EXTENDED_INTEGRAL_PERIODS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-const periodsForShift = (
-  shift: string,
-  integralProfile: IntegralProfile = "standard",
-): number[] => {
+const periodsForShift = (shift: string): number[] => {
   if (shift === "Noite") return [11, 12, 13, 14, 15];
   if (shift === "Tarde") return [6, 7, 8, 9, 10];
-  if (shift === "Integral") {
-    return [...(
-      integralProfile === "extended"
-        ? EXTENDED_INTEGRAL_PERIODS
-        : STANDARD_INTEGRAL_PERIODS
-    )];
-  }
+  if (shift === "Integral") return [...STANDARD_INTEGRAL_PERIODS];
   return [0, 1, 2, 3, 4, 5];
 };
-
-const integralProfileForPeriods = (
-  periods?: number[] | null,
-): IntegralProfile => periods?.includes(5) ? "extended" : "standard";
 
 export default function Turmas() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -99,9 +83,6 @@ export default function Turmas() {
     course_id: 0,
     allowed_periods: periodsForShift("Manhã"),
   });
-  const [classroomDraftIntegralProfile, setClassroomDraftIntegralProfile] =
-    useState<IntegralProfile>("standard");
-
   const [editingSubjectId, setEditingSubjectId] =
     useState<number | null>(null);
   const [subjectDraft, setSubjectDraft] = useState<{
@@ -121,9 +102,6 @@ export default function Turmas() {
   const [newClassCourseId, setNewClassCourseId] = useState("");
   const [newClassHasGroups, setNewClassHasGroups] =
     useState(false);
-  const [newClassIntegralProfile, setNewClassIntegralProfile] =
-    useState<IntegralProfile>("standard");
-
   const [newSubName, setNewSubName] = useState("");
   const [newSubWorkload, setNewSubWorkload] = useState(4);
   const [newSubComplexity, setNewSubComplexity] =
@@ -204,11 +182,6 @@ export default function Turmas() {
       course_id: classroom.course_id,
       allowed_periods: [...allowedPeriods],
     });
-    setClassroomDraftIntegralProfile(
-      classroom.shift === "Integral"
-        ? integralProfileForPeriods(allowedPeriods)
-        : "standard",
-    );
   };
 
   const saveClassroomEdit = async (
@@ -389,10 +362,7 @@ export default function Turmas() {
     await api.post("/classrooms/", {
       name: newClassName,
       shift: newClassShift,
-      allowed_periods: periodsForShift(
-        newClassShift,
-        newClassIntegralProfile,
-      ),
+      allowed_periods: periodsForShift(newClassShift),
       course_id: Number(newClassCourseId),
       has_groups: newClassHasGroups,
       subject_settings: [],
@@ -401,7 +371,6 @@ export default function Turmas() {
 
     setNewClassName("");
     setNewClassHasGroups(false);
-    setNewClassIntegralProfile("standard");
     fetchData();
   };
 
@@ -893,7 +862,6 @@ export default function Turmas() {
                 onChange={event => {
                   const shift = event.target.value;
                   setNewClassShift(shift);
-                  setNewClassIntegralProfile("standard");
                   if (shift === "Noite") {
                     setNewClassHasGroups(false);
                   }
@@ -934,24 +902,6 @@ export default function Turmas() {
                 ))}
               </select>
             </div>
-
-            {newClassShift === "Integral" && (
-              <label className="flex flex-col gap-1 text-xs text-gray-600">
-                <span>Jornada integral</span>
-                <select
-                  value={newClassIntegralProfile}
-                  onChange={event =>
-                    setNewClassIntegralProfile(
-                      event.target.value as IntegralProfile,
-                    )
-                  }
-                  className="border border-gray-300 p-2 rounded-lg bg-white"
-                >
-                  <option value="standard">Padrão: 5 aulas de manhã + 5 à tarde</option>
-                  <option value="extended">Estendida: 6 aulas de manhã + 5 à tarde</option>
-                </select>
-              </label>
-            )}
 
             {newClassShift !== "Noite" && (
               <label className="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 cursor-pointer">
@@ -1020,7 +970,6 @@ export default function Turmas() {
                               shift,
                               allowed_periods: periodsForShift(shift),
                             }));
-                            setClassroomDraftIntegralProfile("standard");
                           }}
                           className="min-w-0 flex-1 border border-gray-300 rounded p-1.5 bg-white"
                         >
@@ -1051,27 +1000,6 @@ export default function Turmas() {
                           ))}
                         </select>
                       </div>
-
-                      {classroomDraft.shift === "Integral" && (
-                        <label className="flex flex-col gap-1 text-[11px] text-gray-600">
-                          <span>Jornada integral</span>
-                          <select
-                            value={classroomDraftIntegralProfile}
-                            onChange={event => {
-                              const profile = event.target.value as IntegralProfile;
-                              setClassroomDraftIntegralProfile(profile);
-                              setClassroomDraft(current => ({
-                                ...current,
-                                allowed_periods: periodsForShift("Integral", profile),
-                              }));
-                            }}
-                            className="border border-gray-300 rounded p-1.5 bg-white"
-                          >
-                            <option value="standard">Padrão: 5 aulas de manhã + 5 à tarde</option>
-                            <option value="extended">Estendida: 6 aulas de manhã + 5 à tarde</option>
-                          </select>
-                        </label>
-                      )}
 
                       <div className="flex justify-end gap-2">
                         <button
