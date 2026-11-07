@@ -7,13 +7,15 @@
 - [x] 36 testes automatizados do backend passaram no GitHub Actions (4,776 s no runner Linux).
 - [x] Build de produção do frontend passou (1.952 módulos transformados).
 - [x] Build Windows com PyInstaller concluiu no runner.
-- [x] Smoke test do EXE em AppData limpo: API local iniciou e 57 aulas do cenário 3º INFO ficaram acessíveis pela rota /timetable/.
+- [x] Smoke test anterior do EXE em AppData limpo: API local iniciou e respondeu; essa versão aceitava pelo menos 50 aulas.
+- [ ] Confirmar o novo smoke test estrito: o EXE deve carregar exatamente as 100 aulas da base fictícia de apresentação.
 - [x] Geração isolada do 3º INFO: 57 aulas, zero sem professor, estado feasible.
 - [x] Base fictícia principal gerada pela API: 2 cursos, 3 turmas, 15 disciplinas, 15 professores, 100 aulas salvas, 100 com professor.
 - [x] Validação conjunta da base fictícia: 100 aulas, zero conflitos de professor, zero janelas dos alunos, disponibilidade e descansos verificados; seis aulas por dia em cada turma/grupo.
 - [x] Base de regressão de oito turmas gerada em conjunto e validada nas restrições obrigatórias: 291 aulas, 234 com professor e 57 sem professor; estado feasible; 120,80 s; 40.012 variáveis e 65.835 restrições.
 - [ ] Melhorar a atribuição docente e a distribuição diária da base de regressão de oito turmas. Ela ainda não é uma grade final aprovada; parte dos dados de Agro e disponibilidades continua provisória.
 - [ ] Executar benchmarks small, medium e large na mesma máquina do baseline e comparar os resultados.
+- [ ] Triar as três vulnerabilidades de alta severidade reportadas pelo npm durante a instalação das dependências do frontend.
 
 ## Interface, exportação e persistência
 
@@ -60,7 +62,8 @@ O texto escrito do TCC não foi alterado nesta rodada.
 ## Aplicativo desktop Windows
 
 - [x] Workflow Build Windows gerou Anatinus.exe e release/Anatinus-Windows-x64.zip no runner.
-- [x] Smoke test em AppData limpo confirmou inicialização da API e acesso às 57 aulas.
+- [x] Smoke test anterior em AppData limpo confirmou a inicialização da API local.
+- [ ] Confirmar que a revisão atual do smoke test carregou exatamente 100 aulas da base fictícia.
 - [ ] Publicar e baixar o ZIP como artefato do GitHub Actions. A publicação em eventos pull_request permanece desativada; o workflow será habilitado para push na branch de trabalho.
 - [ ] Baixar e extrair o ZIP completo em uma pasta limpa.
 - [ ] Abrir Anatinus.exe sem iniciar manualmente Python ou Node.js no Windows real.
