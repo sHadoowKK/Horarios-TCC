@@ -280,11 +280,37 @@ class OptimizerTests(unittest.TestCase):
         self.assertTrue(
             all(len(items) == 2 for items in lessons_by_subject.values())
         )
-        split_across_days = sum(
-            len({item["day"] for item in items}) == 2
-            for items in lessons_by_subject.values()
+
+    def test_two_lesson_subject_can_split_when_no_day_has_two_slots(self):
+        classroom_row = classroom(
+            1,
+            "Turma Manhã",
+            "Manhã",
+            [{"subject_id": 1, "workload": 2, "split": False}],
+            allowed_periods=[0, 1, 2, 3, 4, 5],
         )
-        self.assertGreaterEqual(split_across_days, 5)
+        classroom_row["allowed_periods_by_day"] = {
+            "0": [0],
+            "1": [0],
+            "2": [],
+            "3": [],
+            "4": [],
+        }
+
+        result = generate_schedule(
+            [classroom_row],
+            [subject(1, "Matemática", workload=2)],
+            [],
+            default_config(),
+            _feasibility_only=True,
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(len(result["schedule"]), 2)
+        self.assertEqual(
+            {item["day"] for item in result["schedule"]},
+            {0, 1},
+        )
 
     def test_can_generate_subject_without_teacher(self):
         classrooms = [
