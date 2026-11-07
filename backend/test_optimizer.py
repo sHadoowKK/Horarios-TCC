@@ -151,10 +151,14 @@ class OptimizerTests(unittest.TestCase):
             [0, 1, 2, 3, 4, 5, 6, 7],
         )
 
+        teacher_availability = empty_availability()
+        teacher_availability["2"][6] = True
+        teacher_availability["2"][7] = True
+
         result = generate_schedule(
             [classroom_row],
             [subject(1, "TI", workload=2)],
-            [teacher(1, [1])],
+            [teacher(1, [1], teacher_availability)],
             default_config(),
         )
 
