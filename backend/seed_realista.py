@@ -406,7 +406,9 @@ NIGHT_CLASS_NAMES = {
 def norm(value):
     value = unicodedata.normalize("NFKD", str(value))
     value = "".join(char for char in value if not unicodedata.combining(char))
-    return re.sub(r"[^A-Z0-9]", "", value.upper())
+    key = re.sub(r"[^A-Z0-9]", "", value.upper())
+    # Variação de escrita na planilha para o mesmo componente curricular.
+    return {"CPDPJ": "CPDPI"}.get(key, key)
 
 
 def parse_pair_rows(raw, value_count):
@@ -594,6 +596,14 @@ def main(mode):
             teacher_specs.append((source_teacher, shifts, allowed_keys))
 
         teacher_specs.sort(key=lambda item: norm(item[0]))
+        covered_subjects = set().union(*(item[2] for item in teacher_specs)) if teacher_specs else set()
+        without_teacher = sorted(selected_subject_keys - covered_subjects)
+        if without_teacher:
+            raise RuntimeError(
+                "A planilha não permitiu identificar docente habilitado para: "
+                + ", ".join(subjects_by_key[key]["name"] for key in without_teacher)
+            )
+
         teacher_models = []
         for index, (_, shifts, allowed_keys) in enumerate(teacher_specs, start=1):
             teacher_models.append(models.Teacher(
@@ -684,7 +694,7 @@ def main(mode):
                 else:
                     lesson_units += int(setting["workload"])
 
-        if mode == "all" and (class_count != 20 or subject_count != 110):
+        if mode == "all" and (class_count != 20 or subject_count != 103):
             raise RuntimeError(
                 f"Contagem diferente da transcrição esperada: "
                 f"{class_count} turmas, {subject_count} disciplinas"
@@ -697,7 +707,7 @@ def main(mode):
         print(f"Turmas: {class_count}")
         print(f"Disciplinas: {subject_count}")
         print(f"Professores anonimizados: {teacher_count}")
-        print(f"Aulas/unidades semanais configuradas: {lesson_units}")
+        print(f"Alocações semanais transcritas da planilha: {lesson_units}")
         print("Disponibilidade: ampla e sintética, não foi fornecida pela planilha.")
         print("Complexidade das disciplinas: neutra (média), pois não consta no quadro.")
         print("Dois quadros MTEC e 7 eventos síncronos mensais não entram no solver semanal.")
