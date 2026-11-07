@@ -142,6 +142,12 @@ def ensure_database_compatibility():
                 "ADD COLUMN allowed_periods JSON DEFAULT NULL"
             ))
 
+        if "allowed_periods_by_day" not in classroom_columns:
+            conn.execute(text(
+                "ALTER TABLE classrooms "
+                "ADD COLUMN allowed_periods_by_day JSON DEFAULT NULL"
+            ))
+
         if "split_subject_ids" not in classroom_columns:
             conn.execute(text(
                 "ALTER TABLE classrooms "
@@ -162,32 +168,8 @@ def ensure_database_compatibility():
                 "ADD COLUMN preferred_subject_sequences JSON DEFAULT '[]'"
             ))
 
-        # Migra a exceção antiga por nome para uma configuração explícita.
-        # A aplicação deixa de depender do nome da turma durante a geração.
-        legacy_extended_periods = json.dumps(list(range(11)))
-        legacy_classrooms = conn.execute(text(
-            "SELECT id, name, shift, allowed_periods FROM classrooms "
-            "WHERE allowed_periods IS NULL"
-        )).fetchall()
-        for classroom_id, classroom_name, shift, configured_periods in legacy_classrooms:
-            normalized_name = (classroom_name or "").upper()
-            is_legacy_extended = (
-                shift in {"Integral", "Tarde"}
-                and any(marker in normalized_name for marker in (
-                    "ALIMENTOS", "ITINERÁRIO", "ITINERARIO"
-                ))
-            )
-            if configured_periods is None and is_legacy_extended:
-                conn.execute(
-                    text(
-                        "UPDATE classrooms SET allowed_periods = :periods "
-                        "WHERE id = :classroom_id"
-                    ),
-                    {
-                        "periods": legacy_extended_periods,
-                        "classroom_id": classroom_id,
-                    },
-                )
+        # Jornadas especiais são declaradas por dados da turma, nunca inferidas
+        # pelo nome. Bancos antigos sem overrides continuam usando o turno padrão.
 
         if subject_settings_added:
             subject_rows = conn.execute(text(
