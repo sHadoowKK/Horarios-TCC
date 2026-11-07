@@ -1,6 +1,6 @@
 import unittest
 
-from app.optimizer import generate_schedule, get_allowed_periods
+from app.optimizer import generate_schedule, get_allowed_periods, get_allowed_periods_for_day
 
 
 def default_config():
@@ -125,6 +125,45 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(result["status"], "success", result.get("message"))
         self.assertEqual(len(result["schedule"]), 1)
         self.assertEqual(result["schedule"][0]["period"], 5)
+
+    def test_classroom_daily_period_overrides_are_respected(self):
+        classroom_row = classroom(
+            1,
+            "1º ALIMENTOS",
+            "Integral",
+            [{"subject_id": 1, "workload": 2, "split": False}],
+            allowed_periods=list(range(8)),
+        )
+        classroom_row["allowed_periods_by_day"] = {
+            "0": [0, 1, 2, 3, 4, 5],
+            "1": [0, 1, 2, 3, 4, 5],
+            "2": [0, 1, 2, 3, 4, 5, 6, 7],
+            "3": [0, 1, 2, 3, 4, 5],
+            "4": [0, 1, 2, 3, 4, 5],
+        }
+
+        self.assertEqual(
+            get_allowed_periods_for_day(classroom_row, 0),
+            [0, 1, 2, 3, 4, 5],
+        )
+        self.assertEqual(
+            get_allowed_periods_for_day(classroom_row, 2),
+            [0, 1, 2, 3, 4, 5, 6, 7],
+        )
+
+        result = generate_schedule(
+            [classroom_row],
+            [subject(1, "TI", workload=2)],
+            [teacher(1, [1])],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(len(result["schedule"]), 2)
+        self.assertEqual(
+            {(item["day"], item["period"]) for item in result["schedule"]},
+            {(2, 6), (2, 7)},
+        )
 
     def test_friday_afternoon_is_available_when_not_excluded_by_classroom(self):
         classrooms = [
