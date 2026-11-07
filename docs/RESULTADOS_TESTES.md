@@ -62,11 +62,13 @@ Resumo da transcrição:
 Jornadas diurnas transcritas:
 - Integral: 1º/2º/3º PI Agro A e B e 3º Informática, com a jornada de manhã e tarde indicada no quadro.
 - Manhã: 1º, 2º e 3º Itinerário. Não há aulas à tarde para essas turmas no quadro.
-- 1º Alimentos: permanece Integral, com seis períodos de manhã e dois períodos à tarde no quadro de referência. Não é uma categoria genérica chamada "Integral estendido"; o seed conserva a lista de períodos dessa turma sem expor um perfil inventado na interface.
+- 1º Alimentos: permanece Integral. Tem seis períodos matutinos todos os dias; somente na quarta-feira há mais duas aulas à tarde. O seed usa períodos permitidos por dia (segunda, terça, quinta e sexta: 0–5; quarta: 0–7). Não é uma categoria genérica chamada "Integral estendido".
 
 O primeiro INFO noturno aparece em duas colunas de cargas diferentes. Como o modelo atual não usa grupos em turmas noturnas, o seed cria duas entradas independentes — `1º INFO A` e `1º INFO B` — cada uma com 25 aulas semanais.
 
 O quadro técnico noturno usa os períodos 19:00–19:45, 19:45–20:30 e 20:30–21:15, com intervalo de 21:15–21:30; a grade visual e os limites de tempo do otimizador foram alinhados a esses horários da planilha.
+
+A jornada por turma pode incluir um mapa de períodos permitido por dia. Essa regra é usada no 1º Alimentos para não permitir que o solver coloque aulas à tarde em dias nos quais o quadro não apresenta aulas vespertinas. O mesmo mapa é respeitado no pré-diagnóstico, na validação e na visualização/Excel.
 
 As células mescladas dos quadros diurnos representam aulas para a turma toda. Células independentes nas colunas A/B representam cargas próprias dos grupos. Exemplos conferidos:
 
