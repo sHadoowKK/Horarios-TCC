@@ -266,6 +266,7 @@ class OptimizerTests(unittest.TestCase):
             subjects,
             [],
             default_config(),
+            _feasibility_only=True,
         )
 
         self.assertEqual(result["status"], "success", result.get("message"))
