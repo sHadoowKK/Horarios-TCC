@@ -826,10 +826,32 @@ def generate_schedule(
         seed_is_valid = True
 
         for classroom in classrooms:
+            # A grade-base usa os mesmos docentes habilitados e disponibilidades
+            # da validação individual. Depois removemos teacher_id: a semente
+            # reserva somente os períodos das aulas, sem criar choques entre
+            # turmas quando as grades individuais forem combinadas.
+            class_subject_ids = {
+                subject["id"]
+                for subject in classroom_subjects[classroom["id"]]
+            }
+            seed_teachers = []
+            for teacher in teachers:
+                allowed_for_class = [
+                    subject_id
+                    for subject_id in teacher.get("allowed_subjects", [])
+                    if subject_id in class_subject_ids
+                ]
+                if not allowed_for_class:
+                    continue
+                seed_teachers.append({
+                    **teacher,
+                    "allowed_subjects": allowed_for_class,
+                })
+
             seed_result = generate_schedule(
                 [classroom],
                 subjects,
-                [],
+                seed_teachers,
                 sys_config,
                 num_days=num_days,
                 num_periods=num_periods,
@@ -870,7 +892,13 @@ def generate_schedule(
                 }
                 break
 
-            candidate_seed.extend(seed_result.get("schedule", []))
+            candidate_seed.extend(
+                {
+                    **item,
+                    "teacher_id": None,
+                }
+                for item in seed_result.get("schedule", [])
+            )
 
         if seed_is_valid:
             feasibility_seed_schedule = candidate_seed
