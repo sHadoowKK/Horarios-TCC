@@ -219,6 +219,7 @@ def _validate_one_classroom(
         subjects,
         teachers,
         sys_config,
+        _feasibility_only=True,
     )
     if result.get("status") != "success":
         raise RuntimeError(
@@ -634,7 +635,7 @@ def main() -> None:
         for result in results:
             print(
                 f"- {result['name']}: {result['lessons']} aulas; "
-                f"{result['unstaffed']} sem professor; "
+                f"{result['unstaffed_in_feasibility_search']} sem professor na busca de viabilidade; "
                 f"{result['solution_status']}; "
                 f"{result['solve_seconds']:.2f}s; "
                 f"{result['variables']} variáveis / "
