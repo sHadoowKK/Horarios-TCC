@@ -94,6 +94,7 @@ function App() {
   const [error, setError] = useState("");
   const [generationSuccess, setGenerationSuccess] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
+  const [unstaffedDiagnostics, setUnstaffedDiagnostics] = useState<any[]>([]);
   const [generationScope, setGenerationScope] = useState<"all" | "classrooms" | "subject_selected" | "subject_all">("all");
   const [generationClassroomIds, setGenerationClassroomIds] = useState<number[]>([]);
   const [generationSubjectId, setGenerationSubjectId] = useState<number | "">("");
@@ -259,7 +260,13 @@ function App() {
 
       const response = await api.post("/generate/", request, { timeout: 360000 });
       setSchedule(response.data.schedule);
-      setGenerationMessage(response.data.message || "Grade gerada.");
+      setUnstaffedDiagnostics(response.data.unstaffed_diagnostics || []);
+      const qualityMessage = response.data.solution_status === "optimal"
+        ? "O otimizador comprovou a melhor pontuação possível dentro das regras e pesos configurados."
+        : "Foi encontrada uma grade válida, mas o otimizador não comprovou que ela seja a melhor possível. Pode existir outra distribuição com pontuação maior.";
+      setGenerationMessage(
+        [response.data.message || "Grade gerada.", qualityMessage].join(" "),
+      );
       setGenerationSuccess(true);
     } catch (err: any) {
       setGenerationSuccess(false);
@@ -308,6 +315,7 @@ function App() {
       const response = await api.put(`/timetable/lessons/${editingLesson.id}`, payload);
       
       setSchedule(prev => prev ? prev.map(item => item.id === editingLesson.id ? response.data : item) : null);
+      setUnstaffedDiagnostics([]);
       setEditingLesson(null);
     } catch (err: any) {
       console.error("Erro ao salvar alteração de aula", err);
@@ -1053,10 +1061,27 @@ function App() {
                             const groupLabel = item.studentGroup !== "Todos"
                               ? ` · Grupo ${item.studentGroup}`
                               : "";
+                            const diagnostic = unstaffedDiagnostics.find(entry =>
+                              entry.classroom_id === item.classroomId
+                              && entry.subject_id === item.subjectId
+                              && entry.student_group === item.studentGroup,
+                            );
                             return (
                               <li key={`${item.classroomId}-${item.subjectId}-${item.studentGroup}`}>
                                 <span>{getClassroomName(item.classroomId)} · {getSubName(item.subjectId)}{groupLabel}</span>
                                 <strong>{item.lessons} {item.lessons === 1 ? "aula" : "aulas"}</strong>
+                                {diagnostic && (
+                                  <div className="app-pending-diagnostic">
+                                    <p>{diagnostic.message}</p>
+                                    {diagnostic.teachers?.length > 0 && (
+                                      <small>
+                                        Disponibilidade cadastrada: {diagnostic.teachers
+                                          .map((teacher: any) => `${teacher.name}: ${teacher.available_periods} períodos`)
+                                          .join(" · ")}
+                                      </small>
+                                    )}
+                                  </div>
+                                )}
                               </li>
                             );
                           })}
