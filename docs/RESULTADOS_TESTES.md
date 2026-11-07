@@ -61,6 +61,8 @@ Resumo da transcrição:
 
 O primeiro INFO noturno aparece em duas colunas de cargas diferentes. Como o modelo não divide turmas noturnas em grupos, o seed cria duas turmas independentes — `1º INFO A` e `1º INFO B` — cada uma com 25 aulas semanais.
 
+O quadro técnico noturno usa os períodos 19:00–19:45, 19:45–20:30 e 20:30–21:15, com intervalo de 21:15–21:30; a grade visual e os limites de tempo do otimizador foram alinhados a esses horários da planilha.
+
 As células mescladas dos quadros diurnos representam aulas para a turma toda. Células independentes nas colunas A/B representam cargas próprias dos grupos. Exemplos conferidos:
 
 | Turma | Aulas conjuntas | Específicas A | Específicas B | Carga de cada grupo |
