@@ -90,9 +90,35 @@ def get_allowed_periods(classroom):
     return sorted(normalized)
 
 
+def get_allowed_periods_for_day(classroom, day):
+    """Retorna os períodos permitidos no dia, respeitando overrides explícitos."""
+    configured_by_day = classroom.get("allowed_periods_by_day")
+    if not isinstance(configured_by_day, dict) or not configured_by_day:
+        return get_allowed_periods(classroom)
+
+    raw_periods = configured_by_day.get(str(day), configured_by_day.get(day, []))
+    if not isinstance(raw_periods, (list, tuple, set)):
+        return []
+
+    valid_periods = set(get_allowed_periods(classroom))
+    normalized = set()
+    for raw_period in raw_periods:
+        try:
+            period = int(raw_period)
+        except (TypeError, ValueError):
+            continue
+        if period in valid_periods:
+            normalized.add(period)
+    return sorted(normalized)
+
+
 def _get_allowed_periods(classroom):
     """Alias compatível com testes/código que usam o nome interno antigo."""
     return get_allowed_periods(classroom)
+
+
+def _get_allowed_periods_for_day(classroom, day):
+    return get_allowed_periods_for_day(classroom, day)
 
 
 def _subject_entries_for_classroom(classroom, subjects):
@@ -234,22 +260,26 @@ def generate_schedule(
     )
 
     for classroom, subject, target in units:
-        allowed_periods = set(_get_allowed_periods(classroom))
+        allowed_periods_by_day = {
+            day: set(_get_allowed_periods_for_day(classroom, day))
+            for day in range(num_days)
+        }
         unit_periods = (
             candidate_periods
             if candidate_periods is not None
-            else sorted(allowed_periods)
+            else sorted(set().union(*allowed_periods_by_day.values()))
         )
         none_key = (classroom["id"], subject["id"], target)
         no_teacher_assignment[none_key] = model.NewBoolVar(f"N_c{classroom['id']}_s{subject['id']}_g{target}")
 
         for day in range(num_days):
+            allowed_today = allowed_periods_by_day[day]
             for period in unit_periods:
                 key = (classroom["id"], subject["id"], target, day, period)
                 no_teacher_lesson[key] = model.NewBoolVar(f"U_c{classroom['id']}_s{subject['id']}_g{target}_d{day}_p{period}")
                 model.Add(no_teacher_lesson[key] <= no_teacher_assignment[none_key])
 
-                if period not in allowed_periods:
+                if period not in allowed_today:
                     model.Add(no_teacher_lesson[key] == 0)
 
         unit_key = (classroom["id"], subject["id"], target)
@@ -260,6 +290,7 @@ def generate_schedule(
 
             for day in range(num_days):
                 day_availability = availability.get(str(day))
+                allowed_today = allowed_periods_by_day[day]
                 for period in unit_periods:
                     # Na geração inicial, slots fora da disponibilidade docente
                     # são omitidos, não criados como variáveis travadas em zero.
@@ -271,7 +302,7 @@ def generate_schedule(
                     lesson[key] = model.NewBoolVar(f"Y_c{classroom['id']}_s{subject['id']}_g{target}_t{teacher['id']}_d{day}_p{period}")
                     model.Add(lesson[key] <= assignment[assignment_key])
 
-                    if period not in allowed_periods:
+                    if period not in allowed_today:
                         model.Add(lesson[key] == 0)
 
                     if candidate_periods is not None and day_availability is not None:
