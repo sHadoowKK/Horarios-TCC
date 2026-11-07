@@ -245,6 +245,46 @@ class OptimizerTests(unittest.TestCase):
             )
         )
 
+    def test_two_lesson_subjects_can_split_across_days_when_pairs_do_not_fit(self):
+        # 30 aulas ocupam todos os períodos de manhã (6 x 5 dias).
+        # Com 15 matérias de 2 aulas, não há blocos consecutivos suficientes
+        # para exigir um par no mesmo dia para todas elas.
+        settings = [
+            {"subject_id": subject_id, "workload": 2, "split": False}
+            for subject_id in range(1, 16)
+        ]
+        classrooms = [
+            classroom(1, "1º Alimentos", "Manhã", settings)
+        ]
+        subjects = [
+            subject(subject_id, f"Matéria {subject_id}", workload=2)
+            for subject_id in range(1, 16)
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            [],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(len(result["schedule"]), 30)
+
+        lessons_by_subject = {}
+        for item in result["schedule"]:
+            lessons_by_subject.setdefault(item["subject_id"], []).append(item)
+
+        self.assertEqual(len(lessons_by_subject), 15)
+        self.assertTrue(
+            all(len(items) == 2 for items in lessons_by_subject.values())
+        )
+        split_across_days = sum(
+            len({item["day"] for item in items}) == 2
+            for items in lessons_by_subject.values()
+        )
+        self.assertGreaterEqual(split_across_days, 5)
+
     def test_can_generate_subject_without_teacher(self):
         classrooms = [
             classroom(
