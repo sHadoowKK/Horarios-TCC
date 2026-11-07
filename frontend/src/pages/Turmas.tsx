@@ -208,6 +208,11 @@ export default function Turmas() {
       shift: classroomDraft.shift,
       course_id: classroomDraft.course_id,
       allowed_periods: classroomDraft.allowed_periods,
+      allowed_periods_by_day: (
+        classroomDraft.shift === classroom.shift
+          ? classroom.allowed_periods_by_day ?? null
+          : null
+      ),
       subject_settings: (
         classroom.subject_settings || []
       ).filter(setting =>
