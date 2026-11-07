@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 from .database import engine, ensure_database_compatibility, get_db
 from .optimizer import generate_schedule, get_allowed_periods
+from .generation_diagnostics import build_unstaffed_diagnostics
 
 models.Base.metadata.create_all(bind=engine)
 ensure_database_compatibility()
@@ -957,6 +958,13 @@ def generate_timetable(
             )
 
     generated_schedule = result["schedule"]
+    result["unstaffed_diagnostics"] = build_unstaffed_diagnostics(
+        classrooms,
+        subjects,
+        teachers,
+        generated_schedule,
+        fixed_schedule=fixed_schedule,
+    )
     
     # Restaura a flag is_manual para as aulas geradas
     for item in generated_schedule:
