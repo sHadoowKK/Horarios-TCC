@@ -261,9 +261,11 @@ function App() {
       const response = await api.post("/generate/", request, { timeout: 360000 });
       setSchedule(response.data.schedule);
       setUnstaffedDiagnostics(response.data.unstaffed_diagnostics || []);
-      const qualityMessage = response.data.solution_status === "optimal"
-        ? "O otimizador comprovou a melhor pontuação possível dentro das regras e pesos configurados."
-        : "Foi encontrada uma grade válida, mas o otimizador não comprovou que ela seja a melhor possível. Pode existir outra distribuição com pontuação maior.";
+      const qualityMessage = response.data.teacher_assignment_fallback
+        ? "A distribuição de professores atingiu o limite interno de busca. Os horários das turmas foram preservados, mas as atribuições docentes não foram concluídas; as aulas sem professor não significam necessariamente falta de docentes."
+        : response.data.solution_status === "optimal"
+          ? "O otimizador comprovou a melhor pontuação possível dentro das regras e pesos configurados."
+          : "Foi encontrada uma grade válida, mas o otimizador não comprovou que ela seja a melhor possível. Pode existir outra distribuição com pontuação maior.";
       setGenerationMessage(
         [response.data.message || "Grade gerada.", qualityMessage].join(" "),
       );
@@ -1075,7 +1077,7 @@ function App() {
                                     <p>{diagnostic.message}</p>
                                     {diagnostic.teachers?.length > 0 && (
                                       <small>
-                                        Disponibilidade cadastrada: {diagnostic.teachers
+                                        Janelas marcadas como disponíveis no cadastro: {diagnostic.teachers
                                           .map((teacher: any) => `${teacher.name}: ${teacher.available_periods} períodos`)
                                           .join(" · ")}
                                       </small>
