@@ -885,6 +885,39 @@ def generate_schedule(
                 for item in candidate_seed
             }
 
+            # Os horários encontrados para cada turma são uma base válida para
+            # os alunos. Na geração conjunta, a otimização deve resolver quem
+            # consegue lecionar em cada slot, não descartar ou deslocar aulas
+            # tentando reconstruir simultaneamente as 20 grades.
+            classroom_by_id = {item["id"]: item for item in classrooms}
+            subject_by_id = {item["id"]: item for item in subjects}
+            for seed_item in candidate_seed:
+                seed_classroom = classroom_by_id.get(seed_item["classroom_id"])
+                seed_subject = subject_by_id.get(seed_item["subject_id"])
+                seed_target = seed_item.get("student_group", "Todos")
+                if seed_classroom is None or seed_subject is None:
+                    raise RuntimeError(
+                        "A grade-base contém uma turma ou matéria inexistente."
+                    )
+                slot_variables = vars_for_unit_at(
+                    seed_classroom,
+                    next(
+                        subject for subject in classroom_subjects[seed_classroom["id"]]
+                        if subject["id"] == seed_subject["id"]
+                    ),
+                    seed_target,
+                    seed_item["day"],
+                    seed_item["period"],
+                )
+                if not slot_variables:
+                    raise RuntimeError(
+                        "A grade-base contém uma aula sem variável de decisão: "
+                        f"turma {seed_classroom.get('name')}, "
+                        f"matéria {seed_subject.get('name')}, grupo {seed_target}, "
+                        f"dia {seed_item['day'] + 1}, período {seed_item['period'] + 1}."
+                    )
+                model.AddExactlyOne(slot_variables)
+
             # Hint completo para as decisões principais: todas as aulas ficam
             # alocadas, inicialmente sem professor. A fase de otimização pode
             # então atribuir docentes e reorganizar horários sem perder a
