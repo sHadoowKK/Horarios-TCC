@@ -843,6 +843,25 @@ html.dark-theme .app-brand-title .app-logo-light {
   white-space: nowrap;
 }
 
+.app-pending-diagnostic {
+  flex: 1 0 100%;
+  min-width: 0;
+  color: var(--an-text-secondary);
+}
+
+.app-pending-diagnostic p {
+  margin: 2px 0 3px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.app-pending-diagnostic small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .app-schedule-workspace {
   min-width: 0;
   overflow: hidden;
