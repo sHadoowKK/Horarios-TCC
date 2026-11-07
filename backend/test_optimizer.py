@@ -341,9 +341,9 @@ class OptimizerTests(unittest.TestCase):
             "Todos",
         )
 
-    def test_exact_eleven_hour_rest_allows_11h20(self):
+    def test_exact_eleven_hour_rest_allows_11h25(self):
         availability = empty_availability()
-        availability["0"][11] = True  # seg 19:00-19:50
+        availability["0"][11] = True  # seg 19:00-19:45
         availability["1"][0] = True   # ter 07:10-08:00
 
         classrooms = [
@@ -394,7 +394,7 @@ class OptimizerTests(unittest.TestCase):
 
     def test_exact_eleven_hour_rest_blocks_10h40(self):
         availability = empty_availability()
-        availability["0"][12] = True  # seg 19:50-20:30
+        availability["0"][12] = True  # seg 19:45-20:30
         availability["1"][0] = True   # ter 07:10-08:00
 
         classrooms = [
