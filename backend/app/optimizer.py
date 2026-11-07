@@ -1163,10 +1163,23 @@ def generate_schedule(
         # quantidade de aulas de uma matéria/grupo. As grades-base individuais
         # já passaram pelas restrições dos alunos e preservam todas as cargas.
         seed_counts = _schedule_unit_counts(feasibility_seed_schedule)
+        seed_mismatches = [
+            {
+                "classroom_id": key[0],
+                "subject_id": key[1],
+                "student_group": key[2],
+                "expected": expected,
+                "actual": seed_counts.get(key, 0),
+            }
+            for key, expected in expected_unit_counts.items()
+            if seed_counts.get(key, 0) != expected
+        ]
+        seed_expected_total = sum(expected_unit_counts.values())
+        seed_actual_total = len(feasibility_seed_schedule or [])
         seed_is_complete = (
             feasibility_seed_schedule is not None
-            and all(seed_counts.get(key, 0) == expected
-                    for key, expected in expected_unit_counts.items())
+            and not seed_mismatches
+            and seed_actual_total == seed_expected_total
         )
         if seed_is_complete:
             schedule = [dict(item) for item in feasibility_seed_schedule]
@@ -1189,9 +1202,12 @@ def generate_schedule(
                 "message": (
                     "A geração foi interrompida para não salvar uma grade "
                     "incompleta. A quantidade de aulas não bate com a matriz: "
-                    f"{details}."
+                    f"{details}. Diagnóstico interno: status_solver={status}, "
+                    f"seed_aulas={seed_actual_total}/{seed_expected_total}, "
+                    f"divergências_na_seed={seed_mismatches[:8]}."
                 ),
                 "schedule_integrity_error": incomplete_units,
+                "seed_integrity_error": seed_mismatches,
                 **model_metrics,
             }
 
