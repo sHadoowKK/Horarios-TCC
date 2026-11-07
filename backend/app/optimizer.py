@@ -849,9 +849,13 @@ def generate_schedule(
                     "allowed_subjects": allowed_for_class,
                 })
 
+            seed_subjects = [
+                subject for subject in subjects
+                if subject["id"] in class_subject_ids
+            ]
             seed_result = generate_schedule(
                 [classroom],
-                subjects,
+                seed_subjects,
                 seed_teachers,
                 sys_config,
                 num_days=num_days,
@@ -862,14 +866,25 @@ def generate_schedule(
             seed_branches += int(seed_result.get("solver_branches", 0) or 0)
             seed_conflicts += int(seed_result.get("solver_conflicts", 0) or 0)
             seed_items = seed_result.get("schedule", []) or []
+            expected_class_lessons = sum(
+                int(unit_subject.get("_workload_by_target", {}).get(
+                    target, unit_subject["workload"]
+                ) or 0)
+                for unit_classroom, unit_subject, target in units
+                if unit_classroom["id"] == classroom["id"]
+            )
             seed_class_diagnostics.append({
                 "classroom": classroom.get("name", str(classroom["id"])),
                 "status": seed_result.get("status"),
                 "lessons": len(seed_items),
+                "expected": expected_class_lessons,
                 "message": seed_result.get("message", ""),
             })
 
-            if seed_result.get("status") != "success":
+            if (
+                seed_result.get("status") != "success"
+                or len(seed_items) != expected_class_lessons
+            ):
                 seed_is_valid = False
                 target_loads = {"Todos": 0, "A": 0, "B": 0}
                 for unit_classroom, unit_subject, target in units:
@@ -894,6 +909,8 @@ def generate_schedule(
                 seed_failure_diagnostic = {
                     "classroom": classroom.get("name", f"Turma {classroom['id']}"),
                     "status": seed_result.get("status"),
+                    "expected_lessons": expected_class_lessons,
+                    "actual_lessons": len(seed_items),
                     "weekly_load": load_detail,
                     "weekly_capacity_per_group": weekly_capacity,
                     "solver_message": seed_result.get("message", ""),
