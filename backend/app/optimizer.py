@@ -908,7 +908,7 @@ def generate_schedule(
         # A busca global fica dedicada a distribuir professores e melhorar a
         # qualidade, em vez de procurar primeiro uma combinação de horários.
         solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = 120.0
+        solver.parameters.max_time_in_seconds = 240.0
         solver.parameters.num_search_workers = 8
         status = solver.Solve(model)
         optimization_time = solver.WallTime()
