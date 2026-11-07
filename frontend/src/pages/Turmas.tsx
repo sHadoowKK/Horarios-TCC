@@ -33,6 +33,7 @@ interface Classroom {
   name: string;
   shift: string;
   allowed_periods?: number[] | null;
+  allowed_periods_by_day?: Record<string, number[]> | null;
   course_id: number;
   has_groups: boolean;
   subject_settings: ClassroomSubjectSetting[];
@@ -363,6 +364,7 @@ export default function Turmas() {
       name: newClassName,
       shift: newClassShift,
       allowed_periods: periodsForShift(newClassShift),
+      allowed_periods_by_day: null,
       course_id: Number(newClassCourseId),
       has_groups: newClassHasGroups,
       subject_settings: [],
@@ -387,6 +389,10 @@ export default function Turmas() {
           changes.allowed_periods
           ?? classroom.allowed_periods
           ?? periodsForShift(classroom.shift),
+        allowed_periods_by_day:
+          changes.allowed_periods_by_day !== undefined
+            ? changes.allowed_periods_by_day
+            : classroom.allowed_periods_by_day ?? null,
         course_id:
           changes.course_id ?? classroom.course_id,
         has_groups:
