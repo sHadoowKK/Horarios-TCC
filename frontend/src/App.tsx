@@ -257,7 +257,7 @@ function App() {
         request.subject_id = Number(generationSubjectId);
       }
 
-      const response = await api.post("/generate/", request);
+      const response = await api.post("/generate/", request, { timeout: 360000 });
       setSchedule(response.data.schedule);
       setGenerationMessage(response.data.message || "Grade gerada.");
       setGenerationSuccess(true);
@@ -268,11 +268,15 @@ function App() {
         typeof err.response?.data === "string"
           ? err.response.data
           : "";
-      const message =
-        detail
-        || responseText
-        || err.message
-        || "Erro ao gerar grade";
+      const isTimeout =
+        err.code === "ECONNABORTED"
+        || err.code === "ETIMEDOUT";
+      const message = isTimeout
+        ? "A geração ultrapassou o limite de espera de 6 minutos. Isso não comprova que a grade seja impossível. Confira se o backend ainda está processando antes de tentar novamente."
+        : detail
+          || responseText
+          || err.message
+          || "Erro ao gerar grade";
 
       setError(`Erro ao gerar grade: ${message}`);
       console.error("Erro ao gerar grade", err);
