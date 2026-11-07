@@ -44,7 +44,7 @@ O sistema deve ser descrito como **otimização combinatória / programação po
 - PR #7 aberta em draft na branch `gemini-atualizado-20261029-1451`; não foi mesclada na `main`.
 - 36 testes automatizados do backend passaram na última execução verificada do CI (29 cenários do solver e 7 testes de integração).
 - Build de produção do frontend passou.
-- Build Windows com PyInstaller e smoke test em AppData limpo passaram no runner do GitHub.
+- Build Windows com PyInstaller e o smoke test anterior em AppData limpo passaram no runner do GitHub. A revisão atual do smoke test exige exatamente 100 aulas fictícias; a nova execução ainda está pendente.
 - A base fictícia de apresentação gerou 100 aulas pela API, todas com professor, e passou na validação conjunta.
 - A base de regressão ETEC com oito turmas gerou 291 aulas, 234 com professor e 57 sem professor. Restrições obrigatórias foram validadas, mas a distribuição docente/diária ainda não deve ser apresentada como grade final.
 - O texto escrito do TCC não foi alterado nesta rodada.
