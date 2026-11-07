@@ -214,10 +214,13 @@ def _validate_one_classroom(
         "max_consec_teacher_mode": config_row.max_consec_teacher_mode,
     }
 
+    # Reproduz exatamente a grade-base usada na geração conjunta:
+    # viabilidade das aulas sem docentes, para depois distribuir os professores
+    # globalmente. Testar com docentes aqui poderia esconder uma falha nessa etapa.
     result = generate_schedule(
         [classroom],
         subjects,
-        teachers,
+        [],
         sys_config,
         _feasibility_only=True,
     )
