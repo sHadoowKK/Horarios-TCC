@@ -396,6 +396,9 @@ DAY_CLASS_NAMES = {
     "3º PI AGRO A", "3º PI AGRO B", "3º INFORMÁTICA",
     "1º ITINERÁRIO", "2º ITINERÁRIO", "3º ITINERÁRIO", "1º ALIMENTOS",
 }
+MORNING_CLASS_NAMES = {
+    "1º ITINERÁRIO", "2º ITINERÁRIO", "3º ITINERÁRIO",
+}
 NIGHT_CLASS_NAMES = {
     "1º INFO", "1º LOGÍSTICA", "2º LOGÍSTICA", "3º ADMINISTRAÇÃO",
     "2º INFORMÁTICA", "2º AGRONEGÓCIO",
@@ -473,6 +476,8 @@ def broad_availability(shifts):
     allowed = set()
     if "Integral" in shifts:
         allowed.update(range(11))
+    if "Manhã" in shifts:
+        allowed.update(range(6))
     if "Noite" in shifts:
         allowed.update(range(11, 16))
     return {
@@ -517,9 +522,15 @@ def parse_selected_scenario(mode):
                 expanded.append((f"1º INFO {group}", "Noite", False, settings))
             continue
 
-        shift = "Integral" if name in DAY_CLASS_NAMES else "Noite"
+        shift = (
+            "Manhã" if name in MORNING_CLASS_NAMES
+            else "Integral" if name in DAY_CLASS_NAMES
+            else "Noite"
+        )
         rows = matrix[name]
-        has_internal_groups = shift == "Integral" and any(row["a"] or row["b"] for row in rows)
+        has_internal_groups = shift in {"Integral", "Manhã"} and any(
+            row["a"] or row["b"] for row in rows
+        )
         expanded.append((name, shift, has_internal_groups, rows))
 
     return expanded
@@ -663,9 +674,14 @@ def main(mode):
             classroom_models.append(models.Classroom(
                 name=class_name,
                 shift=shift,
-                allowed_periods=list(range(11)) if shift == "Integral" else list(range(11, 16)),
+                allowed_periods=(
+                    list(range(6)) if shift == "Manhã"
+                    else list(range(11)) if class_name == "1º ALIMENTOS"
+                    else [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] if shift == "Integral"
+                    else list(range(11, 16))
+                ),
                 course_id=course_models[course_name(class_name)].id,
-                has_groups=has_groups if shift == "Integral" else False,
+                has_groups=has_groups if shift in {"Integral", "Manhã"} else False,
                 subject_settings=settings,
                 preferred_subject_sequences=[],
                 split_subject_ids=[],
