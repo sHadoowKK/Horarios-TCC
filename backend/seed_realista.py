@@ -694,10 +694,16 @@ def main(mode):
                 else:
                     lesson_units += int(setting["workload"])
 
-        if mode == "all" and (class_count != 20 or subject_count != 102):
+        if mode == "all" and (
+            class_count != 20
+            or subject_count != 102
+            or teacher_count != 51
+            or lesson_units != 695
+        ):
             raise RuntimeError(
-                f"Contagem diferente da transcrição esperada: "
-                f"{class_count} turmas, {subject_count} disciplinas"
+                "Contagem diferente da transcrição esperada: "
+                f"{class_count} turmas, {subject_count} disciplinas, "
+                f"{teacher_count} docentes e {lesson_units} lançamentos"
             )
 
         print("Base realista criada em banco isolado.")
