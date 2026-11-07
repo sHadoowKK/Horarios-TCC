@@ -194,6 +194,7 @@ def _validate_one_classroom(
         "course_id": classroom_row.course_id,
         "shift": classroom_row.shift,
         "allowed_periods": classroom_row.allowed_periods,
+        "allowed_periods_by_day": classroom_row.allowed_periods_by_day,
         "has_groups": classroom_row.has_groups,
         "subject_settings": settings,
         "preferred_subject_sequences": (
