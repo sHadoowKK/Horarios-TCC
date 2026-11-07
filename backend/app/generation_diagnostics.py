@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from .optimizer import get_allowed_periods
+from .optimizer import get_allowed_periods_for_day
 
 
 def _unit_key(item):
@@ -11,12 +11,13 @@ def _unit_key(item):
     )
 
 
-def _available_period_count(teacher, allowed_periods, num_days=5):
+def _available_period_count(teacher, classroom, num_days=5):
     availability = teacher.get("availability") or {}
     count = 0
 
     for day in range(num_days):
         day_availability = availability.get(str(day))
+        allowed_periods = get_allowed_periods_for_day(classroom, day)
         for period in allowed_periods:
             # O otimizador interpreta dias sem configuração como disponibilidade
             # aberta. Mantemos a mesma regra neste diagnóstico.
@@ -106,14 +107,13 @@ def build_unstaffed_diagnostics(
             diagnostics.append(diagnostic)
             continue
 
-        allowed_periods = get_allowed_periods(classroom)
         availability_rows = [
             {
                 "teacher_id": teacher.get("id"),
                 "name": teacher.get("name", "Professor sem nome"),
                 "available_periods": _available_period_count(
                     teacher,
-                    allowed_periods,
+                    classroom,
                 ),
             }
             for teacher in eligible
