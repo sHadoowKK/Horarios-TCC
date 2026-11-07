@@ -411,6 +411,6 @@ Também existe uma compilação automática pelo GitHub Actions. Após uma execu
 
 ### Dados e atualização
 
-O banco da versão desktop fica em `%LOCALAPPDATA%\Anatinus\school_schedule.db`, separado dos arquivos temporários do executável. Atualizar o programa não deve apagar os cadastros.
+O banco da versão desktop fica em `%LOCALAPPDATA%\Anatinus\school_schedule.db`, separado dos arquivos temporários do executável. Na primeira execução, se ainda não existir um banco nesse local, o Anatinus copia para lá a base fictícia de apresentação incluída no pacote: 100 aulas geradas, todas com professor. Em execuções seguintes, o banco existente é preservado; atualizar o programa não deve apagar os cadastros.
 
 Para levar os cadastros do ambiente de desenvolvimento à primeira execução do EXE, feche o Anatinus e copie o banco `backend\school_schedule.db` para `%LOCALAPPDATA%\Anatinus\school_schedule.db` antes de abrir a versão desktop. Faça primeiro um backup com `backup-db.ps1`.
