@@ -767,15 +767,14 @@ class OptimizerTests(unittest.TestCase):
             subject(4, "Matemática", workload=2),
         ]
 
-        # Sem docentes, a chamada ainda percorre o caminho real de semente
-        # por turma + consolidação global, mas sem gastar busca otimizando
-        # atribuições que não existem. Os testes integrados abaixo cobrem
-        # conflitos entre professores compartilhados.
+        # Este teste valida apenas a viabilidade conjunta das cargas A/B;
+        # os testes de escola com docentes cobrem a otimização global à parte.
         result = generate_schedule(
             classrooms,
             subjects,
             [],
             default_config(),
+            _feasibility_only=True,
         )
 
         self.assertEqual(result["status"], "success", result.get("message"))
