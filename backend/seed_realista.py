@@ -573,7 +573,7 @@ def main(mode):
                     }
                 effective = (
                     row["joint"] + max(row["a"], row["b"])
-                    if shift == "Integral" and has_groups
+                    if shift in {"Integral", "Manhã"} and has_groups
                     else row["a"] if row.get("night_cohort") == "A"
                     else row["b"] if row.get("night_cohort") == "B"
                     else row["joint"]
