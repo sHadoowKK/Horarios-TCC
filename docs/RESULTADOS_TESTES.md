@@ -59,7 +59,12 @@ Resumo da transcrição:
 | Docentes identificados e anonimizados | 51 |
 | Lançamentos semanais transcritos | 695 |
 
-O primeiro INFO noturno aparece em duas colunas de cargas diferentes. Como o modelo não divide turmas noturnas em grupos, o seed cria duas turmas independentes — `1º INFO A` e `1º INFO B` — cada uma com 25 aulas semanais.
+Jornadas diurnas transcritas:
+- Integral: 1º/2º/3º PI Agro A e B e 3º Informática, com a jornada de manhã e tarde indicada no quadro.
+- Manhã: 1º, 2º e 3º Itinerário. Não há aulas à tarde para essas turmas no quadro.
+- 1º Alimentos: permanece Integral, com seis períodos de manhã e dois períodos à tarde no quadro de referência. Não é uma categoria genérica chamada "Integral estendido"; o seed conserva a lista de períodos dessa turma sem expor um perfil inventado na interface.
+
+O primeiro INFO noturno aparece em duas colunas de cargas diferentes. Como o modelo atual não usa grupos em turmas noturnas, o seed cria duas entradas independentes — `1º INFO A` e `1º INFO B` — cada uma com 25 aulas semanais.
 
 O quadro técnico noturno usa os períodos 19:00–19:45, 19:45–20:30 e 20:30–21:15, com intervalo de 21:15–21:30; a grade visual e os limites de tempo do otimizador foram alinhados a esses horários da planilha.
 
