@@ -964,6 +964,7 @@ def generate_timetable(
         teachers,
         generated_schedule,
         fixed_schedule=fixed_schedule,
+        teacher_assignment_fallback=result.get("teacher_assignment_fallback", False),
     )
     
     # Restaura a flag is_manual para as aulas geradas
