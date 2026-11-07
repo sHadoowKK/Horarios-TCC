@@ -75,6 +75,45 @@ const PROFESSOR_ROWS: DisplayRow[] = [
   lesson(14), lesson(15),
 ];
 
+const getClassroomJourneyRows = (classroom?: any): DisplayRow[] => {
+  const shift = classroom?.shift || "Manhã";
+  const defaults = JOURNEY_ROWS[shift] || JOURNEY_ROWS["Manhã"];
+  if (shift !== "Integral" || !Array.isArray(classroom?.allowed_periods)) {
+    return defaults;
+  }
+
+  const allowed = new Set<number>(classroom.allowed_periods.map(Number));
+  const rows: DisplayRow[] = [];
+  const addLessons = (periods: number[]) => {
+    periods.forEach(period => {
+      if (allowed.has(period)) rows.push(lesson(period));
+    });
+  };
+
+  addLessons([0, 1, 2]);
+  if ([3, 4, 5].some(period => allowed.has(period))) {
+    rows.push(pause("09:40 - 10:00", "Intervalo"));
+  }
+  addLessons([3, 4, 5]);
+
+  const hasAfternoon = [6, 7, 8, 9, 10].some(period => allowed.has(period));
+  if (hasAfternoon) {
+    rows.push(
+      pause(
+        allowed.has(5) ? "12:30 - 13:00" : "11:40 - 13:00",
+        "Almoço",
+      ),
+    );
+    addLessons([6, 7]);
+    if (allowed.has(8) || allowed.has(9) || allowed.has(10)) {
+      rows.push(pause("14:40 - 14:50", "Intervalo"));
+    }
+    addLessons([8, 9, 10]);
+  }
+
+  return rows.length > 0 ? rows : defaults;
+};
+
 type Theme = "light" | "dark";
 
 function getInitialTheme(): Theme {
@@ -396,7 +435,7 @@ function App() {
               classroom.id,
               "turma",
               classroom,
-              JOURNEY_ROWS[classroom.shift || "Manhã"] || JOURNEY_ROWS["Manhã"],
+              getClassroomJourneyRows(classroom),
             ),
           }))
       : teachers
@@ -527,7 +566,7 @@ function App() {
 
     if (viewMode === "turma") {
       const classroom = classrooms.find(item => item.id === selectedId);
-      rows = JOURNEY_ROWS[classroom?.shift || "Manhã"] || JOURNEY_ROWS["Manhã"];
+      rows = getClassroomJourneyRows(classroom);
     } else {
       rows = PROFESSOR_ROWS;
     }
