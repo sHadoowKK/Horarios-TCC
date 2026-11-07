@@ -373,8 +373,32 @@ def _validate_all_together(db) -> None:
         expected_total += expected
 
         if actual != expected:
+            actual_by_group = defaultdict(int)
+            for item in schedule:
+                if item["classroom_id"] == classroom_row.id:
+                    actual_by_group[item.get("student_group", "Todos")] += 1
+            expected_by_group = {"Todos": 0, "A": 0, "B": 0}
+            for setting in classroom_row.subject_settings or []:
+                base = int(setting.get("workload", 0) or 0)
+                if classroom_row.has_groups and classroom_row.shift != "Noite" and setting.get("split"):
+                    joint = int(setting.get("joint_workload", 0) or 0)
+                    expected_by_group["Todos"] += joint
+                    expected_by_group["A"] += int(setting.get("workload_a", 0) or 0)
+                    expected_by_group["B"] += int(setting.get("workload_b", 0) or 0)
+                else:
+                    expected_by_group["Todos"] += (
+                        base if setting.get("joint_workload") is None
+                        else int(setting.get("joint_workload", 0) or 0)
+                    )
             raise RuntimeError(
-                f"{classroom_row.name}: esperadas {expected} aulas, geradas {actual}."
+                f"{classroom_row.name}: esperadas {expected} aulas, geradas {actual}; "
+                f"por grupo esperado={expected_by_group}, real={dict(actual_by_group)}; "
+                f"has_groups={classroom_row.has_groups}; "
+                f"split_settings={sum(bool(s.get('split')) for s in classroom_row.subject_settings or [])}; "
+                f"solution_status={result.get('solution_status')}; "
+                f"teacher_fallback={result.get('teacher_assignment_fallback')}; "
+                f"used_feasibility_seed={result.get('used_feasibility_seed')}; "
+                f"solve_time={result.get('solve_time_seconds')}s."
             )
         _assert_no_student_gaps(classroom, [
             item for item in schedule
