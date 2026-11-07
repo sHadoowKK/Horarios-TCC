@@ -42,13 +42,64 @@ A distribuição visual ficou consistente para demonstração: as aulas de duas 
 
 **Este é o cenário recomendado para a apresentação.** O atalho `start-demo.ps1` recria essa base antes de abrir a interface. A recriação leva cerca de dois minutos no runner testado.
 
-## 3. Base de regressão inspirada nas grades da ETEC
+## 3. Base realista transcrita da planilha escolar
 
-A base `seed_realista.py` continua existindo para exercitar o modelo com oito turmas, incluindo 3º INFO, TI Noturno e seis turmas Agro. Parte das cargas e disponibilidades de Agro permanece provisória, e essa base não é a escolhida para a demonstração principal.
+O script `backend/seed_realista.py` foi substituído por uma transcrição da planilha **03-09.26 - Horários Diurno-Noturno e Síncronas**, atualizada em 03/09/2026 às 13h. O script não copia os horários prontos para o resultado: usa as matrizes, as cargas e as associações disciplina/docente como entradas para que o Anatinus gere uma nova distribuição.
 
-Resultado mais recente da geração conjunta em 06/11/2026:
+Resumo da transcrição:
 
 | Indicador | Resultado |
+|---|---:|
+| Quadros de turma preenchidos na planilha | 21 |
+| Quadros diurnos usados no solver | 11 |
+| Quadros técnicos modulares noturnos usados no solver | 8 |
+| Registros de turma no banco após separar 1º INFO A/B | 20 |
+| Disciplinas distintas após normalizar grafias | 103 |
+| Docentes identificados e anonimizados | 51 |
+| Lançamentos semanais transcritos | 695 |
+
+O primeiro INFO noturno aparece em duas colunas de cargas diferentes. Como o modelo não divide turmas noturnas em grupos, o seed cria duas turmas independentes — `1º INFO A` e `1º INFO B` — cada uma com 25 aulas semanais.
+
+As células mescladas dos quadros diurnos representam aulas para a turma toda. Células independentes nas colunas A/B representam cargas próprias dos grupos. Exemplos conferidos:
+
+| Turma | Aulas conjuntas | Específicas A | Específicas B | Carga de cada grupo |
+|---|---:|---:|---:|---:|
+| 1º PI AGRO A/B | 26 | 10 | 10 | 36 |
+| 2º PI AGRO A/B | 26 | 10 | 10 | 36 |
+| 3º INFORMÁTICA | 22 | 14 | 14 | 36 |
+| 1º ITINERÁRIO | 24 | 6 | 6 | 30 |
+| 2º ITINERÁRIO | 18 | 12 | 12 | 30 |
+| 3º ITINERÁRIO | 18 | 12 | 12 | 30 |
+| 1º ALIMENTOS | 20 | 12 | 12 | 32 |
+
+Os dois quadros MTEC (com início às 18h30) e os sete registros de aulas síncronas mensais não entram nessa base semanal. O modelo atual não representa a jornada própria das turmas MTEC nem encontros que acontecem apenas em datas específicas. Eles não foram convertidos artificialmente em aulas semanais.
+
+### Limitações que permanecem explícitas
+
+- A planilha mostra horários existentes e associação de docentes às disciplinas; ela **não informa a disponibilidade semanal completa de cada docente**. O seed usa disponibilidade ampla e sintética nos turnos em que o docente aparece, apenas para permitir o teste do gerador. Isso não deve ser confundido com a disponibilidade real da escola.
+- Os nomes dos docentes são substituídos por identificadores como `Docente 01`, preservando as associações de habilitação sem expor nomes pessoais.
+- O quadro não informa nível de complexidade das disciplinas. O seed usa complexidade neutra (`Media`) e não inventa pesos pedagógicos.
+- Algumas abreviações que diferem apenas por pontuação foram normalizadas. Uma variação de escrita de `C.P.D.P.J` foi associada à forma `CPDPI` usada no cadastro de habilitações.
+- A planilha é uma referência de entrada; o horário gerado pelo Anatinus deve ser uma nova solução, não uma reprodução do quadro original.
+
+Comandos disponíveis, executados dentro de `backend`:
+
+```powershell
+python seed_realista.py
+python seed_realista.py --diurno-only
+python seed_realista.py --noturno-only
+python seed_realista.py --informatica-only
+```
+
+Todos recriam somente `school_schedule_demo.db`; o banco normal `school_schedule.db` não é alterado. A geração do horário deve ser acionada depois pela interface.
+
+## 4. Cenários anteriores de regressão
+
+Os números registrados abaixo são resultados históricos da versão anterior do seed e não descrevem a nova transcrição da planilha. Eles permanecem como evidência dos testes já executados, mas precisam ser repetidos usando a base atual antes de qualquer conclusão sobre desempenho ou qualidade da grade.
+
+### Geração anterior com oito turmas
+
+| Indicador | Resultado histórico |
 |---|---:|
 | Turmas | 8 |
 | Aulas previstas e geradas | 291 |
@@ -58,21 +109,13 @@ Resultado mais recente da geração conjunta em 06/11/2026:
 | Tempo do solver | 120,80 s |
 | Variáveis / restrições | 40.012 / 65.835 |
 
-A validação confirmou as cargas configuradas, persistência SQLite, ausência de conflitos simultâneos de professores, ausência de janelas de alunos e respeito às disponibilidades, aos limites docentes e aos descansos verificados.
+A validação confirmou cargas, persistência SQLite, ausência de conflitos simultâneos de professores, ausência de janelas de alunos e respeito às disponibilidades configuradas, aos limites docentes e aos descansos verificados.
 
-**Limitação importante:** essa geração ainda não é uma grade pronta para ser apresentada como horário final da escola. As 57 aulas sem professor incluem matérias sem docente habilitado cadastrado e aulas que não receberam um dos docentes candidatos na otimização conjunta. Além disso, o relatório mostrou distribuição diária bastante desigual em algumas turmas Agro. O teste atual verifica principalmente viabilidade e restrições obrigatórias; não estabelece uma nota mínima de qualidade visual para essa base. Portanto, não afirmar que a grade de regressão de oito turmas está aprovada.
+**Limitação importante:** essa geração histórica não era uma grade final aceitável. Havia 57 aulas sem professor e distribuição diária desigual em algumas turmas Agro. Não declarar essa base antiga como aprovada.
 
-## 4. 3º INFO isolado
+### 3º INFO isolado, versão anterior
 
-O cenário do 3º INFO Integral A/B foi gerado pela própria função da API e persistido no SQLite:
-
-- 57 alocações;
-- zero aulas sem professor;
-- estado `feasible`;
-- tempo aproximado de 18,70 s no runner Linux;
-- cargas e separações A/B preservadas.
-
-A disponibilidade docente utilizada é provisória, pois o quadro de referência não contém a disponibilidade semanal completa de cada professor.
+O cenário anterior do 3º INFO foi gerado e persistido pela API com 57 alocações e zero aulas sem professor. Esse número não deve ser confundido com a nova matriz corrigida da planilha, cuja carga é 36 aulas para cada grupo A/B.
 
 ## 5. Aplicativo Windows
 
