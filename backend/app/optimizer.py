@@ -1047,6 +1047,7 @@ def generate_schedule(
     return {
         "status": "success",
         "solution_status": "optimal" if status == cp_model.OPTIMAL else "feasible",
+        "teacher_assignment_fallback": seed_fallback,
         "schedule": schedule,
         "unstaffed_lessons": sum(item["teacher_id"] is None for item in schedule),
         **objective_metrics,
