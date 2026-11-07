@@ -694,7 +694,7 @@ def main(mode):
                 else:
                     lesson_units += int(setting["workload"])
 
-        if mode == "all" and (class_count != 20 or subject_count != 103):
+        if mode == "all" and (class_count != 20 or subject_count != 102):
             raise RuntimeError(
                 f"Contagem diferente da transcrição esperada: "
                 f"{class_count} turmas, {subject_count} disciplinas"
