@@ -671,15 +671,29 @@ def main(mode):
                         "split": False,
                     })
 
+            allowed_periods = (
+                list(range(6)) if shift == "Manhã"
+                else list(range(8)) if class_name == "1º ALIMENTOS"
+                else [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] if shift == "Integral"
+                else list(range(11, 16))
+            )
+            allowed_periods_by_day = None
+            if class_name == "1º ALIMENTOS":
+                # Seis aulas matutinas em todos os dias; somente quarta tem
+                # duas aulas à tarde. Não inferir uma tarde cheia nos demais dias.
+                allowed_periods_by_day = {
+                    "0": [0, 1, 2, 3, 4, 5],
+                    "1": [0, 1, 2, 3, 4, 5],
+                    "2": [0, 1, 2, 3, 4, 5, 6, 7],
+                    "3": [0, 1, 2, 3, 4, 5],
+                    "4": [0, 1, 2, 3, 4, 5],
+                }
+
             classroom_models.append(models.Classroom(
                 name=class_name,
                 shift=shift,
-                allowed_periods=(
-                    list(range(6)) if shift == "Manhã"
-                    else list(range(11)) if class_name == "1º ALIMENTOS"
-                    else [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] if shift == "Integral"
-                    else list(range(11, 16))
-                ),
+                allowed_periods=allowed_periods,
+                allowed_periods_by_day=allowed_periods_by_day,
                 course_id=course_models[course_name(class_name)].id,
                 has_groups=has_groups if shift in {"Integral", "Manhã"} else False,
                 subject_settings=settings,
