@@ -1121,6 +1121,80 @@ def generate_schedule(
                             "student_group": target,
                         })
 
+    def _schedule_unit_counts(items):
+        counts = {}
+        for item in items or []:
+            key = (
+                item.get("classroom_id"),
+                item.get("subject_id"),
+                item.get("student_group") or "Todos",
+            )
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    expected_unit_counts = {
+        (
+            classroom["id"],
+            subject["id"],
+            target,
+        ): int(
+            subject.get("_workload_by_target", {}).get(
+                target, subject["workload"]
+            ) or 0
+        )
+        for classroom, subject, target in units
+    }
+    actual_unit_counts = _schedule_unit_counts(schedule)
+    incomplete_units = [
+        {
+            "classroom_id": key[0],
+            "subject_id": key[1],
+            "student_group": key[2],
+            "expected": expected,
+            "actual": actual_unit_counts.get(key, 0),
+        }
+        for key, expected in expected_unit_counts.items()
+        if actual_unit_counts.get(key, 0) != expected
+    ]
+
+    schedule_integrity_fallback = False
+    if incomplete_units:
+        # Nunca devolver uma grade parcial quando a geração global altera a
+        # quantidade de aulas de uma matéria/grupo. As grades-base individuais
+        # já passaram pelas restrições dos alunos e preservam todas as cargas.
+        seed_counts = _schedule_unit_counts(feasibility_seed_schedule)
+        seed_is_complete = (
+            feasibility_seed_schedule is not None
+            and all(seed_counts.get(key, 0) == expected
+                    for key, expected in expected_unit_counts.items())
+        )
+        if seed_is_complete:
+            schedule = [dict(item) for item in feasibility_seed_schedule]
+            seed_fallback = True
+            schedule_integrity_fallback = True
+            optimization_completed = False
+        else:
+            classroom_by_id = {
+                classroom["id"]: classroom.get("name", str(classroom["id"]))
+                for classroom in classrooms
+            }
+            details = "; ".join(
+                f"{classroom_by_id.get(item['classroom_id'], item['classroom_id'])} "
+                f"/ matéria {item['subject_id']} / grupo {item['student_group']}: "
+                f"{item['actual']}/{item['expected']}"
+                for item in incomplete_units[:8]
+            )
+            return {
+                "status": "error",
+                "message": (
+                    "A geração foi interrompida para não salvar uma grade "
+                    "incompleta. A quantidade de aulas não bate com a matriz: "
+                    f"{details}."
+                ),
+                "schedule_integrity_error": incomplete_units,
+                **model_metrics,
+            }
+
     objective_metrics = {}
     if optimization_completed:
         objective_metrics = {
@@ -1130,8 +1204,18 @@ def generate_schedule(
 
     return {
         "status": "success",
-        "solution_status": "optimal" if status == cp_model.OPTIMAL else "feasible",
+        "solution_status": "feasible" if schedule_integrity_fallback else (
+            "optimal" if status == cp_model.OPTIMAL else "feasible"
+        ),
         "teacher_assignment_fallback": seed_fallback,
+        "schedule_integrity_fallback": schedule_integrity_fallback,
+        "message": (
+            "A grade completa foi preservada, mas a distribuição conjunta "
+            "dos professores não pôde ser concluída. Todas as matérias e "
+            "cargas foram mantidas; as aulas ficaram sem professor para "
+            "evitar descartar conteúdo."
+            if schedule_integrity_fallback else ""
+        ),
         "schedule": schedule,
         "unstaffed_lessons": sum(item["teacher_id"] is None for item in schedule),
         **objective_metrics,
