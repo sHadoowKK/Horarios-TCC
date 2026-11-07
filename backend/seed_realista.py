@@ -415,7 +415,7 @@ def parse_pair_rows(raw, value_count):
         parts = [part.strip() for part in line.split("|")]
         if len(parts) != value_count:
             raise ValueError(f"Linha de dados inválida ({line_number}): {line}")
-        parsed[parts[0]] = parts[1:]
+        parsed[parts[0]] = parts[1]
     return parsed
 
 
@@ -500,8 +500,8 @@ def parse_selected_scenario(mode):
                         settings.append({
                             "subject": row["subject"],
                             "joint": 0,
-                            "a": workload,
-                            "b": 0,
+                            "a": workload if group == "A" else 0,
+                            "b": workload if group == "B" else 0,
                             "night_cohort": group,
                         })
                 expanded.append((f"1º INFO {group}", "Noite", False, settings))
@@ -678,7 +678,7 @@ def main(mode):
             for setting in classroom.subject_settings:
                 if classroom.has_groups and setting.get("split"):
                     joint = int(setting.get("joint_workload", 0) or 0)
-                    lesson_units += joint * 2
+                    lesson_units += joint
                     lesson_units += int(setting.get("workload_a", 0) or 0)
                     lesson_units += int(setting.get("workload_b", 0) or 0)
                 else:
