@@ -126,7 +126,19 @@ def build_unstaffed_diagnostics(
         best_teacher = availability_rows[0]
         best_count = best_teacher["available_periods"]
 
-        if best_count == 0:
+        if schedule_integrity_fallback:
+            diagnostic.update({
+                "reason_code": "schedule_integrity_fallback",
+                "message": (
+                    f"A matéria {subject_name} teve suas {lesson_count} aulas "
+                    f"preservadas na grade da turma {classroom_name}, mas a "
+                    "distribuição conjunta não conseguiu manter a atribuição "
+                    "de professores em todos os componentes. Os períodos "
+                    "permanecem reservados; confira os docentes habilitados "
+                    "antes de considerar a grade finalizada."
+                ),
+            })
+        elif best_count == 0:
             names = ", ".join(item["name"] for item in availability_rows)
             diagnostic.update({
                 "reason_code": "no_available_periods",
@@ -145,18 +157,6 @@ def build_unstaffed_diagnostics(
                     f"({best_teacher['name']}) tem apenas {best_count} na jornada "
                     f"de {classroom_name}. Revise a disponibilidade cadastrada "
                     "ou habilite outro docente."
-                ),
-            })
-        elif schedule_integrity_fallback:
-            diagnostic.update({
-                "reason_code": "schedule_integrity_fallback",
-                "message": (
-                    f"A matéria {subject_name} teve suas {lesson_count} aulas "
-                    f"preservadas na grade da turma {classroom_name}, mas a "
-                    "distribuição conjunta não conseguiu manter a atribuição "
-                    "de professores em todos os componentes. Os períodos "
-                    "permanecem reservados; confira os docentes habilitados "
-                    "antes de considerar a grade finalizada."
                 ),
             })
         elif teacher_assignment_fallback:
