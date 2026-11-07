@@ -54,7 +54,8 @@ Resumo da transcrição:
 | Quadros diurnos usados no solver | 11 |
 | Quadros técnicos modulares noturnos usados no solver | 8 |
 | Registros de turma no banco após separar 1º INFO A/B | 20 |
-| Disciplinas distintas após normalizar grafias | 103 |
+| Grafias de disciplinas normalizadas no quadro | 103 |
+| Disciplinas no catálogo após unificar uma variação evidente de abreviação | 102 |
 | Docentes identificados e anonimizados | 51 |
 | Lançamentos semanais transcritos | 695 |
 
@@ -79,7 +80,7 @@ Os dois quadros MTEC (com início às 18h30) e os sete registros de aulas síncr
 - A planilha mostra horários existentes e associação de docentes às disciplinas; ela **não informa a disponibilidade semanal completa de cada docente**. O seed usa disponibilidade ampla e sintética nos turnos em que o docente aparece, apenas para permitir o teste do gerador. Isso não deve ser confundido com a disponibilidade real da escola.
 - Os nomes dos docentes são substituídos por identificadores como `Docente 01`, preservando as associações de habilitação sem expor nomes pessoais.
 - O quadro não informa nível de complexidade das disciplinas. O seed usa complexidade neutra (`Media`) e não inventa pesos pedagógicos.
-- Algumas abreviações que diferem apenas por pontuação foram normalizadas. Uma variação de escrita de `C.P.D.P.J` foi associada à forma `CPDPI` usada no cadastro de habilitações.
+- Algumas abreviações que diferem apenas por pontuação foram normalizadas. As formas `C.P.D.P.J` e `CPDPI` foram unificadas como uma única disciplina porque a lista de habilitações registra essa mesma matéria como `CPDPI`.
 - A planilha é uma referência de entrada; o horário gerado pelo Anatinus deve ser uma nova solução, não uma reprodução do quadro original.
 
 Comandos disponíveis, executados dentro de `backend`:
