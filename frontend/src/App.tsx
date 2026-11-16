@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
-import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer } from 'lucide-react';
+import { Calendar, Users, BookOpen, Settings, Filter, Moon, Sun, Download, Printer, Lock, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { exportTimetableToExcel } from './utils/exportTimetableToExcel';
@@ -21,8 +21,8 @@ const PERIOD_NAMES = [
   "14:50 - 15:40",
   "15:40 - 16:30",
   "16:30 - 17:20",
-  "19:00 - 19:50",
-  "19:50 - 20:30",
+  "19:00 - 19:45",
+  "19:45 - 20:30",
   "20:30 - 21:15",
   "21:30 - 22:15",
   "22:15 - 23:00",
@@ -50,7 +50,6 @@ const JOURNEY_ROWS: Record<string, DisplayRow[]> = {
     pause("14:40 - 14:50", "Intervalo"),
     lesson(8), lesson(9), lesson(10),
   ],
-  // Compatibilidade visual temporária até bancos antigos serem migrados.
   "Tarde": [
     lesson(6), lesson(7),
     pause("14:40 - 14:50", "Intervalo"),
@@ -76,15 +75,52 @@ const PROFESSOR_ROWS: DisplayRow[] = [
   lesson(14), lesson(15),
 ];
 
+const getClassroomJourneyRows = (classroom?: any): DisplayRow[] => {
+  const shift = classroom?.shift || "Manhã";
+  const defaults = JOURNEY_ROWS[shift] || JOURNEY_ROWS["Manhã"];
+  if (shift !== "Integral" || !Array.isArray(classroom?.allowed_periods)) {
+    return defaults;
+  }
+
+  const allowed = new Set<number>(classroom.allowed_periods.map(Number));
+  const rows: DisplayRow[] = [];
+  const addLessons = (periods: number[]) => {
+    periods.forEach(period => {
+      if (allowed.has(period)) rows.push(lesson(period));
+    });
+  };
+
+  addLessons([0, 1, 2]);
+  if ([3, 4, 5].some(period => allowed.has(period))) {
+    rows.push(pause("09:40 - 10:00", "Intervalo"));
+  }
+  addLessons([3, 4, 5]);
+
+  const hasAfternoon = [6, 7, 8, 9, 10].some(period => allowed.has(period));
+  if (hasAfternoon) {
+    rows.push(
+      pause(
+        allowed.has(5) ? "12:30 - 13:00" : "11:40 - 13:00",
+        "Almoço",
+      ),
+    );
+    addLessons([6, 7]);
+    if (allowed.has(8) || allowed.has(9) || allowed.has(10)) {
+      rows.push(pause("14:40 - 14:50", "Intervalo"));
+    }
+    addLessons([8, 9, 10]);
+  }
+
+  return rows.length > 0 ? rows : defaults;
+};
+
 type Theme = "light" | "dark";
 
 function getInitialTheme(): Theme {
   const savedTheme = localStorage.getItem("anatinus-theme");
-
   if (savedTheme === "light" || savedTheme === "dark") {
     return savedTheme;
   }
-
   return "dark";
 }
 
@@ -93,9 +129,9 @@ function App() {
   const [schedule, setSchedule] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [generationSuccess, setGenerationSuccess] =
-    useState(false);
+  const [generationSuccess, setGenerationSuccess] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
+  const [unstaffedDiagnostics, setUnstaffedDiagnostics] = useState<any[]>([]);
   const [generationScope, setGenerationScope] = useState<"all" | "classrooms" | "subject_selected" | "subject_all">("all");
   const [generationClassroomIds, setGenerationClassroomIds] = useState<number[]>([]);
   const [generationSubjectId, setGenerationSubjectId] = useState<number | "">("");
@@ -106,6 +142,12 @@ function App() {
 
   const [viewMode, setViewMode] = useState<"turma" | "professor">("turma");
   const [selectedId, setSelectedId] = useState<number | "">("");
+  const [classroomSearch, setClassroomSearch] = useState("");
+
+  const [editingLesson, setEditingLesson] = useState<any | null>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<number | "">("");
+  const [isFixed, setIsFixed] = useState<boolean>(false);
+  const [savingLesson, setSavingLesson] = useState(false);
 
   const fetchBaseData = async (loadSavedSchedule = true) => {
     try {
@@ -117,26 +159,30 @@ function App() {
 
       const [cRes, sRes, tRes] = await Promise.all(requests);
 
+      let savedTimetable: any[] | null = null;
+      if (loadSavedSchedule) {
+        const timeRes = await api.get("/timetable/");
+        savedTimetable = timeRes.data;
+        setSchedule(timeRes.data.length > 0 ? timeRes.data : null);
+      }
+
       setClassrooms(cRes.data);
       setSubjects(sRes.data);
       setTeachers(tRes.data);
 
       setSelectedId(current => {
-        if (current !== "") {
+        if (
+          current !== "" &&
+          (!savedTimetable || savedTimetable.some(item => item.classroom_id === current))
+        ) {
           return current;
         }
 
-        return cRes.data.length > 0
-          ? cRes.data[0].id
-          : "";
+        const classroomWithSchedule = savedTimetable?.find(item =>
+          cRes.data.some((classroom: { id: number }) => classroom.id === item.classroom_id),
+        )?.classroom_id;
+        return classroomWithSchedule ?? cRes.data[0]?.id ?? "";
       });
-
-      if (loadSavedSchedule) {
-        const timeRes = await api.get("/timetable/");
-        if (timeRes.data.length > 0) {
-          setSchedule(timeRes.data);
-        }
-      }
     } catch (err) {
       console.error("Erro ao buscar dados acadêmicos", err);
     }
@@ -154,8 +200,7 @@ function App() {
       if (valid.length > 0) return valid;
 
       const preferredClassroom =
-        classrooms.find(classroom => classroom.id === selectedId)
-        || classrooms[0];
+        classrooms.find(classroom => classroom.id === selectedId) || classrooms[0];
       return [preferredClassroom.id];
     });
 
@@ -176,28 +221,16 @@ function App() {
       fetchBaseData(false);
     };
 
-    window.addEventListener(
-      "anatinus:academic-data-changed",
-      handleAcademicDataChanged,
-    );
-
+    window.addEventListener("anatinus:academic-data-changed", handleAcademicDataChanged);
     return () => {
-      window.removeEventListener(
-        "anatinus:academic-data-changed",
-        handleAcademicDataChanged,
-      );
+      window.removeEventListener("anatinus:academic-data-changed", handleAcademicDataChanged);
     };
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle(
-      "dark-theme",
-      theme === "dark",
-    );
+    document.documentElement.classList.toggle("dark-theme", theme === "dark");
 
-    const favicon = document.querySelector<HTMLLinkElement>(
-      "#app-favicon",
-    );
+    const favicon = document.querySelector<HTMLLinkElement>("#app-favicon");
     if (favicon) {
       favicon.href =
         theme === "dark"
@@ -209,9 +242,7 @@ function App() {
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme(current =>
-      current === "dark" ? "light" : "dark",
-    );
+    setTheme(current => (current === "dark" ? "light" : "dark"));
   };
 
   const handleGenerate = async () => {
@@ -253,22 +284,26 @@ function App() {
         request.subject_id = Number(generationSubjectId);
       }
 
-      const response = await api.post("/generate/", request);
+      const response = await api.post("/generate/", request, { timeout: 360000 });
       setSchedule(response.data.schedule);
-      setGenerationMessage(response.data.message || "Grade gerada.");
+      setUnstaffedDiagnostics(response.data.unstaffed_diagnostics || []);
+      const qualityMessage = response.data.teacher_assignment_fallback
+        ? "A distribuição de professores atingiu o limite de busca. Horários preservados."
+        : response.data.solution_status === "optimal"
+          ? "Otimização comprovada com a melhor pontuação possível."
+          : "Grade válida gerada com sucesso.";
+      setGenerationMessage(
+        [response.data.message || "Grade gerada.", qualityMessage].join(" "),
+      );
       setGenerationSuccess(true);
     } catch (err: any) {
       setGenerationSuccess(false);
       const detail = err.response?.data?.detail;
-      const responseText =
-        typeof err.response?.data === "string"
-          ? err.response.data
-          : "";
-      const message =
-        detail
-        || responseText
-        || err.message
-        || "Erro ao gerar grade";
+      const responseText = typeof err.response?.data === "string" ? err.response.data : "";
+      const isTimeout = err.code === "ECONNABORTED" || err.code === "ETIMEDOUT";
+      const message = isTimeout
+        ? "A geração ultrapassou o limite de espera de 6 minutos."
+        : detail || responseText || err.message || "Erro ao gerar grade";
 
       setError(`Erro ao gerar grade: ${message}`);
       console.error("Erro ao gerar grade", err);
@@ -277,10 +312,40 @@ function App() {
     }
   };
 
-  const handleExportExcel = () => {
-    if (!schedule || schedule.length === 0) {
+  const handleOpenEditLesson = (lessonItem: any) => {
+    setEditingLesson(lessonItem);
+    setSelectedTeacherId(lessonItem.teacher_id ?? "");
+    setIsFixed(!!lessonItem.is_fixed);
+  };
+
+  const handleSaveLesson = async () => {
+    if (!editingLesson || !editingLesson.id) {
+      setError("Não é possível alterar uma aula sem ID gravado no banco.");
+      setEditingLesson(null);
       return;
     }
+
+    setSavingLesson(true);
+    try {
+      const payload = {
+        teacher_id: selectedTeacherId === "" ? null : Number(selectedTeacherId),
+        is_fixed: isFixed,
+      };
+
+      const response = await api.put(`/timetable/lessons/${editingLesson.id}`, payload);
+      setSchedule(prev => prev ? prev.map(item => item.id === editingLesson.id ? response.data : item) : null);
+      setUnstaffedDiagnostics([]);
+      setEditingLesson(null);
+    } catch (err: any) {
+      console.error("Erro ao salvar alteração de aula", err);
+      alert(err.response?.data?.detail || "Erro ao atualizar aula.");
+    } finally {
+      setSavingLesson(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (!schedule || schedule.length === 0) return;
 
     const buildRows = (
       entityId: number,
@@ -345,7 +410,7 @@ function App() {
               classroom.id,
               "turma",
               classroom,
-              JOURNEY_ROWS[classroom.shift || "Manhã"] || JOURNEY_ROWS["Manhã"],
+              getClassroomJourneyRows(classroom),
             ),
           }))
       : teachers
@@ -376,15 +441,17 @@ function App() {
     if (id === null || id === undefined) {
       return "Sem professor";
     }
-
-    return (
-      teachers.find(teacher => teacher.id === id)?.name
-      || "Professor não encontrado"
-    );
+    return teachers.find(teacher => teacher.id === id)?.name || "Professor não encontrado";
   };
 
   const getClassroomName = (id: number) =>
     classrooms.find(classroom => classroom.id === id)?.name || "N/A";
+
+  const filteredClassrooms = classrooms.filter(classroom => {
+    const query = classroomSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!query) return true;
+    return `${classroom.name} ${classroom.shift}`.toLocaleLowerCase("pt-BR").includes(query);
+  });
 
   const regenerationSubjectOptions = subjects.filter(subject =>
     classrooms.some(classroom =>
@@ -403,40 +470,29 @@ function App() {
     : classrooms;
 
   const allVisibleRegenerationClassesSelected =
-    regenerationClassroomOptions.length > 0
-    && regenerationClassroomOptions.every(classroom =>
+    regenerationClassroomOptions.length > 0 &&
+    regenerationClassroomOptions.every(classroom =>
       generationClassroomIds.includes(classroom.id),
     );
 
-  const unstaffedLessons =
-    schedule?.filter(item => item.teacher_id == null).length || 0;
+  const unstaffedLessons = schedule?.filter(item => item.teacher_id == null).length || 0;
 
   const unstaffedSummary = Object.values(
     (schedule || [])
       .filter(item => item.teacher_id == null)
-      .reduce(
-        (groups: Record<string, any>, item: any) => {
-          const key = [
-            item.classroom_id,
-            item.subject_id,
-            item.student_group || "Todos",
-          ].join(":");
-
-          if (!groups[key]) {
-            groups[key] = {
-              classroomId: item.classroom_id,
-              subjectId: item.subject_id,
-              studentGroup:
-                item.student_group || "Todos",
-              lessons: 0,
-            };
-          }
-
-          groups[key].lessons += 1;
-          return groups;
-        },
-        {},
-      ),
+      .reduce((groups: Record<string, any>, item: any) => {
+        const key = [item.classroom_id, item.subject_id, item.student_group || "Todos"].join(":");
+        if (!groups[key]) {
+          groups[key] = {
+            classroomId: item.classroom_id,
+            subjectId: item.subject_id,
+            studentGroup: item.student_group || "Todos",
+            lessons: 0,
+          };
+        }
+        groups[key].lessons += 1;
+        return groups;
+      }, {}),
   ) as Array<{
     classroomId: number;
     subjectId: number;
@@ -447,455 +503,487 @@ function App() {
   const renderScheduleGrid = () => {
     if (!schedule) {
       return (
-        <div className="app-empty-state">
-          <div className="app-empty-icon"><Calendar className="w-6 h-6" /></div>
-          <h3>Nenhuma grade gerada</h3>
-          <p>Use “Gerar grade” para criar os horários.</p>
+        <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--an-muted)" }}>
+          <Calendar style={{ width: 36, height: 36, margin: "0 auto 12px", opacity: 0.5 }} />
+          <p style={{ fontSize: 15, fontWeight: 600, color: "var(--an-text)", margin: "0 0 4px" }}>
+            Nenhuma grade horária gerada
+          </p>
+          <p style={{ fontSize: 13, margin: 0 }}>
+            Utilize o botão "Gerar grade" acima para executar a otimização de horários.
+          </p>
         </div>
       );
     }
 
     if (!selectedId) {
       return (
-        <div className="app-empty-state app-empty-state-compact">
-          <div className="app-empty-icon"><Filter className="w-5 h-5" /></div>
-          <h3>Selecione uma turma ou professor</h3>
+        <div style={{ padding: "36px 24px", textAlign: "center", color: "var(--an-muted)" }}>
+          <Filter style={{ width: 28, height: 28, margin: "0 auto 8px", opacity: 0.5 }} />
+          <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>
+            Selecione uma turma ou professor para visualizar a grade semanal.
+          </p>
         </div>
       );
     }
 
     let rows: DisplayRow[];
-
     if (viewMode === "turma") {
       const classroom = classrooms.find(item => item.id === selectedId);
-      rows = JOURNEY_ROWS[classroom?.shift || "Manhã"] || JOURNEY_ROWS["Manhã"];
+      rows = getClassroomJourneyRows(classroom);
     } else {
       rows = PROFESSOR_ROWS;
     }
 
     return (
-      <div className="app-schedule-frame overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
-        <table className="app-schedule-table w-full text-sm text-center">
-          <thead className="bg-gray-100 text-gray-600 font-bold border-b">
-            <tr>
-              <th className="p-3 border-r w-28">Horário</th>
-              {DAYS.map(day => (
-                <th key={day} className="p-3 border-r last:border-0">{day}</th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {rows.map((row, rowIndex) => {
-              if (row.kind === "break") {
-                return (
-                  <tr key={`break-${row.label}-${rowIndex}`} className="border-b bg-slate-100">
-                    <td className="px-3 py-2 border-r font-semibold text-slate-500 whitespace-nowrap">
-                      {row.label}
-                    </td>
-                    <td colSpan={5} className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-500">
-                      {row.name}
-                    </td>
-                  </tr>
-                );
-              }
-
-              const period = row.period;
-
+      <table className="app-timetable">
+        <thead>
+          <tr>
+            <th className="app-timetable-col-time">Horário</th>
+            {DAYS.map(day => (
+              <th key={day}>{day}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => {
+            if (row.kind === "break") {
               return (
-                <tr key={period} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="p-3 border-r font-bold text-gray-700 bg-gray-50 whitespace-nowrap">
-                    {PERIOD_NAMES[period]}
+                <tr key={`break-${row.label}-${rowIndex}`} className="app-timetable-break-row">
+                  <td className="app-timetable-col-time">{row.label}</td>
+                  <td colSpan={5} className="app-timetable-break-cell">
+                    {row.name}
                   </td>
+                </tr>
+              );
+            }
 
-                  {DAYS.map((_, day) => {
-                    let cellContent = null;
+            const period = row.period;
 
-                    if (viewMode === "turma") {
-                      const classroom = classrooms.find(
-                        item => item.id === selectedId
-                      );
+            return (
+              <tr key={period}>
+                <td className="app-timetable-col-time">
+                  {PERIOD_NAMES[period]}
+                </td>
+                {DAYS.map((_, day) => {
+                  let cellContent = null;
 
-                      const lessons = schedule.filter(
-                        item =>
-                          item.day === day &&
-                          item.period === period &&
-                          item.classroom_id === selectedId
-                      );
+                  if (viewMode === "turma") {
+                    const classroom = classrooms.find(item => item.id === selectedId);
+                    const lessons = schedule.filter(
+                      item =>
+                        item.day === day &&
+                        item.period === period &&
+                        item.classroom_id === selectedId,
+                    );
 
-                      if (classroom?.has_groups) {
-                        const jointLesson = lessons.find(
-                          item => item.student_group === "Todos"
-                        );
-                        const groupA = lessons.find(
-                          item => item.student_group === "A"
-                        );
-                        const groupB = lessons.find(
-                          item => item.student_group === "B"
-                        );
+                    if (classroom?.has_groups) {
+                      const jointLesson = lessons.find(item => item.student_group === "Todos");
+                      const groupA = lessons.find(item => item.student_group === "A");
+                      const groupB = lessons.find(item => item.student_group === "B");
 
-                        if (jointLesson) {
-                          cellContent = (
-                            <div className="flex flex-col items-center justify-center p-2 h-full bg-indigo-50 border border-indigo-100 rounded">
-                              <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-400 mb-1">
-                                Turma inteira
+                      if (jointLesson) {
+                        cellContent = (
+                          <div
+                            onClick={() => handleOpenEditLesson(jointLesson)}
+                            className="app-lesson-slot"
+                            title="Clique para editar ou fixar aula"
+                          >
+                            {jointLesson.is_fixed && (
+                              <span title="Aula fixada manualmente" className="app-lesson-fixed-icon">
+                                <Lock style={{ width: 12, height: 12 }} />
                               </span>
-                              <span className="font-bold text-indigo-900">
-                                {getSubName(jointLesson.subject_id)}
-                              </span>
-                              <span className={`text-xs mt-1 ${
-                                jointLesson.teacher_id == null
-                                  ? "text-red-600 font-bold"
-                                  : "text-indigo-600"
-                              }`}>
-                                {getProfName(jointLesson.teacher_id)}
-                              </span>
-                            </div>
-                          );
-                        } else {
-                          const renderGroup = (group: "A" | "B", item: any) => (
-                            <div className={item
-                              ? "min-h-16 flex flex-col items-center justify-center p-1.5 bg-indigo-50 border border-indigo-100 rounded"
-                              : "min-h-16"} aria-hidden={!item}>
-                              {item && (
-                                <>
-                                  <span className="text-[10px] font-bold uppercase text-indigo-400">
-                                    Grupo {group}
-                                  </span>
-                                  <span className="text-xs font-bold text-indigo-900 mt-0.5 leading-tight">
-                                    {getSubName(item.subject_id)}
-                                  </span>
-                                  <span className={`text-[10px] mt-0.5 leading-tight ${
-                                    item.teacher_id == null
-                                      ? "text-red-600 font-bold"
-                                      : "text-indigo-600"
-                                  }`}>
-                                    {getProfName(item.teacher_id)}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          );
-
-                          cellContent = (
-                            <div className="grid grid-cols-2 gap-1 h-full">
-                              {renderGroup("A", groupA)}
-                              {renderGroup("B", groupB)}
-                            </div>
-                          );
-                        }
+                            )}
+                            <span className="app-lesson-tag">Turma inteira</span>
+                            <span className="app-lesson-subject">
+                              {getSubName(jointLesson.subject_id)}
+                            </span>
+                            <span className={`app-lesson-teacher ${jointLesson.teacher_id == null ? "unstaffed" : ""}`}>
+                              {getProfName(jointLesson.teacher_id)}
+                            </span>
+                          </div>
+                        );
                       } else {
-                        const currentLesson = lessons[0];
-
-                        if (currentLesson) {
-                          cellContent = (
-                            <div className="flex flex-col items-center justify-center p-2 h-full bg-indigo-50 border border-indigo-100 rounded">
-                              <span className="font-bold text-indigo-900">
-                                {getSubName(currentLesson.subject_id)}
-                              </span>
-                              <span className={`text-xs mt-1 ${
-                                currentLesson.teacher_id == null
-                                  ? "text-red-600 font-bold"
-                                  : "text-indigo-600"
-                              }`}>
-                                {getProfName(currentLesson.teacher_id)}
-                              </span>
-                            </div>
-                          );
-                        }
-                      }
-                    } else {
-                      const currentLesson = schedule.find(
-                        item =>
-                          item.day === day &&
-                          item.period === period &&
-                          item.teacher_id === selectedId
-                      );
-
-                      if (currentLesson) {
-                        const groupLabel =
-                          currentLesson.student_group &&
-                          currentLesson.student_group !== "Todos"
-                            ? ` · Grupo ${currentLesson.student_group}`
-                            : "";
+                        const renderGroup = (group: "A" | "B", item: any) => (
+                          <div
+                            onClick={() => item && handleOpenEditLesson(item)}
+                            className={item ? "app-lesson-slot" : "app-lesson-empty-cell"}
+                            style={{ flex: 1, minHeight: 48 }}
+                          >
+                            {item && (
+                              <>
+                                {item.is_fixed && (
+                                  <span title="Fixada" className="app-lesson-fixed-icon">
+                                    <Lock style={{ width: 11, height: 11 }} />
+                                  </span>
+                                )}
+                                <span className="app-lesson-tag">Grupo {group}</span>
+                                <span className="app-lesson-subject" style={{ fontSize: 11 }}>
+                                  {getSubName(item.subject_id)}
+                                </span>
+                                <span className={`app-lesson-teacher ${item.teacher_id == null ? "unstaffed" : ""}`} style={{ fontSize: 10 }}>
+                                  {getProfName(item.teacher_id)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        );
 
                         cellContent = (
-                          <div className="flex flex-col items-center justify-center p-2 h-full bg-emerald-50 border border-emerald-100 rounded">
-                            <span className="font-bold text-emerald-900">
+                          <div style={{ display: "flex", gap: 4, height: "100%" }}>
+                            {renderGroup("A", groupA)}
+                            {renderGroup("B", groupB)}
+                          </div>
+                        );
+                      }
+                    } else {
+                      const currentLesson = lessons[0];
+                      if (currentLesson) {
+                        cellContent = (
+                          <div
+                            onClick={() => handleOpenEditLesson(currentLesson)}
+                            className="app-lesson-slot"
+                            title="Clique para editar ou fixar aula"
+                          >
+                            {currentLesson.is_fixed && (
+                              <span title="Aula fixada manualmente" className="app-lesson-fixed-icon">
+                                <Lock style={{ width: 12, height: 12 }} />
+                              </span>
+                            )}
+                            <span className="app-lesson-subject">
                               {getSubName(currentLesson.subject_id)}
                             </span>
-                            <span className="text-xs text-emerald-700 mt-1">
-                              {getClassroomName(currentLesson.classroom_id)}
-                              {groupLabel}
+                            <span className={`app-lesson-teacher ${currentLesson.teacher_id == null ? "unstaffed" : ""}`}>
+                              {getProfName(currentLesson.teacher_id)}
                             </span>
                           </div>
                         );
                       }
                     }
-
-                    return (
-                      <td
-                        key={day}
-                        className="p-2 border-r last:border-0 align-top h-20 w-[18%]"
-                      >
-                        {cellContent || (
-                          <div className="h-full w-full bg-gray-50 rounded border border-dashed border-gray-200" />
-                        )}
-                      </td>
+                  } else {
+                    const currentLesson = schedule.find(
+                      item =>
+                        item.day === day &&
+                        item.period === period &&
+                        item.teacher_id === selectedId,
                     );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+
+                    if (currentLesson) {
+                      const groupLabel =
+                        currentLesson.student_group && currentLesson.student_group !== "Todos"
+                          ? ` · G${currentLesson.student_group}`
+                          : "";
+
+                      cellContent = (
+                        <div
+                          onClick={() => handleOpenEditLesson(currentLesson)}
+                          className="app-lesson-slot"
+                          title="Clique para editar ou fixar aula"
+                        >
+                          {currentLesson.is_fixed && (
+                            <span title="Aula fixada manualmente" className="app-lesson-fixed-icon">
+                              <Lock style={{ width: 12, height: 12 }} />
+                            </span>
+                          )}
+                          <span className="app-lesson-subject">
+                            {getSubName(currentLesson.subject_id)}
+                          </span>
+                          <span className="app-lesson-teacher">
+                            {getClassroomName(currentLesson.classroom_id)}{groupLabel}
+                          </span>
+                        </div>
+                      );
+                    }
+                  }
+
+                  return (
+                    <td key={day} style={{ height: 68 }}>
+                      {cellContent || <div className="app-lesson-empty-cell" />}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     );
   };
 
   return (
     <Router>
-      <div className="app-shell flex h-screen w-full text-left">
-        <aside className="app-sidebar flex flex-col shrink-0">
-          <div className="app-brand p-6 border-b border-gray-200">
-            <h1 className="app-brand-title text-xl font-bold flex items-center gap-2">
-              <img
-                src="/Anatinus%20final%201.png"
-                alt=""
-                aria-hidden="true"
-                className="app-logo-light w-8 h-8"
-              />
-              <img
-                src="/anatinus%20final%201%20branco.png"
-                alt=""
-                aria-hidden="true"
-                className="app-logo-dark w-8 h-8"
-              />
-              <span className="app-brand-name">Anatinus</span>
-            </h1>
+      <div className="app-shell">
+        {/* CABEÇALHO SUPERIOR COMPACTO (Substitui a antiga sidebar SaaS) */}
+        <header className="app-header">
+          <div className="app-header-brand">
+            <img
+              src="/Anatinus%20final%201.png"
+              alt="Anatinus"
+              className="app-logo-light"
+            />
+            <img
+              src="/anatinus%20final%201%20branco.png"
+              alt="Anatinus"
+              className="app-logo-dark"
+            />
+            <span className="app-header-brand-title">Anatinus</span>
           </div>
 
-          <nav className="app-nav flex-1 p-4 space-y-2 flex flex-col">
+          <nav className="app-header-nav">
             <NavLink
               to="/"
-              title="Grade Horária"
-              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+              className={({ isActive }) => `app-nav-item ${isActive ? "active" : ""}`}
             >
-              <Calendar className="w-5 h-5 text-gray-500" />
-              <span className="app-nav-label font-medium">Grade Horária</span>
+              <Calendar />
+              <span>Grade Horária</span>
             </NavLink>
 
             <NavLink
               to="/professores"
-              title="Professores"
-              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+              className={({ isActive }) => `app-nav-item ${isActive ? "active" : ""}`}
             >
-              <Users className="w-5 h-5 text-gray-500" />
-              <span className="app-nav-label font-medium">Professores</span>
+              <Users />
+              <span>Professores</span>
             </NavLink>
 
             <NavLink
               to="/turmas"
-              title="Turmas e Matérias"
-              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+              className={({ isActive }) => `app-nav-item ${isActive ? "active" : ""}`}
             >
-              <BookOpen className="w-5 h-5 text-gray-500" />
-              <span className="app-nav-label font-medium">Turmas e Matérias</span>
+              <BookOpen />
+              <span>Turmas e Matérias</span>
             </NavLink>
-
-            <div className="flex-1" />
-
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="app-theme-toggle w-full flex items-center justify-start p-3 rounded-lg transition-colors"
-              title={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
-              aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
-            >
-              <span className="app-theme-label-group flex items-center space-x-3">
-                {theme === "dark" ? (
-                  <Sun className="w-5 h-5 text-amber-400" />
-                ) : (
-                  <Moon className="w-5 h-5 text-gray-500" />
-                )}
-                <span className="app-nav-label font-medium">
-                  {theme === "dark" ? "Tema claro" : "Tema escuro"}
-                </span>
-              </span>
-
-
-            </button>
 
             <NavLink
               to="/config"
-              title="Regras e Leis"
-              className={({ isActive }) => `app-nav-link flex items-center space-x-3 p-3 rounded-lg transition-colors ${isActive ? "app-nav-link-active" : ""}`}
+              className={({ isActive }) => `app-nav-item ${isActive ? "active" : ""}`}
             >
-              <Settings className="w-5 h-5 text-gray-500" />
-              <span className="app-nav-label font-medium">Regras e Leis</span>
+              <Settings />
+              <span>Regras e Leis</span>
             </NavLink>
           </nav>
-        </aside>
 
-        <main className="app-main flex-1 overflow-auto">
+          <div className="app-header-actions">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="app-theme-btn"
+              title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+              aria-label="Alternar tema"
+            >
+              {theme === "dark" ? (
+                <Sun style={{ width: 16, height: 16, color: "#D4A454" }} />
+              ) : (
+                <Moon style={{ width: 16, height: 16 }} />
+              )}
+            </button>
+          </div>
+        </header>
+
+        {/* ÁREA DE TRABALHO PRINCIPAL */}
+        <main className="app-main">
           <Routes>
             <Route
               path="/"
               element={
-                <div className="app-page p-8 max-w-7xl mx-auto">
-                  <h2 className="sr-only">Grade horária</h2>
-                  <div className="app-toolbar no-print">
-                    <div className="app-view-controls">
-                      <select
-                        aria-label="Visualizar por"
-                        className="app-toolbar-select"
-                        value={viewMode}
-                        onChange={event => {
-                          setViewMode(event.target.value as "turma" | "professor");
-                          setSelectedId("");
-                        }}
-                      >
-                        <option value="turma">Por turma</option>
-                        <option value="professor">Por professor</option>
-                      </select>
-
-                      <select
-                        aria-label={viewMode === "turma" ? "Selecionar turma" : "Selecionar professor"}
-                        className="app-toolbar-select app-toolbar-select-target"
-                        value={selectedId}
-                        onChange={event => setSelectedId(event.target.value === "" ? "" : Number(event.target.value))}
-                      >
-                        <option value="">Selecionar...</option>
-                        {viewMode === "turma" && classrooms.map(classroom => (
-                          <option key={classroom.id} value={classroom.id}>
-                            {classroom.name} ({classroom.shift}{classroom.has_groups ? " · Grupos A/B" : ""})
-                          </option>
-                        ))}
-                        {viewMode === "professor" && teachers.map(teacher => (
-                          <option key={teacher.id} value={teacher.id}>
-                            {teacher.name}
-                          </option>
-                        ))}
-                      </select>
+                <div className="app-workspace">
+                  {/* Título de tela explícito e profissional */}
+                  <div className="app-page-title-row no-print">
+                    <div>
+                      <h1 className="app-page-title">
+                        Grade Horária
+                        <span className="app-page-subtitle">
+                          {viewMode === "turma"
+                            ? (classrooms.find(c => c.id === selectedId)?.name || "Selecione uma turma")
+                            : (teachers.find(t => t.id === selectedId)?.name || "Selecione um professor")}
+                        </span>
+                      </h1>
                     </div>
 
-                    <div className="app-toolbar-actions">
+                    <div className="app-control-group">
                       {schedule && schedule.length > 0 && (
                         <>
                           <button
                             type="button"
                             onClick={handleExportExcel}
-                            className="app-action-secondary"
-                            title={viewMode === "turma" ? "Exportar uma aba por turma em Excel" : "Exportar uma aba por professor em Excel"}
+                            className="app-btn app-btn-secondary"
+                            title="Exportar pasta de trabalho Excel"
                           >
-                            <Download className="w-4 h-4" />
-                            Excel
+                            <Download style={{ width: 14, height: 14 }} />
+                            <span>Exportar Excel</span>
                           </button>
                           <button
                             type="button"
                             onClick={handlePrint}
-                            className="app-action-secondary"
-                            title="Imprimir a visualização atual"
+                            className="app-btn app-btn-secondary"
+                            title="Imprimir visualização atual"
                           >
-                            <Printer className="w-4 h-4" />
-                            Imprimir
+                            <Printer style={{ width: 14, height: 14 }} />
+                            <span>Imprimir</span>
                           </button>
                         </>
                       )}
-
                     </div>
                   </div>
 
-                  <div className="app-generation-controls no-print">
-                    <label htmlFor="generation-scope">Gerar novamente:</label>
-                    <select
-                      id="generation-scope"
-                      aria-label="Escopo da geração"
-                      className="app-toolbar-select app-generation-scope-select"
-                      value={generationScope}
-                      onChange={event => {
-                        const nextScope = event.target.value as
-                          | "all"
-                          | "classrooms"
-                          | "subject_selected"
-                          | "subject_all";
-                        setGenerationScope(nextScope);
-                        setError("");
-                        setGenerationSuccess(false);
-
-                        if (nextScope === "subject_selected" && generationSubjectId !== "") {
-                          const matchingIds = classrooms
-                            .filter(classroom =>
-                              (classroom.subject_settings || []).some(
-                                (setting: any) => Number(setting.subject_id) === Number(generationSubjectId),
-                              ),
-                            )
-                            .map(classroom => classroom.id);
-                          setGenerationClassroomIds(current => {
-                            const retained = current.filter(id => matchingIds.includes(id));
-                            return retained.length > 0 ? retained : matchingIds.slice(0, 1);
-                          });
-                        }
-                      }}
-                    >
-                      <option value="all">Escola inteira</option>
-                      <option value="classrooms" disabled={!schedule || schedule.length === 0}>Turmas selecionadas</option>
-                      <option value="subject_selected" disabled={!schedule || schedule.length === 0}>Matéria nas turmas selecionadas</option>
-                      <option value="subject_all" disabled={!schedule || schedule.length === 0}>Matéria na escola inteira</option>
-                    </select>
-
-                    {(generationScope === "subject_selected" || generationScope === "subject_all") && (
+                  {/* BARRA DE CONTROLE: VISUALIZAÇÃO E FILTROS */}
+                  <div className="app-control-bar no-print">
+                    <div className="app-control-group">
                       <select
-                        aria-label="Matéria para regeneração"
-                        className="app-toolbar-select app-generation-target-select"
-                        value={generationSubjectId}
-                        onChange={event => {
-                          const nextSubjectId = event.target.value === "" ? "" : Number(event.target.value);
-                          setGenerationSubjectId(nextSubjectId);
+                        aria-label="Modo de visualização"
+                        className="app-select"
+                        value={viewMode}
+                        onChange={e => {
+                          setViewMode(e.target.value as "turma" | "professor");
+                          setSelectedId("");
+                        }}
+                      >
+                        <option value="turma">Visualizar por Turma</option>
+                        <option value="professor">Visualizar por Professor</option>
+                      </select>
+
+                      {viewMode === "turma" && (
+                        <input
+                          type="search"
+                          aria-label="Filtrar turmas"
+                          placeholder="Filtrar turma ou turno..."
+                          className="app-input"
+                          style={{ width: 180 }}
+                          value={classroomSearch}
+                          onChange={e => {
+                            const query = e.target.value;
+                            setClassroomSearch(query);
+                            const normalized = query.trim().toLocaleLowerCase("pt-BR");
+                            const matches = classrooms.filter(c =>
+                              `${c.name} ${c.shift}`.toLocaleLowerCase("pt-BR").includes(normalized),
+                            );
+                            if (!matches.some(c => c.id === selectedId)) {
+                              setSelectedId(matches[0]?.id ?? "");
+                            }
+                          }}
+                        />
+                      )}
+
+                      <select
+                        aria-label={viewMode === "turma" ? "Selecionar turma" : "Selecionar professor"}
+                        className="app-select"
+                        style={{ minWidth: 220 }}
+                        value={selectedId}
+                        onChange={e => setSelectedId(e.target.value === "" ? "" : Number(e.target.value))}
+                      >
+                        <option value="">Selecionar...</option>
+                        {viewMode === "turma" &&
+                          filteredClassrooms.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({c.shift}{c.has_groups ? " · Grupos A/B" : ""})
+                            </option>
+                          ))}
+                        {viewMode === "professor" &&
+                          teachers.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="app-control-group">
+                      <button
+                        type="button"
+                        onClick={handleGenerate}
+                        disabled={loading}
+                        className="app-btn app-btn-primary"
+                      >
+                        <Calendar style={{ width: 14, height: 14 }} />
+                        <span>{loading ? "Otimizando horários..." : "Gerar grade"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* PAINEL DE ESCOPO / REGENERAÇÃO */}
+                  <div className="app-scope-panel no-print">
+                    <div className="app-scope-row">
+                      <span className="app-scope-label">Escopo da geração:</span>
+                      <select
+                        aria-label="Escopo da geração"
+                        className="app-select"
+                        value={generationScope}
+                        onChange={e => {
+                          const nextScope = e.target.value as any;
+                          setGenerationScope(nextScope);
                           setError("");
                           setGenerationSuccess(false);
 
-                          if (generationScope === "subject_selected" && nextSubjectId !== "") {
+                          if (nextScope === "subject_selected" && generationSubjectId !== "") {
                             const matchingIds = classrooms
-                              .filter(classroom =>
-                                (classroom.subject_settings || []).some(
-                                  (setting: any) => Number(setting.subject_id) === Number(nextSubjectId),
-                                ),
-                              )
-                              .map(classroom => classroom.id);
-                            setGenerationClassroomIds(current => {
-                              const retained = current.filter(id => matchingIds.includes(id));
-                              return retained.length > 0 ? retained : matchingIds.slice(0, 1);
+                              .filter(c => (c.subject_settings || []).some((s: any) => Number(s.subject_id) === Number(generationSubjectId)))
+                              .map(c => c.id);
+                            setGenerationClassroomIds(curr => {
+                              const ret = curr.filter(id => matchingIds.includes(id));
+                              return ret.length > 0 ? ret : matchingIds.slice(0, 1);
                             });
                           }
                         }}
                       >
-                        <option value="">Selecionar matéria...</option>
-                        {regenerationSubjectOptions.map(subject => (
-                          <option key={subject.id} value={subject.id}>
-                            {subject.name}
-                          </option>
-                        ))}
+                        <option value="all">Escola inteira (completa)</option>
+                        <option value="classrooms" disabled={!schedule || schedule.length === 0}>
+                          Turmas selecionadas
+                        </option>
+                        <option value="subject_selected" disabled={!schedule || schedule.length === 0}>
+                          Matéria nas turmas selecionadas
+                        </option>
+                        <option value="subject_all" disabled={!schedule || schedule.length === 0}>
+                          Matéria na escola inteira
+                        </option>
                       </select>
-                    )}
+
+                      {(generationScope === "subject_selected" || generationScope === "subject_all") && (
+                        <select
+                          aria-label="Matéria para regeneração"
+                          className="app-select"
+                          value={generationSubjectId}
+                          onChange={e => {
+                            const nextSubjectId = e.target.value === "" ? "" : Number(e.target.value);
+                            setGenerationSubjectId(nextSubjectId);
+                            setError("");
+                            setGenerationSuccess(false);
+
+                            if (generationScope === "subject_selected" && nextSubjectId !== "") {
+                              const matchingIds = classrooms
+                                .filter(c => (c.subject_settings || []).some((s: any) => Number(s.subject_id) === Number(nextSubjectId)))
+                                .map(c => c.id);
+                              setGenerationClassroomIds(curr => {
+                                const ret = curr.filter(id => matchingIds.includes(id));
+                                return ret.length > 0 ? ret : matchingIds.slice(0, 1);
+                              });
+                            }
+                          }}
+                        >
+                          <option value="">Selecionar matéria...</option>
+                          {regenerationSubjectOptions.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
 
                     {(generationScope === "classrooms" || generationScope === "subject_selected") && (
-                      <div className="app-generation-classroom-picker">
-                        <div className="app-generation-classroom-picker-header">
+                      <div className="app-classroom-picker">
+                        <div className="app-classroom-picker-header">
                           <span>
-                            Turmas incluídas ({generationClassroomIds.filter(id =>
-                              regenerationClassroomOptions.some(classroom => classroom.id === id),
-                            ).length})
+                            Turmas incluídas ({generationClassroomIds.filter(id => regenerationClassroomOptions.some(c => c.id === id)).length})
                           </span>
                           <button
                             type="button"
-                            className="app-generation-select-all"
+                            className="app-btn app-btn-secondary"
+                            style={{ height: 26, fontSize: 11, padding: "0 8px" }}
                             onClick={() => {
-                              const visibleIds = regenerationClassroomOptions.map(classroom => classroom.id);
-                              setGenerationClassroomIds(current =>
+                              const visibleIds = regenerationClassroomOptions.map(c => c.id);
+                              setGenerationClassroomIds(curr =>
                                 allVisibleRegenerationClassesSelected
-                                  ? current.filter(id => !visibleIds.includes(id))
-                                  : Array.from(new Set([...current, ...visibleIds])),
+                                  ? curr.filter(id => !visibleIds.includes(id))
+                                  : Array.from(new Set([...curr, ...visibleIds]))
                               );
                               setError("");
                               setGenerationSuccess(false);
@@ -904,91 +992,79 @@ function App() {
                             {allVisibleRegenerationClassesSelected ? "Desmarcar todas" : "Selecionar todas"}
                           </button>
                         </div>
-                        <div className="app-generation-classroom-list">
-                          {regenerationClassroomOptions.map(classroom => (
-                            <label key={classroom.id} className="app-generation-classroom-option">
+                        <div className="app-classroom-picker-grid">
+                          {regenerationClassroomOptions.map(c => (
+                            <label key={c.id} className="app-classroom-checkbox-item">
                               <input
                                 type="checkbox"
-                                checked={generationClassroomIds.includes(classroom.id)}
-                                onChange={event => {
-                                  setGenerationClassroomIds(current =>
-                                    event.target.checked
-                                      ? Array.from(new Set([...current, classroom.id]))
-                                      : current.filter(id => id !== classroom.id),
+                                checked={generationClassroomIds.includes(c.id)}
+                                onChange={e => {
+                                  setGenerationClassroomIds(curr =>
+                                    e.target.checked
+                                      ? Array.from(new Set([...curr, c.id]))
+                                      : curr.filter(id => id !== c.id)
                                   );
                                   setError("");
                                   setGenerationSuccess(false);
                                 }}
-                                style={{ accentColor: "var(--an-accent)" }}
+                                style={{ accentColor: "var(--an-primary)" }}
                               />
-                              <span>{classroom.name}</span>
-                              <small>{classroom.shift}</small>
+                              <span style={{ fontWeight: 500 }}>{c.name}</span>
+                              <span style={{ fontSize: 10, color: "var(--an-muted)", marginLeft: "auto" }}>
+                                {c.shift}
+                              </span>
                             </label>
                           ))}
-                          {regenerationClassroomOptions.length === 0 && (
-                            <p className="app-generation-empty">
-                              Essa matéria não está configurada em nenhuma turma.
-                            </p>
-                          )}
                         </div>
                       </div>
                     )}
-
-                    {generationScope === "subject_all" && (
-                      <p className="app-generation-scope-note">
-                        A matéria será reorganizada em todas as turmas onde está cadastrada. Os demais horários serão preservados.
-                      </p>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={handleGenerate}
-                      disabled={loading}
-                      className="app-action-primary disabled:opacity-50"
-                    >
-                      {loading ? <span>Gerando...</span> : "Gerar grade"}
-                    </button>
                   </div>
 
+                  {/* MENSAGENS E ALERTAS */}
                   {error && (
-                    <div className="app-status-message app-status-error" role="alert">
-                      {error}
+                    <div className="app-alert app-alert-error no-print" role="alert">
+                      <span>{error}</span>
                     </div>
                   )}
 
                   {loading && schedule && (
-                    <div className="app-status-message app-status-info" role="status">
-                      <strong>Gerando uma nova grade.</strong>
-                      <span>A grade anterior continua disponível até o cálculo terminar.</span>
+                    <div className="app-alert app-alert-info no-print" role="status">
+                      <span>Otimizando nova grade horária. A visualização anterior permanece ativa enquanto o cálculo é executado.</span>
                     </div>
                   )}
 
                   {!error && generationSuccess && (
-                    <div className="app-status-message app-status-success" role="status">
-                      {generationMessage || "Grade gerada."}
+                    <div className="app-alert app-alert-success no-print" role="status">
+                      <span>{generationMessage || "Grade gerada com sucesso."}</span>
                     </div>
                   )}
 
                   {!error && unstaffedLessons > 0 && (
-                    <details className="app-pending-details">
-                      <summary>
-                        <span className="app-pending-marker" aria-hidden="true" />
-                        <strong>{unstaffedLessons}</strong>
-                        <span>{unstaffedLessons === 1 ? "aula sem professor" : "aulas sem professor"}</span>
-                        <span className="app-pending-toggle app-pending-toggle-closed">Ver detalhes</span>
-                        <span className="app-pending-toggle app-pending-toggle-open">Ocultar detalhes</span>
+                    <details className="app-unstaffed-accordion no-print">
+                      <summary className="app-unstaffed-summary">
+                        <span>
+                          {unstaffedLessons} {unstaffedLessons === 1 ? "aula sem professor atribuído" : "aulas sem professor atribuído"}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 500 }}>Ver detalhes</span>
                       </summary>
-                      <div className="app-pending-body">
-                        <p>Esses horários permanecem reservados até a escola atribuir um docente.</p>
-                        <ul>
+                      <div className="app-unstaffed-list">
+                        <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
                           {unstaffedSummary.map(item => {
-                            const groupLabel = item.studentGroup !== "Todos"
-                              ? ` · Grupo ${item.studentGroup}`
-                              : "";
+                            const groupLabel = item.studentGroup !== "Todos" ? ` · Grupo ${item.studentGroup}` : "";
+                            const diagnostic = unstaffedDiagnostics.find(
+                              entry =>
+                                entry.classroom_id === item.classroomId &&
+                                entry.subject_id === item.subjectId &&
+                                entry.student_group === item.studentGroup,
+                            );
                             return (
                               <li key={`${item.classroomId}-${item.subjectId}-${item.studentGroup}`}>
-                                <span>{getClassroomName(item.classroomId)} · {getSubName(item.subjectId)}{groupLabel}</span>
-                                <strong>{item.lessons} {item.lessons === 1 ? "aula" : "aulas"}</strong>
+                                <strong>{getClassroomName(item.classroomId)}</strong> — {getSubName(item.subjectId)}{groupLabel} ({item.lessons} {item.lessons === 1 ? "aula" : "aulas"})
+                                {diagnostic && (
+                                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--an-muted)" }}>
+                                    {diagnostic.message}
+                                  </p>
+                                )}
                               </li>
                             );
                           })}
@@ -996,14 +1072,21 @@ function App() {
                       </div>
                     </details>
                   )}
-                  <section className="app-schedule-workspace" aria-label="Grade semanal">
-                    {schedule && selectedId !== "" && (
-                      <header className="app-schedule-workspace-header">
-                        <h2>{viewMode === "turma" ? getClassroomName(Number(selectedId)) : getProfName(Number(selectedId))}</h2>
-                      </header>
-                    )}
+
+                  {/* GRADE HORÁRIA TABULAR */}
+                  <div className="app-timetable-container">
+                    <div className="app-timetable-header">
+                      <h2 className="app-timetable-title">
+                        {viewMode === "turma"
+                          ? getClassroomName(Number(selectedId))
+                          : getProfName(Number(selectedId))}
+                      </h2>
+                      <span className="font-mono" style={{ fontSize: 12, color: "var(--an-muted)" }}>
+                        Horário Semanal
+                      </span>
+                    </div>
                     {renderScheduleGrid()}
-                  </section>
+                  </div>
                 </div>
               }
             />
@@ -1013,6 +1096,91 @@ function App() {
             <Route path="/config" element={<Config />} />
           </Routes>
         </main>
+
+        {/* MODAL PARA ALTERAR E FIXAR AULA */}
+        {editingLesson && (
+          <div className="app-modal-backdrop">
+            <div className="app-modal">
+              <div className="app-modal-header">
+                <h3 className="app-modal-title">Editar Aula</h3>
+                <button
+                  type="button"
+                  onClick={() => setEditingLesson(null)}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--an-muted)" }}
+                >
+                  <X style={{ width: 18, height: 18 }} />
+                </button>
+              </div>
+
+              <div className="app-modal-body">
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--an-muted)", display: "block", marginBottom: 2 }}>
+                    Turma
+                  </label>
+                  <p style={{ margin: 0, fontWeight: 600 }}>{getClassroomName(editingLesson.classroom_id)}</p>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--an-muted)", display: "block", marginBottom: 2 }}>
+                    Disciplina
+                  </label>
+                  <p style={{ margin: 0, fontWeight: 600 }}>{getSubName(editingLesson.subject_id)}</p>
+                </div>
+
+                <div>
+                  <label htmlFor="modal-teacher" style={{ fontSize: 11, fontWeight: 600, color: "var(--an-muted)", display: "block", marginBottom: 4 }}>
+                    Professor Atribuído
+                  </label>
+                  <select
+                    id="modal-teacher"
+                    value={selectedTeacherId}
+                    onChange={e => setSelectedTeacherId(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="app-select"
+                    style={{ width: "100%" }}
+                  >
+                    <option value="">Sem professor atribuído</option>
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 6 }}>
+                  <input
+                    type="checkbox"
+                    id="is_fixed_checkbox"
+                    checked={isFixed}
+                    onChange={e => setIsFixed(e.target.checked)}
+                    style={{ accentColor: "var(--an-primary)", width: 16, height: 16 }}
+                  />
+                  <label htmlFor="is_fixed_checkbox" style={{ fontSize: 13, cursor: "pointer" }}>
+                    Fixar aula manual (impede alterações automáticas do otimizador)
+                  </label>
+                </div>
+              </div>
+
+              <div className="app-modal-footer">
+                <button
+                  type="button"
+                  onClick={() => setEditingLesson(null)}
+                  className="app-btn app-btn-secondary"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveLesson}
+                  disabled={savingLesson}
+                  className="app-btn app-btn-primary"
+                >
+                  {savingLesson ? "Salvando..." : "Salvar Alterações"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Router>
   );

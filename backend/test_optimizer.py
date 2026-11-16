@@ -1,6 +1,6 @@
 import unittest
 
-from app.optimizer import generate_schedule
+from app.optimizer import generate_schedule, get_allowed_periods, get_allowed_periods_for_day
 
 
 def default_config():
@@ -38,6 +38,7 @@ def classroom(
     shift,
     settings,
     has_groups=False,
+    allowed_periods=None,
 ):
     return {
         "id": classroom_id,
@@ -45,6 +46,7 @@ def classroom(
         "course_id": 1,
         "shift": shift,
         "has_groups": has_groups,
+        "allowed_periods": allowed_periods,
         "subject_settings": settings,
     }
 
@@ -85,6 +87,123 @@ def teacher(
 
 
 class OptimizerTests(unittest.TestCase):
+    def test_explicit_journey_periods_are_respected_and_limited_to_turn(self):
+        standard = get_allowed_periods({
+            "shift": "Integral",
+            "allowed_periods": [0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
+        })
+        extended = get_allowed_periods({
+            "shift": "Integral",
+            "allowed_periods": list(range(11)),
+        })
+        night = get_allowed_periods({
+            "shift": "Noite",
+            "allowed_periods": [0, 11, 12, 15],
+        })
+
+        self.assertEqual(standard, [0, 1, 2, 3, 4, 6, 7, 8, 9, 10])
+        self.assertEqual(extended, list(range(11)))
+        self.assertEqual(night, [11, 12, 15])
+
+    def test_extended_integral_can_schedule_sixth_morning_period(self):
+        classrooms = [
+            classroom(
+                1,
+                "1º PI AGRO A",
+                "Integral",
+                [{"subject_id": 1, "workload": 1, "split": False}],
+                allowed_periods=[5],
+            )
+        ]
+        subjects = [subject(1, "Matemática", workload=1)]
+        teachers = [teacher(1, [1])]
+
+        result = generate_schedule(
+            classrooms, subjects, teachers, default_config()
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(len(result["schedule"]), 1)
+        self.assertEqual(result["schedule"][0]["period"], 5)
+
+    def test_classroom_daily_period_overrides_are_respected(self):
+        classroom_row = classroom(
+            1,
+            "1º ALIMENTOS",
+            "Integral",
+            [{"subject_id": 1, "workload": 2, "split": False}],
+            allowed_periods=list(range(8)),
+        )
+        classroom_row["allowed_periods_by_day"] = {
+            "0": [0, 1, 2, 3, 4, 5],
+            "1": [0, 1, 2, 3, 4, 5],
+            "2": [0, 1, 2, 3, 4, 5, 6, 7],
+            "3": [0, 1, 2, 3, 4, 5],
+            "4": [0, 1, 2, 3, 4, 5],
+        }
+
+        self.assertEqual(
+            get_allowed_periods_for_day(classroom_row, 0),
+            [0, 1, 2, 3, 4, 5],
+        )
+        self.assertEqual(
+            get_allowed_periods_for_day(classroom_row, 2),
+            [0, 1, 2, 3, 4, 5, 6, 7],
+        )
+
+        teacher_availability = empty_availability()
+        teacher_availability["2"][6] = True
+        teacher_availability["2"][7] = True
+
+        result = generate_schedule(
+            [classroom_row],
+            [subject(1, "TI", workload=2)],
+            [teacher(1, [1], teacher_availability)],
+            default_config(),
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(len(result["schedule"]), 2)
+        self.assertEqual(
+            {(item["day"], item["period"]) for item in result["schedule"]},
+            {(2, 6), (2, 7)},
+        )
+
+    def test_friday_afternoon_is_available_when_not_excluded_by_classroom(self):
+        classrooms = [
+            classroom(
+                1,
+                "1º A",
+                "Integral",
+                [{"subject_id": 1, "workload": 1, "split": False}],
+                allowed_periods=[6],
+            )
+        ]
+        subjects = [subject(1, "Matemática", workload=1)]
+        teachers = [teacher(1, [1])]
+        fixed_schedule = [{
+            "classroom_id": 1,
+            "subject_id": 1,
+            "teacher_id": 1,
+            "day": 4,
+            "period": 6,
+            "student_group": "Todos",
+        }]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+            fixed_schedule=fixed_schedule,
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(
+            [(item["day"], item["period"]) for item in result["schedule"]],
+            [(4, 6)],
+        )
+
     def test_classroom_uses_only_selected_subjects(self):
         classrooms = [
             classroom(
@@ -124,6 +243,37 @@ class OptimizerTests(unittest.TestCase):
                 item["subject_id"] == 1
                 for item in result["schedule"]
             )
+        )
+
+    def test_two_lesson_subject_can_split_when_no_day_has_two_slots(self):
+        classroom_row = classroom(
+            1,
+            "Turma Manhã",
+            "Manhã",
+            [{"subject_id": 1, "workload": 2, "split": False}],
+            allowed_periods=[0, 1, 2, 3, 4, 5],
+        )
+        classroom_row["allowed_periods_by_day"] = {
+            "0": [0],
+            "1": [0],
+            "2": [],
+            "3": [],
+            "4": [],
+        }
+
+        result = generate_schedule(
+            [classroom_row],
+            [subject(1, "Matemática", workload=2)],
+            [],
+            default_config(),
+            _feasibility_only=True,
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(len(result["schedule"]), 2)
+        self.assertEqual(
+            {item["day"] for item in result["schedule"]},
+            {0, 1},
         )
 
     def test_can_generate_subject_without_teacher(self):
@@ -265,9 +415,9 @@ class OptimizerTests(unittest.TestCase):
             "Todos",
         )
 
-    def test_exact_eleven_hour_rest_allows_11h20(self):
+    def test_exact_eleven_hour_rest_allows_11h25(self):
         availability = empty_availability()
-        availability["0"][11] = True  # seg 19:00-19:50
+        availability["0"][11] = True  # seg 19:00-19:45
         availability["1"][0] = True   # ter 07:10-08:00
 
         classrooms = [
@@ -318,7 +468,7 @@ class OptimizerTests(unittest.TestCase):
 
     def test_exact_eleven_hour_rest_blocks_10h40(self):
         availability = empty_availability()
-        availability["0"][12] = True  # seg 19:50-20:30
+        availability["0"][12] = True  # seg 19:45-20:30
         availability["1"][0] = True   # ter 07:10-08:00
 
         classrooms = [
@@ -581,6 +731,70 @@ class OptimizerTests(unittest.TestCase):
         )
 
 
+    def test_joint_school_generation_preserves_split_group_loads(self):
+        classrooms = [
+            classroom(
+                1,
+                "1º PI AGRO A",
+                "Integral",
+                [
+                    {"subject_id": 1, "workload": 2, "split": False},
+                    {
+                        "subject_id": 2,
+                        "workload": 2,
+                        "joint_workload": 0,
+                        "workload_a": 2,
+                        "workload_b": 2,
+                        "split": True,
+                    },
+                    {"subject_id": 3, "workload": 2, "split": False},
+                ],
+                has_groups=True,
+                allowed_periods=[0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
+            ),
+            classroom(
+                2,
+                "2º PI AGRO A",
+                "Integral",
+                [{"subject_id": 4, "workload": 2, "split": False}],
+                allowed_periods=[0, 1, 2, 3, 4, 6, 7, 8, 9, 10],
+            ),
+        ]
+        subjects = [
+            subject(1, "Arte", workload=2),
+            subject(2, "A.P.P.", workload=2),
+            subject(3, "História", workload=2),
+            subject(4, "Matemática", workload=2),
+        ]
+
+        # Este teste valida apenas a viabilidade conjunta das cargas A/B;
+        # os testes de escola com docentes cobrem a otimização global à parte.
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            [],
+            default_config(),
+            _feasibility_only=True,
+        )
+
+        self.assertEqual(result["status"], "success", result.get("message"))
+        self.assertEqual(len(result["schedule"]), 10)
+        first_class = [
+            item for item in result["schedule"]
+            if item["classroom_id"] == 1
+        ]
+        self.assertEqual(len(first_class), 8)
+        self.assertEqual(
+            {
+                group: sum(item["student_group"] == group for item in first_class)
+                for group in ("Todos", "A", "B")
+            },
+            {"Todos": 4, "A": 2, "B": 2},
+        )
+        self.assertEqual(
+            sum(item["classroom_id"] == 2 for item in result["schedule"]),
+            2,
+        )
     def test_small_school_multiple_classrooms_and_shared_teachers(self):
         """
         Cenário integrado de uma pequena escola.
@@ -775,7 +989,8 @@ class OptimizerTests(unittest.TestCase):
         """
         availability = empty_availability()
 
-        for period in [0, 1, 2, 3]:
+        # Dois blocos válidos; o período 2–3 tem intervalo de 20 minutos.
+        for period in [0, 1, 3, 4]:
             availability["0"][period] = True
 
         classrooms = [
@@ -855,8 +1070,8 @@ class OptimizerTests(unittest.TestCase):
             {
                 (0, 0),
                 (0, 1),
-                (0, 2),
                 (0, 3),
+                (0, 4),
             },
         )
 
@@ -1589,6 +1804,53 @@ class OptimizerTests(unittest.TestCase):
             if item["classroom_id"] == 1 and item["subject_id"] != 1
         )
         self.assertEqual(regenerated_other_subject, original_other_subject)
+
+
+    def test_student_gap_remains_hard_after_compacting_subject_constraints(self):
+        classrooms = [
+            classroom(
+                1,
+                "1A",
+                "Manhã",
+                [
+                    {"subject_id": 1, "workload": 1, "split": False},
+                    {"subject_id": 2, "workload": 1, "split": False},
+                ],
+            )
+        ]
+        subjects = [
+            subject(1, "Matemática", workload=1),
+            subject(2, "História", workload=1),
+        ]
+        teachers = [teacher(1, [1]), teacher(2, [2])]
+        fixed_schedule = [
+            {
+                "classroom_id": 1,
+                "subject_id": 1,
+                "teacher_id": 1,
+                "day": 0,
+                "period": 0,
+                "student_group": "Todos",
+            },
+            {
+                "classroom_id": 1,
+                "subject_id": 2,
+                "teacher_id": 2,
+                "day": 0,
+                "period": 2,
+                "student_group": "Todos",
+            },
+        ]
+
+        result = generate_schedule(
+            classrooms,
+            subjects,
+            teachers,
+            default_config(),
+            fixed_schedule=fixed_schedule,
+        )
+
+        self.assertEqual(result["status"], "infeasible")
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,10 +5,23 @@ on:
     branches:
       - main
       - design/anatinus-dark-workspace
+      - gemini-atualizado-20261029-1451
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '*.md'
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '*.md'
   workflow_dispatch:
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -32,12 +45,13 @@ jobs:
 
       - name: Testar e empacotar
         shell: pwsh
-        run: .\build-windows.ps1
+        run: .\\build-windows.ps1
 
       - name: Publicar pacote como artefato
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: Anatinus-Windows-x64
           path: release/Anatinus-Windows-x64.zip
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7

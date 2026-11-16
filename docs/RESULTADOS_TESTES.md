@@ -1,87 +1,159 @@
 # ANATINUS — REGISTRO DE TESTES E RESULTADOS
 
-Este arquivo separa **o que já foi observado** do que ainda precisa ser repetido após alterações no solver.
+Atualizado em 08/11/2026. Este documento registra resultados observados no GitHub Actions e na estação Windows local. Não substitui a seção de Resultados do TCC.
 
-## 1. Testes automatizados
+## Atualização local de 08/11/2026 — pacote baseado na planilha
 
-### Execução confirmada após as otimizações e testes de integração
+O pacote da apresentação agora é semeado por `backend/seed_apresentacao_planilha.py`, usando as matrizes semanais transcritas de `backend/seed_realista.py`. A base contém 8 cursos, 20 turmas, 102 disciplinas, 51 docentes anonimizados e 695 aulas semanais configuradas. A disponibilidade docente é sintética e ampla por turno, porque a planilha não contém a agenda semanal completa.
 
-O GitHub Actions executou automaticamente a suíte completa em 19/10/2026. A versão atual possui **22 testes**: 18 cenários do otimizador e 4 testes de integração do backend.
+O banco embutido no pacote já inclui uma grade gerada para 3º Informática: 50 aulas, sendo 22 conjuntas, 14 do grupo A e 14 do grupo B, sem aulas sem professor. As outras turmas já têm cursos, disciplinas, cargas e habilitações cadastradas. A geração simultânea da escola inteira ainda não deve ser apresentada como completa: a última execução manteve 695 aulas, mas atribuiu docente a somente 284. Essa grade não foi incluída no pacote.
+
+Os dois quadros MTEC iniciados às 18h30 e os sete encontros síncronos mensais permanecem fora do banco semanal: o modelo não representa a jornada específica MTEC nem eventos com datas.
+
+O build usa o ícone branco para `Anatinus.exe` e o smoke test verifica os cadastros completos e a grade de 50 aulas em um AppData limpo.
+
+## 1. Testes automatizados e build
+
+Na execução mais recente do GitHub Actions:
 
 ```text
-Ran 22 tests in 1.752s
+Ran 36 tests in 4.776s
 OK
 ```
 
-Os quatro testes de integração acrescentados verificam:
-- geração e salvamento automático da grade;
-- substituição da grade salva em uma nova geração;
-- exclusão de professor preservando as aulas como "Sem professor";
-- pré-validação de carga semanal acima da capacidade da turma.
+A suíte contém 29 cenários do otimizador e 7 testes de integração do backend. O tempo é do runner Linux do GitHub e não deve ser comparado diretamente com medições no computador local.
 
-O tempo acima pertence ao runner do GitHub e não deve ser comparado diretamente com medições feitas no computador local. O dado relevante é que **os 22 testes passaram na versão atual**.
+O build de produção do frontend passou (1.952 módulos transformados). O build Windows também concluiu o empacotamento com PyInstaller e executou o smoke test do Anatinus.exe em um AppData limpo.
 
-### Casos cobertos
+Durante o `npm install` do CI, o npm reportou três vulnerabilidades de alta severidade nas dependências do frontend. Elas ainda não foram triadas nem corrigidas nesta rodada; não apliquei `npm audit fix` automaticamente para evitar atualizações potencialmente incompatíveis sem validação.
 
-- turma utiliza apenas matérias selecionadas;
-- disciplina sem professor continua na grade;
-- professor válido é preferido a "Sem professor";
-- divisão A/B por turma + disciplina;
-- interjornada de 11h20 permitida;
-- interjornada de 10h40 bloqueada;
-- 7ª aula sem pausa de 1h bloqueada;
-- 7ª aula após pausa >= 1h permitida;
-- máximo de 9 aulas/dia;
-- bloco noturno de 5 aulas permitido;
-- carga diurna 4 tende a 2+2;
-- carga diurna 3 tende a 2+1;
-- bloco triplo noturno permitido;
-- triplo diurno ainda possível se necessário;
-- semana noturna completa de 25 aulas;
-- grupos A/B com matérias diferentes simultaneamente;
-- duas turmas concorrendo pelo mesmo professor;
-- cenário integrado com várias turmas e professores compartilhados.
+## 2. Base fictícia principal para a apresentação
 
----
+O modo de apresentação usa `backend/seed_apresentacao.py`. Os dados são inteiramente inventados e ficam em `backend/school_schedule_demo.db`, separados do banco de desenvolvimento e de qualquer cadastro real.
 
-## 2. Build do frontend
+Resultado observado em 06/11/2026:
 
-O build local já havia sido validado em 01/10/2026. Após as alterações mais recentes, o GitHub Actions executou novamente a compilação de produção e concluiu com sucesso:
+| Indicador | Resultado |
+|---|---:|
+| Cursos | 2 |
+| Turmas | 3 |
+| Disciplinas | 15 |
+| Professores | 15 |
+| Aulas geradas e salvas | 100 |
+| Aulas com professor | 100 |
+| Aulas sem professor | 0 |
+| Estado do solver | `feasible` |
+| Tempo do solver | 120,55 s |
+| Variáveis / restrições | 9.338 / 16.979 |
 
-```text
-✓ 1988 modules transformed.
-✓ built
+A validação conjunta da mesma base, repetida pela API, confirmou novamente as 100 aulas, todas com professor, e persistência correspondente no SQLite. O relatório diário confirmou seis aulas por dia, de segunda a sexta, em cada turma/grupo: 1º DS Integral A, 1º DS Integral B, 2º DS Integral e 1º ADM Integral. Não foram encontrados conflitos de professores, indisponibilidades violadas, janelas de alunos ou violações das regras de descanso verificadas.
+
+A distribuição visual ficou consistente para demonstração: as aulas de duas horas aparecem majoritariamente em blocos duplos; disciplinas com três aulas semanais aparecem em combinações de uma e duas aulas. A solução é válida, mas `feasible` não significa que o solver provou optimalidade.
+
+**Este é o cenário recomendado para a apresentação.** O atalho `start-demo.ps1` recria essa base antes de abrir a interface. A recriação leva cerca de dois minutos no runner testado.
+
+## 3. Base realista transcrita da planilha escolar
+
+O script `backend/seed_realista.py` foi substituído por uma transcrição da planilha **03-09.26 - Horários Diurno-Noturno e Síncronas**, atualizada em 03/09/2026 às 13h. O script não copia os horários prontos para o resultado: usa as matrizes, as cargas e as associações disciplina/docente como entradas para que o Anatinus gere uma nova distribuição.
+
+Resumo da transcrição:
+
+| Indicador | Resultado |
+|---|---:|
+| Quadros de turma preenchidos na planilha | 21 |
+| Quadros diurnos usados no solver | 11 |
+| Quadros técnicos modulares noturnos usados no solver | 8 |
+| Registros de turma no banco após separar 1º INFO A/B | 20 |
+| Grafias de disciplinas normalizadas no quadro | 103 |
+| Disciplinas no catálogo após unificar uma variação evidente de abreviação | 102 |
+| Docentes identificados e anonimizados | 51 |
+| Lançamentos semanais transcritos | 695 |
+
+Jornadas diurnas transcritas:
+- Integral: 1º/2º/3º PI Agro A e B e 3º Informática, com a jornada de manhã e tarde indicada no quadro.
+- Manhã: 1º, 2º e 3º Itinerário. Não há aulas à tarde para essas turmas no quadro.
+- 1º Alimentos: permanece Integral. Tem seis períodos matutinos todos os dias; somente na quarta-feira há mais duas aulas à tarde. O seed usa períodos permitidos por dia (segunda, terça, quinta e sexta: 0–5; quarta: 0–7). Não é uma categoria genérica chamada "Integral estendido".
+
+O primeiro INFO noturno aparece em duas colunas de cargas diferentes. Como o modelo atual não usa grupos em turmas noturnas, o seed cria duas entradas independentes — `1º INFO A` e `1º INFO B` — cada uma com 25 aulas semanais.
+
+O quadro técnico noturno usa os períodos 19:00–19:45, 19:45–20:30 e 20:30–21:15, com intervalo de 21:15–21:30; a grade visual e os limites de tempo do otimizador foram alinhados a esses horários da planilha.
+
+A jornada por turma pode incluir um mapa de períodos permitido por dia. Essa regra é usada no 1º Alimentos para não permitir que o solver coloque aulas à tarde em dias nos quais o quadro não apresenta aulas vespertinas. O mesmo mapa é respeitado no pré-diagnóstico, na validação e na visualização/Excel.
+
+### Regra de distribuição para matérias com 2 aulas semanais
+
+A validação da planilha encontrou uma inviabilidade real na turma 1º Alimentos. Cada grupo tem 32 aulas semanais em 16 componentes de duas aulas. A jornada permite 6 períodos de manhã por dia e mais 2 períodos na quarta-feira à tarde. Como a manhã tem dois blocos de três aulas separados pelo intervalo, não existem blocos consecutivos suficientes para obrigar as 16 matérias a ocorrerem sempre em pares no mesmo dia.
+
+A regra antiga transformava a preferência por duas aulas consecutivas em uma obrigação matemática. Ela foi alterada: o solver continua **favorecendo** pares consecutivos, mas pode colocar as duas aulas em dias diferentes quando a estrutura da jornada não comportar todos os pares. Cargas semanais, períodos disponíveis, intervalos e limites diários não foram reduzidos.
+
+As células mescladas dos quadros diurnos representam aulas para a turma toda. Células independentes nas colunas A/B representam cargas próprias dos grupos. Exemplos conferidos:
+
+| Turma | Aulas conjuntas | Específicas A | Específicas B | Carga de cada grupo |
+|---|---:|---:|---:|---:|
+| 1º PI AGRO A/B | 26 | 10 | 10 | 36 |
+| 2º PI AGRO A/B | 26 | 10 | 10 | 36 |
+| 3º INFORMÁTICA | 22 | 14 | 14 | 36 |
+| 1º ITINERÁRIO | 24 | 6 | 6 | 30 |
+| 2º ITINERÁRIO | 18 | 12 | 12 | 30 |
+| 3º ITINERÁRIO | 18 | 12 | 12 | 30 |
+| 1º ALIMENTOS | 20 | 12 | 12 | 32 |
+
+Os dois quadros MTEC (com início às 18h30) e os sete registros de aulas síncronas mensais não entram nessa base semanal. O modelo atual não representa a jornada própria das turmas MTEC nem encontros que acontecem apenas em datas específicas. Eles não foram convertidos artificialmente em aulas semanais.
+
+### Limitações que permanecem explícitas
+
+- A planilha mostra horários existentes e associação de docentes às disciplinas; ela **não informa a disponibilidade semanal completa de cada docente**. O seed usa disponibilidade ampla e sintética nos turnos em que o docente aparece, apenas para permitir o teste do gerador. Isso não deve ser confundido com a disponibilidade real da escola.
+- Os nomes dos docentes são substituídos por identificadores como `Docente 01`, preservando as associações de habilitação sem expor nomes pessoais.
+- O quadro não informa nível de complexidade das disciplinas. O seed usa complexidade neutra (`Media`) e não inventa pesos pedagógicos.
+- Algumas abreviações que diferem apenas por pontuação foram normalizadas. As formas `C.P.D.P.J` e `CPDPI` foram unificadas como uma única disciplina porque a lista de habilitações registra essa mesma matéria como `CPDPI`.
+- A planilha é uma referência de entrada; o horário gerado pelo Anatinus deve ser uma nova solução, não uma reprodução do quadro original.
+
+Comandos disponíveis, executados dentro de `backend`:
+
+```powershell
+python seed_realista.py
+python seed_realista.py --diurno-only
+python seed_realista.py --noturno-only
+python seed_realista.py --informatica-only
 ```
 
-O tempo do build depende do ambiente e não é usado como métrica de desempenho do Anatinus.
+Todos recriam somente `school_schedule_demo.db`; o banco normal `school_schedule.db` não é alterado. A geração do horário deve ser acionada depois pela interface.
 
----
+## 4. Cenários anteriores de regressão
 
-## 3. Teste manual do fluxo completo
+Os números registrados abaixo são resultados históricos da versão anterior do seed e não descrevem a nova transcrição da planilha. Eles permanecem como evidência dos testes já executados, mas precisam ser repetidos usando a base atual antes de qualquer conclusão sobre desempenho ou qualidade da grade.
 
-Confirmado manualmente:
+### Geração anterior com oito turmas
 
-- cadastro de cursos;
-- cadastro de turmas;
-- cadastro de disciplinas;
-- categoria removida da interface;
-- matriz específica por turma;
-- professores e disponibilidade;
-- geração de grade;
-- exibição de "Sem professor";
-- visão por turma;
-- visão por professor;
-- salvamento da grade;
-- atualização de listas sem F5;
-- tema escuro.
+| Indicador | Resultado histórico |
+|---|---:|
+| Turmas | 8 |
+| Aulas previstas e geradas | 291 |
+| Aulas com professor | 234 |
+| Aulas sem professor | 57 |
+| Estado do solver | `feasible` |
+| Tempo do solver | 120,80 s |
+| Variáveis / restrições | 40.012 / 65.835 |
 
-Também foi observado que a grade antiga permanecia visível durante uma nova geração. A interface foi modificada para avisar explicitamente que se trata da última grade salva enquanto o cálculo está em andamento.
+A validação confirmou cargas, persistência SQLite, ausência de conflitos simultâneos de professores, ausência de janelas de alunos e respeito às disponibilidades configuradas, aos limites docentes e aos descansos verificados.
 
----
+**Limitação importante:** essa geração histórica não era uma grade final aceitável. Havia 57 aulas sem professor e distribuição diária desigual em algumas turmas Agro. Não declarar essa base antiga como aprovada.
 
-## 4. Benchmark base ANTES das otimizações
+### 3º INFO isolado, versão anterior
 
-Resultado do cenário sintético small informado em 01/10/2026:
+O cenário anterior do 3º INFO foi gerado e persistido pela API com 57 alocações e zero aulas sem professor. Esse número não deve ser confundido com a nova matriz corrigida da planilha, cuja carga é 36 aulas para cada grupo A/B.
+
+## 5. Aplicativo Windows
+
+- O script `build-windows.ps1` gerou `Anatinus.exe` e `release/Anatinus-Windows-x64.zip` no runner Windows.
+- O smoke test abriu o EXE com AppData limpo, iniciou a API local e confirmou 57 aulas acessíveis pela rota `/timetable/`.
+- O job Windows terminou com sucesso em 06/11/2026.
+- O upload do ZIP foi pulado no evento de pull request para evitar consumo de cota. O arquivo foi criado no runner, mas não ficou disponível como artefato para download.
+- Ainda falta abrir a janela gráfica em um Windows real e testar navegação, Excel, impressão, backup/restauração e o computador/projetor da apresentação.
+
+## 6. Benchmarks
+
+O baseline conhecido antes das otimizações permanece:
 
 ```text
 Cenário: small
@@ -89,72 +161,25 @@ Turmas: 5
 Disciplinas no catálogo: 12
 Professores: 14
 Aulas/unidades esperadas: 105
-
 Status: success
-Tempo total medido: 19.009s
-Estado da solução: optimal
-Tempo informado pelo solver: 16.305s
+Tempo total: 19,009 s
+Tempo do solver: 16,305 s
+Estado: optimal
 Aulas geradas: 105
 Aulas sem professor: 0
 ```
 
-Esse resultado serve como **baseline anterior** às seguintes otimizações:
+Esse resultado foi medido em 01/10/2026, antes das otimizações. Os benchmarks `small`, `medium` e `large` ainda precisam ser repetidos na mesma máquina para comparação justa. Nenhum ganho percentual deve ser declarado antes dessas medições.
 
-1. substituição da enumeração de combinações da regra de descanso por contadores de sequência;
-2. remoção de variáveis de professores inelegíveis.
+## 7. Pendências manuais e de entrega
 
-### Próxima medição obrigatória
+- abrir a janela gráfica do EXE em Windows real;
+- testar fluxo completo pela interface e visões por turma/professor;
+- conferir A/B e Filosofia → Sociologia visualmente;
+- validar exportação Excel (.xlsx), impressão e backup/restauração;
+- obter avaliação de alguém da escola que monta horários;
+- repetir benchmarks small, medium e large;
+- testar no computador/projetor da apresentação;
+- concluir apêndice, conclusão e referências do TCC escrito.
 
-Executar novamente:
-
-```powershell
-python benchmark_optimizer.py --size small
-python benchmark_optimizer.py --size medium
-python benchmark_optimizer.py --size large
-```
-
-Registrar:
-- status;
-- tempo total;
-- tempo do solver;
-- variáveis do modelo;
-- restrições do modelo;
-- objective value;
-- best objective bound;
-- aulas geradas;
-- aulas sem professor.
-
-Não comparar tempos de máquinas diferentes como se fossem equivalentes.
-
----
-
-## 5. Evidências úteis para Resultados e Discussão
-
-### Falta de professor
-A interface já demonstrou grades válidas com disciplinas exibidas como "Sem professor", sem impedir o restante do horário.
-
-### Distribuição 2+2
-Foi observado em testes que quatro aulas diurnas de uma disciplina podem ser favorecidas em distribuição 2+2 em vez de 1+1+1+1.
-
-### Visão por professor
-Foi verificado que a visualização agrega aulas de diferentes turmas e grupos sem duplicar o professor em um mesmo período.
-
-### Timeout
-Foi observado um timeout de 20 segundos quando frontend e solver possuíam limites coincidentes. Depois:
-- frontend passou a esperar 60s;
-- solver passou a ter limite de 30s;
-- timeout foi separado de infeasibilidade.
-
----
-
-## 6. O que ainda falta medir de forma séria
-
-- tempo manual para criar uma grade comparável;
-- tempo de configuração no Anatinus;
-- tempo de geração em base real completa;
-- quantidade de ajustes manuais necessários após geração;
-- opinião de quem efetivamente monta a grade;
-- taxa de "Sem professor" em dados reais;
-- comportamento com todas as turmas e professores da instituição.
-
-Esses dados são necessários antes de fazer afirmações quantitativas no TCC.
+O texto escrito do TCC não foi alterado nesta rodada.

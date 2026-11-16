@@ -18,18 +18,20 @@ class Classroom(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
     shift = Column(String, nullable=False)
+    # Índices de períodos permitidos para esta jornada específica.
+    # None mantém o padrão do turno para compatibilidade com bancos antigos.
+    allowed_periods = Column(JSON, nullable=True, default=None)
+    # Overrides allowed periods by weekday (0=Monday ... 4=Friday).
+    allowed_periods_by_day = Column(JSON, nullable=True, default=None)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     has_groups = Column(Boolean, default=False)
 
     # Configuração real da matriz daquela turma.
-    # Cada item possui subject_id, workload e split.
     subject_settings = Column(JSON, default=list)
 
-    # Pares ordenados de disciplinas preferidas em sequência, por ex. [[filosofia_id, sociologia_id]].
-    # São preferências Soft: nunca tornam a grade impossível por si só.
+    # Pares ordenados de disciplinas preferidas em sequência.
     preferred_subject_sequences = Column(JSON, default=list)
 
-    # Mantido temporariamente para compatibilidade com bancos anteriores.
     split_subject_ids = Column(JSON, default=list)
 
     course = relationship("Course", back_populates="classes")
@@ -41,10 +43,7 @@ class Subject(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
 
-    # Carga padrão usada ao adicionar a disciplina a uma turma.
-    # A carga efetiva fica em Classroom.subject_settings.
     workload = Column(Integer, nullable=False)
-
     complexity = Column(String, nullable=False)
     category = Column(String, default="Ensino Médio")
     course_ids = Column(JSON, default=list)
@@ -75,11 +74,7 @@ class SystemConfig(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     max_classes_per_day = Column(Integer, default=9)
-
-    # Campo antigo mantido por compatibilidade. A regra real de descanso
-    # após 6 aulas é fixa no otimizador.
     max_consecutive_classes = Column(Integer, default=6)
-
     max_high_complexity_per_day = Column(Integer, default=2)
     student_gaps_hard = Column(Boolean, default=True)
     teacher_gaps_hard = Column(Boolean, default=False)
@@ -88,9 +83,6 @@ class SystemConfig(Base):
     avoid_first_period = Column(Boolean, default=False)
     avoid_last_period = Column(Boolean, default=False)
     avoid_friday = Column(Boolean, default=False)
-
-    # Regra opcional legada. Por padrão não limita aulas seguidas do mesmo
-    # professor, porque horários reais podem ter blocos longos da mesma matéria.
     max_consec_per_teacher = Column(Integer, default=2)
     max_consec_teacher_mode = Column(String, default="ignore")
 
@@ -101,11 +93,10 @@ class TimetableItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     classroom_id = Column(Integer, index=True, nullable=False)
     subject_id = Column(Integer, nullable=False)
-
-    # Pode ficar vazio quando a disciplina está na grade, mas a escola
-    # ainda não possui professor atribuído.
     teacher_id = Column(Integer, index=True, nullable=True)
-
     day = Column(Integer, nullable=False)
     period = Column(Integer, nullable=False)
     student_group = Column(String, default="Todos", nullable=False)
+
+    # Novo campo para o Modelo Híbrido: grava travas de edição manual
+    is_manual = Column(Boolean, default=False, nullable=False)

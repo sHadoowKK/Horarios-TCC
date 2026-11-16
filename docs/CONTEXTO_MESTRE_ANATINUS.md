@@ -39,14 +39,32 @@ Otimização:
 
 O sistema deve ser descrito como **otimização combinatória / programação por restrições**, e não simplesmente como IA.
 
-## Estado verificado
+## Estado verificado em 06/11/2026
 
-- 22 testes automatizados;
-- 18 testes do solver;
-- 4 testes de integração do backend;
-- GitHub Actions executando testes e build;
-- build do frontend verde;
-- branch estável: `stable-tcc-2026-10-19-final`.
+- PR #7 aberta em draft na branch `gemini-atualizado-20261029-1451`; não foi mesclada na `main`.
+- 36 testes automatizados do backend passaram na última execução verificada do CI (29 cenários do solver e 7 testes de integração).
+- Build de produção do frontend passou.
+- Build Windows com PyInstaller e o smoke test anterior em AppData limpo passaram no runner do GitHub. A revisão atual do smoke test exige exatamente 100 aulas fictícias; a nova execução ainda está pendente.
+- A base fictícia de apresentação gerou 100 aulas pela API, todas com professor, e passou na validação conjunta.
+- A base de regressão ETEC com oito turmas gerou 291 aulas, 234 com professor e 57 sem professor. Restrições obrigatórias foram validadas, mas a distribuição docente/diária ainda não deve ser apresentada como grade final.
+- O texto escrito do TCC não foi alterado nesta rodada.
+
+O workflow Windows agora está configurado para também executar em push na branch de trabalho e publicar o ZIP fora de eventos pull_request. A publicação do próximo artefato ainda precisa ser confirmada/baixada.
+
+## Base fictícia principal para apresentação
+
+Script: `backend/seed_apresentacao.py` e atalho `start-demo.ps1`.
+
+- 2 cursos, 3 turmas, 15 disciplinas, 15 professores.
+- 1º DS Integral com grupos A/B, 2º DS Integral e 1º ADM Integral.
+- 100 aulas geradas e persistidas pela API; 100 com professor, 0 sem professor.
+- A validação conjunta confirmou seis aulas por dia em cada turma/grupo, ausência de conflitos docentes, ausência de janelas de alunos e as verificações de disponibilidade/descanso.
+- Estado `feasible`, cerca de 120,6 s no runner; não foi provada optimalidade.
+- Todos os dados são inventados. O banco `school_schedule_demo.db` fica separado de `school_schedule.db`.
+
+O atalho `start-demo.ps1` recria a base fictícia antes de abrir a interface. Para usar o recorte separado do 3º INFO, execute `start-informatica.ps1`; esse atalho usa `start-demo.ps1 -SkipSeed` para não sobrescrever o banco que acabou de preparar.
+
+A base ETEC de oito turmas usa também `school_schedule_demo.db`, por isso é um cenário de regressão alternativo: não execute seus seeds imediatamente antes da apresentação principal sem recriar a base fictícia.
 
 ## Jornadas
 
@@ -199,16 +217,17 @@ O seed `backend/seed_realista.py --informatica-only` transcreve as matérias e c
 
 ## Empacotamento desktop Windows
 
-A branch de trabalho visual/empacotamento é `design/anatinus-dark-workspace`.
+A branch atual de trabalho da PR é `gemini-atualizado-20261029-1451`.
 
 - `backend/app/desktop.py` inicia FastAPI e abre a interface numa janela PyWebView.
 - `backend/app/main.py` serve o frontend compilado quando o pacote desktop está em execução.
 - `frontend/src/api.ts` usa a API na mesma origem na build de produção.
 - `backend/app/database.py` guarda os dados desktop em `%LOCALAPPDATA%\\Anatinus\\school_schedule.db`.
-- `build-windows.ps1` executa testes, build e empacotamento.
-- `.github/workflows/build-windows.yml` publica `Anatinus-Windows-x64` como artefato quando a compilação passa.
+- `build-windows.ps1` executa testes, build, empacotamento e smoke test.
+- O CI Windows concluiu o build e smoke test em AppData limpo; o ZIP foi criado no runner, mas o upload foi pulado no evento pull_request.
+- `.github/workflows/build-windows.yml` foi configurado para executar também em push na branch atual e publicar o artefato fora de pull_request. Confirmar o próximo artefato antes de considerar essa entrega concluída.
 
-O pacote Windows só deve ser considerado pronto depois de baixar, abrir e testar o artefato gerado em um Windows real.
+O pacote Windows só deve ser considerado pronto depois de baixar, extrair e testar o ZIP em um Windows real, inclusive navegação, Excel, impressão e persistência.
 
 ## Arquivos de documentação
 
@@ -243,10 +262,11 @@ Evitar alegações não medidas como:
 
 ## Próximos passos prioritários
 
-1. repetir benchmarks após otimizações;
-2. cadastrar base real maior;
-3. validar com responsável real pela montagem;
-4. registrar feedback;
-5. calibrar pesos;
-6. terminar texto/formatação final do TCC;
-7. preparar slides e ensaiar demo.
+1. confirmar e baixar o ZIP do Windows gerado no próximo push da branch;
+2. abrir o EXE em Windows real e testar interface, Excel, impressão, backup e restauração;
+3. repetir benchmarks small/medium/large na mesma máquina do baseline;
+4. revisar e calibrar a geração de regressão das oito turmas com dados docentes mais completos;
+5. obter avaliação de alguém da escola que monta horários;
+6. triar as três vulnerabilidades de alta severidade reportadas pelo npm no install do frontend, sem aplicar atualizações automáticas sem validação;
+7. terminar apêndice, conclusão, referências e formatação final do TCC;
+8. ensaiar a demonstração com a base fictícia de 100 aulas.

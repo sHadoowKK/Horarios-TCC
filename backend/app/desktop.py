@@ -1,5 +1,6 @@
 """Inicializador desktop do Anatinus para Windows."""
 
+import argparse
 import json
 import logging
 import os
@@ -13,10 +14,8 @@ from threading import Thread
 import uvicorn
 import webview
 
-from app.main import app
-
 HOST = "127.0.0.1"
-PORT = 8765
+PORT = int(os.environ.get("ANATINUS_PORT", "8765"))
 BASE_URL = f"http://{HOST}:{PORT}"
 
 
@@ -80,8 +79,29 @@ def _wait_for_server(server_thread: Thread) -> bool:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Inicializador desktop do Anatinus.")
+    parser.add_argument(
+        "--smoke-test",
+        action="store_true",
+        help="inicia a API local e verifica a grade demo sem abrir a janela gráfica.",
+    )
+    args = parser.parse_args()
+    smoke_test = args.smoke_test or os.environ.get("ANATINUS_SMOKE_TEST") == "1"
+
     _configure_logging()
     logging.info("Inicializando Anatinus desktop.")
+
+    try:
+        from app.main import app
+    except Exception:
+        logging.exception("Falha ao carregar a aplicação e o banco de dados.")
+        if smoke_test:
+            raise
+        _show_error(
+            "Não foi possível carregar os dados do Anatinus. "
+            "Detalhes no log em %LOCALAPPDATA%\\Anatinus\\logs\\desktop.log."
+        )
+        return
 
     server = None
     server_thread = None
@@ -89,43 +109,110 @@ def main() -> None:
 
     if _is_port_open():
         if _is_anatinus_running():
-            _show_error(
-                "O Anatinus já está aberto. Verifique as janelas em execução."
-            )
+            message = "O Anatinus já está aberto. Verifique as janelas em execução."
         else:
-            _show_error(
+            message = (
                 "A porta local necessária pelo Anatinus já está ocupada. "
                 "Feche o programa que está usando essa porta e tente novamente."
             )
+        if smoke_test:
+            raise RuntimeError(message)
+        _show_error(message)
         return
-    else:
-        config = uvicorn.Config(
-            app,
-            host=HOST,
-            port=PORT,
-            log_level="warning",
-            access_log=False,
-            log_config=None,
-        )
-        server = uvicorn.Server(config)
-        server_thread = Thread(
-            target=server.run,
-            name="AnatinusAPI",
-            daemon=True,
-        )
-        server_thread.start()
-        owns_server = True
 
+    config = uvicorn.Config(
+        app,
+        host=HOST,
+        port=PORT,
+        log_level="warning",
+        access_log=False,
+        log_config=None,
+    )
+    server = uvicorn.Server(config)
+    server_thread = Thread(
+        target=server.run,
+        name="AnatinusAPI",
+        daemon=True,
+    )
+    server_thread.start()
+    owns_server = True
+
+    try:
         if not _wait_for_server(server_thread):
-            logging.error("A API não iniciou dentro do tempo esperado.")
-            server.should_exit = True
-            _show_error(
-                "O Anatinus não conseguiu iniciar o serviço local. "
+            raise RuntimeError(
+                "A API local não iniciou dentro do tempo esperado. "
                 "Consulte o log em %LOCALAPPDATA%\\Anatinus\\logs\\desktop.log."
+            )
+
+        if smoke_test:
+            def get_json(path):
+                with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=10) as response:
+                    return json.loads(response.read().decode("utf-8"))
+
+            classrooms = get_json("/classrooms/")
+            subjects = get_json("/subjects/")
+            teachers = get_json("/teachers/")
+            timetable = get_json("/timetable/")
+
+            lesson_units = 0
+            for classroom in classrooms:
+                for setting in classroom.get("subject_settings", []):
+                    if (
+                        classroom.get("has_groups")
+                        and classroom.get("shift") != "Noite"
+                        and setting.get("split")
+                    ):
+                        lesson_units += int(setting.get("joint_workload") or 0)
+                        lesson_units += int(setting.get("workload_a") or 0)
+                        lesson_units += int(setting.get("workload_b") or 0)
+                    else:
+                        lesson_units += int(setting.get("workload") or 0)
+
+            schedule_class_ids = {item["classroom_id"] for item in timetable}
+            schedule_class = next(
+                (
+                    classroom
+                    for classroom in classrooms
+                    if classroom["id"] in schedule_class_ids
+                ),
+                None,
+            )
+            group_counts = {}
+            for item in timetable:
+                group = item.get("student_group") or "Todos"
+                group_counts[group] = group_counts.get(group, 0) + 1
+
+            if (
+                len(classrooms) != 20
+                or len(subjects) != 102
+                or len(teachers) != 51
+                or lesson_units != 695
+                or len(timetable) != 50
+                or len(schedule_class_ids) != 1
+                or any(item.get("teacher_id") is None for item in timetable)
+                or group_counts != {"Todos": 22, "A": 14, "B": 14}
+                or schedule_class is None
+                or "INFORM" not in schedule_class.get("name", "").upper()
+            ):
+                raise RuntimeError(
+                    "A base da planilha não passou na conferência: "
+                    f"{len(classrooms)} turmas, {len(subjects)} disciplinas, "
+                    f"{len(teachers)} docentes, {lesson_units} aulas semanais "
+                    f"configuradas e {len(timetable)} aulas demonstrativas."
+                )
+
+            message = (
+                "SMOKE TEST OK: API local ativa, 20 turmas da planilha "
+                "e grade demonstrativa de 50 aulas do 3º Informática carregadas."
+            )
+            print(message, flush=True)
+            logging.info(message)
+            (_data_directory() / "smoke-test.ok").write_text(
+                message,
+                encoding="utf-8",
             )
             return
 
-    try:
         window = webview.create_window(
             "Anatinus",
             BASE_URL,
@@ -135,16 +222,16 @@ def main() -> None:
             background_color="#08090a",
         )
 
-        if owns_server and server is not None:
-            def stop_local_server(*_args) -> None:
-                logging.info("Janela fechada; encerrando a API local.")
-                server.should_exit = True
+        def stop_local_server(*_args) -> None:
+            logging.info("Janela fechada; encerrando a API local.")
+            server.should_exit = True
 
-            window.events.closed += stop_local_server
-
+        window.events.closed += stop_local_server
         webview.start(debug=False)
     except Exception:
-        logging.exception("Falha ao abrir a janela do Anatinus.")
+        logging.exception("Falha ao iniciar o Anatinus.")
+        if smoke_test:
+            raise
         _show_error(
             "Não foi possível abrir a janela do Anatinus. "
             "Verifique se o WebView2 do Microsoft Edge está instalado. "

@@ -9,6 +9,26 @@ $backend = Join-Path $root "backend"
 $frontend = Join-Path $root "frontend"
 $venvPython = Join-Path $backend ".venv\Scripts\python.exe"
 
+Write-Host "Validando sintaxe dos scripts PowerShell..." -ForegroundColor Cyan
+$scriptPaths = @(
+    (Join-Path $root "build-windows.ps1"),
+    (Join-Path $root "start-demo.ps1"),
+    (Join-Path $root "start-informatica.ps1")
+)
+foreach ($scriptPath in $scriptPaths) {
+    $parseTokens = $null
+    $parseErrors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile(
+        $scriptPath,
+        [ref]$parseTokens,
+        [ref]$parseErrors
+    )
+    if ($parseErrors.Count -gt 0) {
+        $details = ($parseErrors | ForEach-Object { $_.Message }) -join "; "
+        throw "Erro de sintaxe em $(Split-Path $scriptPath -Leaf): $details"
+    }
+}
+
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw "Python não foi encontrado. Instale Python 3.12 e marque a opção para adicioná-lo ao PATH."
 }
@@ -34,7 +54,9 @@ if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar dependências Python." }
 Write-Host "[3/5] Instalando dependências e compilando o frontend..." -ForegroundColor Cyan
 Push-Location $frontend
 try {
-    if (Test-Path "package-lock.json") {
+    if (Test-Path "node_modules\.bin\vite.cmd") {
+        Write-Host "Usando dependências locais já instaladas." -ForegroundColor DarkGray
+    } elseif (Test-Path "package-lock.json") {
         npm ci
     } else {
         npm install
@@ -64,14 +86,14 @@ try {
     & $venvPython -m unittest discover -p "test_*.py"
     if ($LASTEXITCODE -ne 0) { throw "Os testes do backend falharam; o EXE não será empacotado." }
 
-    Write-Host "Gerando banco inicial de demonstração..." -ForegroundColor Cyan
-    & $venvPython (Join-Path $backend "seed_realista.py")
-    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar a base de demonstração." }
+    Write-Host "Gerando a base completa da planilha e uma grade demonstrativa..." -ForegroundColor Cyan
+    & $venvPython (Join-Path $backend "seed_apresentacao_planilha.py")
+    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar e validar a base de apresentação da planilha." }
 
     New-Item -ItemType Directory -Path (Join-Path $root "build\\pyinstaller") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root "build\\spec") -Force | Out-Null
 
-    $iconPath = Join-Path $frontend "public\Anatinus final 1.png"
+    $iconPath = Join-Path $frontend "public\anatinus final 1 branco.png"
     if (-not (Test-Path $iconPath)) {
         throw "Logo do executável não encontrada: $iconPath"
     }
@@ -113,6 +135,41 @@ $appDirectory = Join-Path $root "dist\Anatinus"
 $exePath = Join-Path $appDirectory "Anatinus.exe"
 if (-not (Test-Path $exePath)) {
     throw "O empacotamento terminou sem encontrar dist\Anatinus\Anatinus.exe."
+}
+
+Write-Host "Executando smoke test do EXE com um AppData limpo..." -ForegroundColor Cyan
+$smokeData = Join-Path $root "build\smoke-appdata"
+if (Test-Path $smokeData) {
+    Remove-Item $smokeData -Recurse -Force
+}
+New-Item -ItemType Directory -Path $smokeData -Force | Out-Null
+$previousLocalAppData = $env:LOCALAPPDATA
+$previousAnatinusPort = $env:ANATINUS_PORT
+$previousSmokeTest = $env:ANATINUS_SMOKE_TEST
+$env:LOCALAPPDATA = $smokeData
+$env:ANATINUS_PORT = "18765"
+$env:ANATINUS_SMOKE_TEST = "1"
+try {
+    & $exePath --smoke-test
+    if ($LASTEXITCODE -ne 0) {
+        throw "O smoke test do Anatinus.exe falhou. O pacote não será publicado."
+    }
+} finally {
+    if ($null -eq $previousLocalAppData) {
+        Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+    } else {
+        $env:LOCALAPPDATA = $previousLocalAppData
+    }
+    if ($null -eq $previousAnatinusPort) {
+        Remove-Item Env:ANATINUS_PORT -ErrorAction SilentlyContinue
+    } else {
+        $env:ANATINUS_PORT = $previousAnatinusPort
+    }
+    if ($null -eq $previousSmokeTest) {
+        Remove-Item Env:ANATINUS_SMOKE_TEST -ErrorAction SilentlyContinue
+    } else {
+        $env:ANATINUS_SMOKE_TEST = $previousSmokeTest
+    }
 }
 
 $releaseDirectory = Join-Path $root "release"

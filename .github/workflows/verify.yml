@@ -5,7 +5,15 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '*.md'
   workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend:
@@ -34,9 +42,14 @@ jobs:
       - name: Validar seeds de demonstração
         working-directory: backend
         run: |
-          python -m py_compile seed_realista.py
-          python seed_realista.py
+          python -m py_compile seed_realista.py validate_demo_generation.py seed_apresentacao.py
           python seed_realista.py --informatica-only
+          python validate_demo_generation.py --api
+          python seed_realista.py
+          python validate_demo_generation.py
+          python validate_demo_generation.py --all-together
+          python seed_apresentacao.py
+          python validate_demo_generation.py --all-together
 
   frontend:
     name: Build do frontend

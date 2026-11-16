@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from . import models, schemas
 from .database import engine, ensure_database_compatibility, get_db
-from .optimizer import JOURNEY_PERIODS, generate_schedule
+from .optimizer import generate_schedule, get_allowed_periods_for_day
+from .generation_diagnostics import build_unstaffed_diagnostics
 
 models.Base.metadata.create_all(bind=engine)
 ensure_database_compatibility()
@@ -19,7 +20,6 @@ def _frontend_dist_directory() -> Path:
         bundle_root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
         return bundle_root / "frontend_dist"
 
-    # backend/app/main.py -> backend/app -> backend -> raiz do repositório.
     return Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
@@ -45,7 +45,6 @@ def get_or_create_config(db: Session) -> models.SystemConfig:
         db.commit()
         db.refresh(config)
 
-    # Regras fixas do sistema.
     changed = False
 
     if config.max_classes_per_day > 9:
@@ -148,7 +147,6 @@ def delete_course(
             "Remova ou altere essas turmas antes de excluir o curso.",
         )
 
-    # Retira a associação do curso nas disciplinas sem apagá-las.
     for subject in db.query(models.Subject).all():
         course_ids = list(subject.course_ids or [])
         if course_id in course_ids:
@@ -164,6 +162,44 @@ def delete_course(
     return {"detail": "Curso removido com sucesso"}
 
 
+def _normalize_night_subject_settings(settings):
+    """Transforma cargas A/B antigas em uma carga por turma noturna inteira."""
+    normalized_settings = []
+    for setting in settings or []:
+        if not isinstance(setting, dict):
+            continue
+
+        normalized = dict(setting)
+        raw_joint = setting.get("joint_workload")
+        raw_a = setting.get("workload_a")
+        raw_b = setting.get("workload_b")
+
+        if any(value is not None for value in (raw_joint, raw_a, raw_b)):
+            base_load = int(setting.get("workload", 0) or 0)
+            joint = int(raw_joint or 0)
+            load_a = (
+                base_load
+                if raw_a is None and joint == 0
+                else int(raw_a or 0)
+            )
+            load_b = (
+                base_load
+                if raw_b is None and joint == 0
+                else int(raw_b or 0)
+            )
+            combined_load = joint + max(load_a, load_b)
+            if combined_load > 0:
+                normalized["workload"] = combined_load
+
+        normalized.pop("workload_a", None)
+        normalized.pop("workload_b", None)
+        normalized.pop("joint_workload", None)
+        normalized["split"] = False
+        normalized_settings.append(normalized)
+
+    return normalized_settings
+
+
 # ----------------------------------------------------------------------
 # TURMAS
 # ----------------------------------------------------------------------
@@ -172,7 +208,13 @@ def create_classroom(
     data: schemas.ClassroomCreate,
     db: Session = Depends(get_db),
 ):
-    item = models.Classroom(**data.model_dump())
+    values = data.model_dump()
+    if values["shift"] == "Noite":
+        values["has_groups"] = False
+        values["subject_settings"] = _normalize_night_subject_settings(
+            values.get("subject_settings", [])
+        )
+    item = models.Classroom(**values)
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -200,6 +242,11 @@ def update_classroom(
         raise HTTPException(404, "Turma não encontrada")
 
     values = data.model_dump()
+    if values["shift"] == "Noite":
+        values["has_groups"] = False
+        values["subject_settings"] = _normalize_night_subject_settings(
+            values.get("subject_settings", [])
+        )
 
     valid_subject_ids = {
         subject.id
@@ -444,8 +491,6 @@ def delete_teacher(
     if not item:
         raise HTTPException(404, "Professor não encontrado")
 
-    # Preserva a última grade como referência histórica, mas as aulas
-    # do professor removido passam a aparecer como "Sem professor".
     db.query(models.TimetableItem).filter(
         models.TimetableItem.teacher_id == teacher_id
     ).update(
@@ -495,7 +540,6 @@ def update_config(
     config = get_or_create_config(db)
     values = data.model_dump()
 
-    # Regras obrigatórias: podem ser endurecidas, mas não relaxadas.
     values["max_classes_per_day"] = min(
         values["max_classes_per_day"],
         9,
@@ -512,7 +556,7 @@ def update_config(
 
 
 # ----------------------------------------------------------------------
-# GRADE SALVA
+# GRADE SALVA E EDIÇÃO MANUAL
 # ----------------------------------------------------------------------
 @app.get("/timetable/", response_model=list[schemas.TimetableItem])
 def read_timetable(db: Session = Depends(get_db)):
@@ -540,6 +584,25 @@ def save_timetable(
     return rows
 
 
+@app.put("/timetable/lessons/{lesson_id}", response_model=schemas.TimetableItem)
+def update_lesson_slot(
+    lesson_id: int,
+    data: schemas.LessonUpdate,
+    db: Session = Depends(get_db),
+):
+    item = db.query(models.TimetableItem).filter(models.TimetableItem.id == lesson_id).first()
+
+    if not item:
+        raise HTTPException(404, "Aula não encontrada.")
+
+    item.teacher_id = data.teacher_id
+    item.is_manual = data.is_fixed
+    db.commit()
+    db.refresh(item)
+
+    return item
+
+
 # ----------------------------------------------------------------------
 # GERAÇÃO
 # ----------------------------------------------------------------------
@@ -557,7 +620,6 @@ def generate_timetable(
     if not requested_classroom_ids and payload.classroom_id is not None:
         requested_classroom_ids = [int(payload.classroom_id)]
 
-    # Aceita os nomes anteriores enquanto instalações antigas são atualizadas.
     if scope == "classroom":
         scope = "classrooms"
     elif scope == "subject":
@@ -640,9 +702,9 @@ def generate_timetable(
                     f"A matéria selecionada não está configurada em: {names}.",
                 )
     else:
-        # Ignora parâmetros de escopo se o usuário escolher Escola inteira.
         target_classroom_ids = []
         target_subject_id = None
+
     if not classroom_rows:
         raise HTTPException(
             400,
@@ -675,6 +737,8 @@ def generate_timetable(
             "name": classroom.name,
             "course_id": classroom.course_id,
             "shift": classroom.shift,
+            "allowed_periods": classroom.allowed_periods,
+            "allowed_periods_by_day": classroom.allowed_periods_by_day,
             "has_groups": classroom.has_groups,
             "subject_settings": classroom.subject_settings or [],
             "preferred_subject_sequences": (
@@ -709,12 +773,6 @@ def generate_timetable(
 
     config = get_or_create_config(db)
 
-    # --------------------------------------------------------------
-    # PRÉ-VALIDAÇÃO
-    # --------------------------------------------------------------
-    # Alguns cenários podem ser identificados como impossíveis sem
-    # construir o modelo CP-SAT. Isso economiza tempo e produz mensagens
-    # mais úteis para quem está montando a grade.
     subject_by_id = {
         subject["id"]: subject
         for subject in subjects
@@ -723,14 +781,9 @@ def generate_timetable(
     preflight_errors = []
 
     for classroom in classrooms:
-        weekly_capacity = (
-            len(
-                JOURNEY_PERIODS.get(
-                    classroom.get("shift", "Manhã"),
-                    JOURNEY_PERIODS["Manhã"],
-                )
-            )
-            * 5
+        weekly_capacity = sum(
+            len(get_allowed_periods_for_day(classroom, day))
+            for day in range(5)
         )
 
         settings = classroom.get(
@@ -827,6 +880,7 @@ def generate_timetable(
             config.max_consec_per_teacher,
         "max_consec_teacher_mode":
             config.max_consec_teacher_mode,
+        "balance_daily_load_hard": payload.balance_daily_load_hard,
     }
 
     saved_schedule = [
@@ -837,19 +891,33 @@ def generate_timetable(
             "day": row.day,
             "period": row.period,
             "student_group": row.student_group,
+            "is_manual": getattr(row, "is_manual", False),
         }
         for row in saved_rows
     ]
 
-    fixed_schedule = saved_schedule if scope != "all" else None
+    # Prepara as aulas que devem ser fixadas, mantendo sempre as que têm a flag is_manual
+    fixed_schedule = []
+    for item in saved_schedule:
+        in_scope = False
+        if scope == "all":
+            in_scope = True
+        elif scope == "classrooms":
+            in_scope = item["classroom_id"] in target_classroom_ids
+        elif scope in {"subject_selected", "subject_all"}:
+            in_scope = (item["classroom_id"] in target_classroom_ids) and (item["subject_id"] == target_subject_id)
+
+        if item.get("is_manual"):
+            fixed_schedule.append(item)
+        elif not in_scope:
+            fixed_schedule.append(item)
+
     result = generate_schedule(
         classrooms,
         subjects,
         teachers,
         sys_config,
         fixed_schedule=fixed_schedule,
-        mutable_classroom_ids=target_classroom_ids if scope != "all" else None,
-        mutable_subject_id=target_subject_id if scope in subject_scopes else None,
     )
 
     if result["status"] == "infeasible":
@@ -864,7 +932,8 @@ def generate_timetable(
     if scope == "all":
         result["generation_scope"] = "all"
         result["preserved_lessons"] = 0
-        result["message"] = "Grade da escola inteira gerada."
+        if not result.get("schedule_integrity_fallback"):
+            result["message"] = "Grade da escola inteira gerada."
     else:
         preserved = [
             row for row in saved_schedule
@@ -894,14 +963,34 @@ def generate_timetable(
                 "os demais horários foram preservados."
             )
 
-    # A geração e o salvamento passam a fazer parte da mesma operação.
-    # Assim a interface nunca precisa depender de uma segunda requisição
-    # para persistir a grade recém-calculada.
+    generated_schedule = result["schedule"]
+    result["unstaffed_diagnostics"] = build_unstaffed_diagnostics(
+        classrooms,
+        subjects,
+        teachers,
+        generated_schedule,
+        fixed_schedule=fixed_schedule,
+        teacher_assignment_fallback=result.get("teacher_assignment_fallback", False),
+        schedule_integrity_fallback=result.get("schedule_integrity_fallback", False),
+    )
+    
+    # Restaura a flag is_manual para as aulas geradas
+    for item in generated_schedule:
+        item["is_manual"] = False
+        for fx in fixed_schedule:
+            if (fx["classroom_id"] == item["classroom_id"] and
+                fx["subject_id"] == item["subject_id"] and
+                fx["day"] == item["day"] and
+                fx["period"] == item["period"] and
+                fx.get("student_group", "Todos") == item["student_group"]):
+                item["is_manual"] = fx.get("is_manual", False)
+                break
+
     db.query(models.TimetableItem).delete()
 
     rows = [
         models.TimetableItem(**item)
-        for item in result["schedule"]
+        for item in generated_schedule
     ]
 
     db.add_all(rows)
@@ -923,7 +1012,6 @@ def serve_frontend(frontend_path: str):
     frontend_root = FRONTEND_DIST.resolve()
     requested_file = (frontend_root / frontend_path).resolve()
 
-    # Não permite que um caminho solicitado leia arquivos fora da pasta pública.
     try:
         requested_file.relative_to(frontend_root)
     except ValueError:
@@ -932,5 +1020,4 @@ def serve_frontend(frontend_path: str):
     if requested_file.is_file():
         return FileResponse(requested_file)
 
-    # Fallback para rotas do React Router, como /professores e /turmas.
     return FileResponse(index_file)

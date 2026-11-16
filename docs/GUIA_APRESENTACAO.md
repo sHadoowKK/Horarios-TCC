@@ -1,190 +1,76 @@
-# ANATINUS — GUIA DE APRESENTAÇÃO E DEMONSTRAÇÃO
+# ANATINUS — GUIA DE APRESENTAÇÃO
 
-## Objetivo da apresentação
+## Base pronta para abrir
 
-Mostrar que o projeto resolve um problema de **otimização escolar com muitas restrições concorrentes**, e não apenas que possui uma interface bonita.
+O pacote da apresentação já abre com os dados semanais transcritos da planilha:
 
----
+- 8 cursos;
+- 20 turmas;
+- 102 disciplinas;
+- 51 docentes anonimizados;
+- 695 aulas semanais configuradas nas matrizes.
 
-## 1. Demonstração recomendada
+O 3º Informática abre selecionado com uma grade gerada pelo Anatinus: 50 aulas, 22 para a turma inteira, 14 para o grupo A e 14 para o grupo B. As 50 aulas têm docente atribuído. As outras turmas já estão cadastradas com disciplinas, cargas, grupos e habilitações docentes.
 
-### Etapa 1 — Gestão Acadêmica
-Mostrar rapidamente:
-- cursos;
-- turmas;
-- disciplinas;
-- matriz própria de uma turma;
-- carga semanal;
-- grupo A/B.
+Feche instâncias anteriores e execute `Anatinus.exe` extraído do ZIP. O aplicativo copia a base de demonstração para `%LOCALAPPDATA%\Anatinus` na primeira abertura. O banco normal fica nesse mesmo diretório, separado do banco de desenvolvimento.
 
-Frase curta:
+## Roteiro sugerido
 
-> "A matriz não é global. Cada turma informa quais disciplinas possui, a carga semanal e se a disciplina ocorre com a turma inteira ou separada em A/B."
+### 1. Mostrar a grade inicial
 
-### Etapa 2 — Professores
-Mostrar:
-- disciplinas habilitadas;
-- pontuação;
-- disponibilidade;
-- atalhos por dia e turno.
+Comece pelo 3º Informática. Mostre a grade semanal gerada, a divisão A/B e as aulas compartilhadas. Explique que o CP-SAT buscou uma solução válida com as cargas e habilitações configuradas.
 
-Frase:
+### 2. Mostrar a gestão acadêmica
 
-> "A disponibilidade representa quando o professor pode trabalhar aqui. Regras como as 11 horas de interjornada são calculadas pelo solver, não precisam ser marcadas manualmente."
+Abra **Turmas** e mostre a lista completa. Selecione uma turma para conferir disciplinas, cargas semanais e separações por grupo. O cadastro completo já está dentro do ZIP, sem digitação durante a apresentação.
 
-### Etapa 3 — Regras e Preferências
-Explicar a diferença:
+### 3. Mostrar os docentes
 
-**Hard**
-- não pode violar.
+Abra **Professores** para mostrar as disciplinas habilitadas. Os nomes foram anonimizados. Como a planilha não informa a disponibilidade semanal completa, a base usa disponibilidades sintéticas por turno.
 
-**Soft**
-- tenta melhorar, mas pode abrir exceção.
+### 4. Explicar regras e preferências
 
-Exemplo:
+O CP-SAT trata conflitos, cargas e intervalos como restrições do modelo. Preferências, como blocos consecutivos, são usadas para orientar a busca sem eliminar soluções necessárias.
 
-> "Um professor em duas turmas ao mesmo tempo é proibido. Já o bloco de duas aulas é uma preferência; se a realidade exigir, o sistema pode usar outra distribuição."
+### 5. Mostrar exportação
 
-### Etapa 4 — Gerar
-Clicar em Gerar Nova Grade.
+Use Excel ou impressão somente se essas ações já tiverem sido conferidas no computador da apresentação.
 
-Enquanto calcula:
+## Limites do recorte
 
-> "A grade anterior permanece visível e identificada como a última salva."
+A grade inicial de 50 aulas corresponde somente ao 3º Informática. A base também contém as matrizes das demais turmas, mas a grade de toda a escola não está pré-carregada no pacote. Os professores estão anonimizados e a disponibilidade é sintética, não uma agenda oficial.
 
-### Etapa 5 — Resultado por turma
-Mostrar:
-- aulas;
-- intervalos;
-- Sem professor;
-- blocos.
+Os dois quadros MTEC com início às 18h30 e os sete encontros síncronos mensais da planilha não foram convertidos em aulas semanais: o aplicativo ainda não representa esse turno nem eventos datados. Evite apresentar essa base como cadastro operacional oficial ou afirmar que todas as turmas já foram geradas em conjunto.
 
-### Etapa 6 — Resultado por professor
-Trocar a visão.
+O estado `feasible` significa que o solver encontrou uma solução válida segundo o modelo; não significa que provou ser a melhor solução matemática possível.
 
-Frase:
+## Explicação curta do CP-SAT
 
-> "Aqui o mesmo resultado é reorganizado pela agenda docente, o que facilita conferir conflitos e carga."
+> "O Anatinus transforma os horários possíveis em variáveis e descreve ao CP-SAT quais combinações são permitidas ou proibidas. Depois atribui pesos às preferências. O solver procura uma combinação que respeite as regras obrigatórias e melhore as preferências."
 
-### Etapa 7 — Exportação
-Mostrar:
-- Exportar CSV;
-- Imprimir.
-
----
-
-## 2. Explicação simples do CP-SAT
-
-Versão de 20 segundos:
-
-> "O Anatinus transforma cada possibilidade de aula em variáveis e informa ao CP-SAT quais combinações são permitidas ou proibidas. Depois define preferências com pesos. O solver procura uma combinação que cumpra as regras obrigatórias e, entre as válidas, tenta melhorar as preferências."
-
----
-
-## 3. Perguntas prováveis da banca
+## Perguntas prováveis
 
 ### "Isso é inteligência artificial?"
-Resposta:
 
 > "Não no sentido de IA generativa. O núcleo é programação por restrições e otimização combinatória usando o CP-SAT do Google OR-Tools."
 
 ### "Ele sempre encontra a melhor grade?"
-Resposta:
 
-> "Se retornar optimal, o solver provou a optimalidade dentro daquele modelo. Também pode retornar uma solução feasible, que é válida mas sem prova de ser a melhor, principalmente quando há limite de tempo."
-
-### "E se não existir professor para uma matéria?"
-Resposta:
-
-> "A matéria não desaparece. Ela fica reservada na grade como Sem professor. Essa opção recebe penalidade alta e só é usada quando não há alternativa docente melhor."
-
-### "Por que não bloquear tudo como regra?"
-Resposta:
-
-> "Porque uma escola real possui exceções. Se toda preferência virar proibição, o sistema pode tornar uma grade possível artificialmente inviável."
+> "Quando retorna `optimal`, o solver provou a optimalidade dentro daquele modelo. Também pode retornar `feasible`, que é uma solução válida sem prova de que seja a melhor, especialmente quando há limite de tempo."
 
 ### "Como funciona A/B?"
-Resposta:
 
 > "A divisão é configurada por turma e disciplina. Uma matéria pode ser conjunta e outra separada. Quando separada, A e B possuem cargas independentes."
 
-### "Como vocês sabem que funciona?"
-Resposta:
-
-> "Temos testes automatizados para regras específicas e cenários integrados, build de produção do frontend, testes manuais do fluxo completo e benchmark separado para desempenho."
-
-### "Por que SQLite?"
-Resposta:
-
-> "É adequado ao protótipo local e simplifica implantação durante o TCC. Para ambiente multiusuário em produção seria razoável migrar para um banco servidor."
-
-### "Qual foi a maior dificuldade?"
-Resposta sugerida:
-
-> "Transformar regras descritas de forma humana em restrições matemáticas sem deixar o modelo rígido demais. Vários comportamentos tiveram que ser revistos depois de comparar com grades reais."
-
 ### "O sistema substitui a coordenação?"
-Resposta:
 
-> "Não. Ele automatiza verificação e busca combinatória. A coordenação continua responsável pelas decisões pedagógicas, exceções e validação final."
+> "Não. Ele automatiza a busca e a verificação de restrições. A coordenação continua responsável pelas decisões pedagógicas, exceções e validação final."
 
-### "Qual é a principal limitação?"
-Resposta:
+## Antes da banca
 
-> "Desempenho e calibração quando a quantidade de restrições cresce, além da necessidade de validar com uma base completa da escola."
-
----
-
-## 4. Coisas que NÃO devem ser ditas
-
-Evitar:
-- "elimina 100% dos erros";
-- "reduz 70% do tempo";
-- "usa IA";
-- "já está pronto para qualquer escola";
-- "sempre encontra a grade perfeita";
-- "substitui a coordenação";
-- "foi testado em toda a escola", se isso ainda não tiver ocorrido.
-
----
-
-## 5. Plano B para o dia da apresentação
-
-Antes da banca:
-1. iniciar backend;
-2. iniciar frontend;
-3. gerar uma grade uma vez;
-4. deixar a grade salva;
-5. tirar screenshots;
-6. manter o banco de demonstração pronto.
-
-Se a geração ao vivo demorar:
-- mostrar a última grade salva;
-- explicar que o solver possui limite de tempo;
-- usar os screenshots;
-- não ficar repetindo o botão de gerar.
-
----
-
-## 6. Comandos do dia
-
-Backend:
-
-```powershell
-cd C:\Projetos\Horarios-TCC\backend
-.\.venv\Scripts\Activate.ps1
-python -m uvicorn app.main:app --reload
-```
-
-Frontend:
-
-```powershell
-cd C:\Projetos\Horarios-TCC\frontend
-npm run dev
-```
-
-Abrir:
-
-```text
-http://localhost:5173
-```
+1. Extraia o ZIP inteiro.
+2. Abra `Anatinus.exe` e confira se a grade do 3º Informática aparece.
+3. Abra Turmas e Professores para confirmar os dados carregados.
+4. Confira o tema e o ícone da versão branca.
+5. Teste Excel e impressão no computador que será usado.
+6. Mantenha o ZIP e uma cópia dele em outro local.
