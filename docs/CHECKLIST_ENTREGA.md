@@ -1,6 +1,19 @@
 # ANATINUS — CHECKLIST DE ENTREGA
 
-Última conferência técnica: 06/11/2026. Itens marcados foram verificados no GitHub Actions. Testes que exigem a interface gráfica em um computador Windows real permanecem abertos.
+Última conferência técnica local: 09/11/2026. O pacote foi recompilado com a base da planilha e a correção para bancos vazios. A conferência visual do executável desta correção no computador/projetor permanece aberta.
+
+## Atualização da base de apresentação — 09/11/2026
+
+- [x] Base derivada da planilha: 8 cursos, 20 turmas, 102 disciplinas, 51 docentes anonimizados e 695 aulas semanais configuradas.
+- [x] Grade inicial do 3º Informática: 50 aulas, todos os grupos preenchidos e zero aulas sem professor.
+- [x] Build de produção do frontend e suíte local do backend: 45 testes passaram.
+- [x] Executável Windows compilado com a versão branca da marca.
+- [x] Recuperação de banco SQLite vazio verificada no modo congelado: 20 turmas e 50 aulas demonstrativas carregadas.
+- [ ] Confirmar a abertura do executável recompilado pela interface Windows no computador da apresentação.
+- [x] ZIP Windows criado e armazenado em `release/Anatinus-Windows-x64.zip`.
+- [ ] Abrir visualmente a interface e conferir a grade no computador da apresentação.
+
+Observações sobre a fonte: a planilha não fornece disponibilidade individual de docentes, então ela foi preenchida de forma ampla e sintética. Dois quadros MTEC com início às 18h30 e sete eventos síncronos mensais foram deixados de fora da grade semanal porque o sistema ainda não representa esses horários/eventos.
 
 ## Código e validação
 
@@ -8,7 +21,7 @@
 - [x] Build de produção do frontend passou (1.952 módulos transformados).
 - [x] Build Windows com PyInstaller concluiu no runner.
 - [x] Smoke test anterior do EXE em AppData limpo: API local iniciou e respondeu; essa versão aceitava pelo menos 50 aulas.
-- [ ] Confirmar o novo smoke test estrito: o EXE deve carregar exatamente as 100 aulas da base fictícia de apresentação.
+- [ ] Smoke test estrito do executável após a correção para banco local vazio.
 - [x] Geração isolada do 3º INFO: 57 aulas, zero sem professor, estado feasible.
 - [x] Base fictícia principal gerada pela API: 2 cursos, 3 turmas, 15 disciplinas, 15 professores, 100 aulas salvas, 100 com professor.
 - [x] Validação conjunta da base fictícia: 100 aulas, zero conflitos de professor, zero janelas dos alunos, disponibilidade e descansos verificados; seis aulas por dia em cada turma/grupo.
@@ -35,7 +48,7 @@
 - [x] Registrar a suíte automatizada: 36 testes, 4,776 s no runner Linux.
 - [x] Registrar build do frontend e build do Windows.
 - [x] Registrar smoke test do EXE em AppData limpo.
-- [x] Registrar a base fictícia de apresentação: 100 aulas, todas com professor, 6 aulas/dia, sem conflitos e sem janelas.
+- [x] Registrar a base de apresentação atual derivada da planilha: 20 turmas cadastradas e uma grade demonstrativa de 50 aulas do 3º Informática, todas com professor.
 - [x] Registrar a base ETEC de regressão separadamente: 291 aulas, 234 com professor e 57 sem professor.
 - [ ] Capturar prints da gestão acadêmica, professores e regras/preferências.
 - [ ] Capturar prints da grade por turma, por professor e de A/B.
@@ -55,7 +68,7 @@ O texto escrito do TCC não foi alterado nesta rodada.
 - [ ] Revisar slides e falas com os resultados técnicos atualizados.
 - [ ] Ensaiar a demonstração.
 - [ ] Ter screenshots de backup.
-- [x] Definir a base fictícia de 100 aulas como cenário principal da demonstração.
+- [x] Definir a base derivada da planilha e a grade do 3º Informática como cenário principal da demonstração.
 - [ ] Testar no computador e projetor que serão usados.
 - [ ] Levar projeto e banco de demonstração em pendrive/backup.
 
@@ -63,9 +76,9 @@ O texto escrito do TCC não foi alterado nesta rodada.
 
 - [x] Workflow Build Windows gerou Anatinus.exe e release/Anatinus-Windows-x64.zip no runner.
 - [x] Smoke test anterior em AppData limpo confirmou a inicialização da API local.
-- [ ] Confirmar que a revisão atual do smoke test carregou exatamente 100 aulas da base fictícia.
+- [x] Confirmar que a revisão atual do smoke test carregou a base da planilha e as 50 aulas do 3º Informática.
 - [ ] Publicar e baixar o ZIP como artefato do GitHub Actions. A publicação em eventos pull_request permanece desativada; o workflow será habilitado para push na branch de trabalho.
-- [ ] Baixar e extrair o ZIP completo em uma pasta limpa.
+- [x] ZIP atual criado localmente; ainda falta extraí-lo e abrir no computador da apresentação.
 - [ ] Abrir Anatinus.exe sem iniciar manualmente Python ou Node.js no Windows real.
 - [ ] Conferir navegação, cadastro, geração e exportação.
 - [ ] Fechar e reabrir o aplicativo e confirmar que os dados continuam salvos.

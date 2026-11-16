@@ -880,6 +880,7 @@ def generate_timetable(
             config.max_consec_per_teacher,
         "max_consec_teacher_mode":
             config.max_consec_teacher_mode,
+        "balance_daily_load_hard": payload.balance_daily_load_hard,
     }
 
     saved_schedule = [

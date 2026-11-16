@@ -54,7 +54,9 @@ if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar dependências Python." }
 Write-Host "[3/5] Instalando dependências e compilando o frontend..." -ForegroundColor Cyan
 Push-Location $frontend
 try {
-    if (Test-Path "package-lock.json") {
+    if (Test-Path "node_modules\.bin\vite.cmd") {
+        Write-Host "Usando dependências locais já instaladas." -ForegroundColor DarkGray
+    } elseif (Test-Path "package-lock.json") {
         npm ci
     } else {
         npm install
@@ -84,14 +86,14 @@ try {
     & $venvPython -m unittest discover -p "test_*.py"
     if ($LASTEXITCODE -ne 0) { throw "Os testes do backend falharam; o EXE não será empacotado." }
 
-    Write-Host "Gerando banco fictício e grade de 100 aulas para a apresentação..." -ForegroundColor Cyan
-    & $venvPython (Join-Path $backend "seed_apresentacao.py")
-    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar e validar a base fictícia de apresentação." }
+    Write-Host "Gerando a base completa da planilha e uma grade demonstrativa..." -ForegroundColor Cyan
+    & $venvPython (Join-Path $backend "seed_apresentacao_planilha.py")
+    if ($LASTEXITCODE -ne 0) { throw "Não foi possível gerar e validar a base de apresentação da planilha." }
 
     New-Item -ItemType Directory -Path (Join-Path $root "build\\pyinstaller") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root "build\\spec") -Force | Out-Null
 
-    $iconPath = Join-Path $frontend "public\Anatinus final 1.png"
+    $iconPath = Join-Path $frontend "public\anatinus final 1 branco.png"
     if (-not (Test-Path $iconPath)) {
         throw "Logo do executável não encontrada: $iconPath"
     }
@@ -142,7 +144,11 @@ if (Test-Path $smokeData) {
 }
 New-Item -ItemType Directory -Path $smokeData -Force | Out-Null
 $previousLocalAppData = $env:LOCALAPPDATA
+$previousAnatinusPort = $env:ANATINUS_PORT
+$previousSmokeTest = $env:ANATINUS_SMOKE_TEST
 $env:LOCALAPPDATA = $smokeData
+$env:ANATINUS_PORT = "18765"
+$env:ANATINUS_SMOKE_TEST = "1"
 try {
     & $exePath --smoke-test
     if ($LASTEXITCODE -ne 0) {
@@ -154,7 +160,18 @@ try {
     } else {
         $env:LOCALAPPDATA = $previousLocalAppData
     }
+    if ($null -eq $previousAnatinusPort) {
+        Remove-Item Env:ANATINUS_PORT -ErrorAction SilentlyContinue
+    } else {
+        $env:ANATINUS_PORT = $previousAnatinusPort
+    }
+    if ($null -eq $previousSmokeTest) {
+        Remove-Item Env:ANATINUS_SMOKE_TEST -ErrorAction SilentlyContinue
+    } else {
+        $env:ANATINUS_SMOKE_TEST = $previousSmokeTest
+    }
 }
+
 $releaseDirectory = Join-Path $root "release"
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
 $archivePath = Join-Path $releaseDirectory "Anatinus-Windows-x64.zip"

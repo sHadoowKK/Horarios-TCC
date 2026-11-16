@@ -29,12 +29,12 @@ if ($SkipSeed) {
     }
     Write-Host "Usando a base DEMO já preparada; nenhum cadastro será recriado." -ForegroundColor Cyan
 } else {
-    Write-Host "Preparando a base fictícia e gerando o horário de apresentação..." -ForegroundColor Cyan
+    Write-Host "Preparando a base da planilha e gerando o horário de apresentação..." -ForegroundColor Cyan
     Push-Location $backend
     try {
-        & $python (Join-Path $backend "seed_apresentacao.py")
+        & $python (Join-Path $backend "seed_apresentacao_planilha.py")
         if ($LASTEXITCODE -ne 0) {
-            throw "Falha ao criar a base fictícia de apresentação."
+            throw "Falha ao criar a base de apresentação da planilha."
         }
     } finally {
         Pop-Location
@@ -77,7 +77,7 @@ Write-Host ""
 if ($SkipSeed) {
     Write-Host "Anatinus iniciou usando a BASE DEMO EXISTENTE." -ForegroundColor Green
 } else {
-    Write-Host "Anatinus iniciou usando a BASE FICTÍCIA DE APRESENTAÇÃO." -ForegroundColor Green
+    Write-Host "Anatinus iniciou usando a BASE DA PLANILHA PARA APRESENTAÇÃO." -ForegroundColor Green
 }
 Write-Host "Frontend: http://localhost:5173"
 Write-Host "API:      http://localhost:8000"
@@ -86,6 +86,6 @@ Write-Host ""
 if ($SkipSeed) {
     Write-Host "Os dados existentes do cenário selecionado foram preservados." -ForegroundColor Yellow
 } else {
-    Write-Host "Todos os cadastros e horários são fictícios." -ForegroundColor Yellow
+    Write-Host "Os docentes estão anonimizados; a disponibilidade é ampla e sintética." -ForegroundColor Yellow
 }
 Write-Host "Os dados ficam separados de backend\school_schedule.db." -ForegroundColor Yellow

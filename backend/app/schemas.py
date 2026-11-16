@@ -23,6 +23,7 @@ class TimetableGenerationRequest(BaseModel):
     classroom_ids: List[int] = Field(default_factory=list)
     classroom_id: Optional[int] = Field(default=None, gt=0)
     subject_id: Optional[int] = Field(default=None, gt=0)
+    balance_daily_load_hard: bool = False
 
 
 class CourseBase(BaseModel):

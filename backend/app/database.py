@@ -1,11 +1,50 @@
 import json
 import os
+import sqlite3
 import shutil
 import sys
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+
+
+def _has_academic_data(database_path: Path) -> bool:
+    """Avoid replacing a user's database unless it has no school records."""
+    if not database_path.is_file():
+        return False
+
+    try:
+        with sqlite3.connect(database_path) as connection:
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            }
+            for table in ("classrooms", "courses", "subjects", "teachers", "timetable"):
+                if table in tables and connection.execute(
+                    f'SELECT 1 FROM "{table}" LIMIT 1'
+                ).fetchone():
+                    return True
+    except sqlite3.DatabaseError:
+        # A corrupt or unreadable database must be left for recovery, not replaced.
+        return True
+
+    return False
+
+
+def _install_demo_database(database_path: Path) -> None:
+    """Copy the bundled presentation database on first run or into an empty DB."""
+    if not getattr(sys, "frozen", False):
+        return
+
+    bundle_root = Path(
+        getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent)
+    )
+    demo_database = bundle_root / "demo_seed" / "school_schedule_demo.db"
+    if demo_database.is_file() and not _has_academic_data(database_path):
+        shutil.copy2(demo_database, database_path)
 
 
 def _database_url() -> str:
@@ -19,6 +58,7 @@ def _database_url() -> str:
         database_directory = Path(data_directory).expanduser()
         database_directory.mkdir(parents=True, exist_ok=True)
         database_path = database_directory / "school_schedule.db"
+        _install_demo_database(database_path)
         return f"sqlite:///{database_path.as_posix()}"
 
     if getattr(sys, "frozen", False):
@@ -32,13 +72,7 @@ def _database_url() -> str:
         database_directory.mkdir(parents=True, exist_ok=True)
         database_path = database_directory / "school_schedule.db"
 
-        if not database_path.exists():
-            bundle_root = Path(
-                getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent)
-            )
-            demo_database = bundle_root / "demo_seed" / "school_schedule_demo.db"
-            if demo_database.is_file():
-                shutil.copy2(demo_database, database_path)
+        _install_demo_database(database_path)
 
         return f"sqlite:///{database_path.as_posix()}"
 

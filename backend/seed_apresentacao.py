@@ -17,7 +17,7 @@ DATABASE_PATH = Path(__file__).resolve().with_name("school_schedule_demo.db")
 os.environ["ANATINUS_DATABASE_URL"] = f"sqlite:///{DATABASE_PATH.as_posix()}"
 
 from fastapi import HTTPException  # noqa: E402
-from app import models  # noqa: E402
+from app import models, schemas  # noqa: E402
 from app.database import Base, SessionLocal, engine, ensure_database_compatibility  # noqa: E402
 
 
@@ -243,7 +243,12 @@ def main():
         from app.main import generate_timetable
 
         try:
-            result = generate_timetable(db=db)
+            result = generate_timetable(
+                db=db,
+                payload=schemas.TimetableGenerationRequest(
+                    balance_daily_load_hard=True
+                ),
+            )
         except HTTPException as exc:
             raise RuntimeError(
                 f"Não foi possível gerar a grade de apresentação "

@@ -1,6 +1,16 @@
 # ANATINUS — REGISTRO DE TESTES E RESULTADOS
 
-Atualizado em 06/11/2026. Este documento registra resultados observados no GitHub Actions e separa a base fictícia de apresentação da base de regressão inspirada na ETEC. Não substitui a seção de Resultados do TCC.
+Atualizado em 08/11/2026. Este documento registra resultados observados no GitHub Actions e na estação Windows local. Não substitui a seção de Resultados do TCC.
+
+## Atualização local de 08/11/2026 — pacote baseado na planilha
+
+O pacote da apresentação agora é semeado por `backend/seed_apresentacao_planilha.py`, usando as matrizes semanais transcritas de `backend/seed_realista.py`. A base contém 8 cursos, 20 turmas, 102 disciplinas, 51 docentes anonimizados e 695 aulas semanais configuradas. A disponibilidade docente é sintética e ampla por turno, porque a planilha não contém a agenda semanal completa.
+
+O banco embutido no pacote já inclui uma grade gerada para 3º Informática: 50 aulas, sendo 22 conjuntas, 14 do grupo A e 14 do grupo B, sem aulas sem professor. As outras turmas já têm cursos, disciplinas, cargas e habilitações cadastradas. A geração simultânea da escola inteira ainda não deve ser apresentada como completa: a última execução manteve 695 aulas, mas atribuiu docente a somente 284. Essa grade não foi incluída no pacote.
+
+Os dois quadros MTEC iniciados às 18h30 e os sete encontros síncronos mensais permanecem fora do banco semanal: o modelo não representa a jornada específica MTEC nem eventos com datas.
+
+O build usa o ícone branco para `Anatinus.exe` e o smoke test verifica os cadastros completos e a grade de 50 aulas em um AppData limpo.
 
 ## 1. Testes automatizados e build
 

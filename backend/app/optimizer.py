@@ -223,6 +223,7 @@ def generate_schedule(
     avoid_first_period = bool(sys_config.get("avoid_first_period", False))
     avoid_last_period = bool(sys_config.get("avoid_last_period", False))
     avoid_friday = bool(sys_config.get("avoid_friday", False))
+    balance_daily_load_hard = bool(sys_config.get("balance_daily_load_hard", False))
     min_classes_students = int(sys_config.get("min_classes_students", 2))
     min_classes_teachers = int(sys_config.get("min_classes_teachers", 2))
     max_high = int(sys_config.get("max_high_complexity_per_day", 2))
@@ -472,6 +473,12 @@ def generate_schedule(
                     for period in allowed_today
                     if (classroom["id"], audience, day, period) in student_occupancy
                 )
+                if balance_daily_load_hard:
+                    upper_daily_load = target_daily_load + int(
+                        weekly_load % num_days != 0
+                    )
+                    model.Add(daily_load >= target_daily_load)
+                    model.Add(daily_load <= upper_daily_load)
                 deviation = model.NewIntVar(
                     0,
                     len(allowed_today),
@@ -796,6 +803,71 @@ def generate_schedule(
                     key = (classroom["id"], subject["id"], target, teacher["id"], day, period)
                     if key in lesson:
                         rewards.append(score * lesson[key])
+
+    # Sequências configuradas são preferências: recompense cada par de
+    # disciplinas adjacentes na ordem indicada, sem torná-lo uma regra rígida.
+    subjects_by_id = {
+        classroom["id"]: {
+            subject["id"]: subject
+            for subject in classroom_subjects[classroom["id"]]
+        }
+        for classroom in classrooms
+    }
+    for classroom in classrooms:
+        classroom_id = classroom["id"]
+        sequences = classroom.get("preferred_subject_sequences", []) or []
+        for sequence_index, sequence in enumerate(sequences):
+            if not isinstance(sequence, (list, tuple)) or len(sequence) < 2:
+                continue
+            for pair_index, (first_id, second_id) in enumerate(zip(sequence, sequence[1:])):
+                if (
+                    first_id not in subjects_by_id[classroom_id]
+                    or second_id not in subjects_by_id[classroom_id]
+                ):
+                    continue
+                for day in range(num_days):
+                    allowed_today = set(_get_allowed_periods_for_day(classroom, day))
+                    for first_period, second_period in contiguous_period_pairs:
+                        if first_period not in allowed_today or second_period not in allowed_today:
+                            continue
+
+                        first_vars = [
+                            variable
+                            for target in _targets_for(classroom, subjects_by_id[classroom_id][first_id])
+                            for variable in vars_for_unit_at(
+                                classroom, subjects_by_id[classroom_id][first_id],
+                                target, day, first_period
+                            )
+                        ]
+                        second_vars = [
+                            variable
+                            for target in _targets_for(classroom, subjects_by_id[classroom_id][second_id])
+                            for variable in vars_for_unit_at(
+                                classroom, subjects_by_id[classroom_id][second_id],
+                                target, day, second_period
+                            )
+                        ]
+                        if not first_vars or not second_vars:
+                            continue
+
+                        first_present = model.NewBoolVar(
+                            f"seq_first_c{classroom_id}_q{sequence_index}_i{pair_index}_d{day}_p{first_period}"
+                        )
+                        second_present = model.NewBoolVar(
+                            f"seq_second_c{classroom_id}_q{sequence_index}_i{pair_index}_d{day}_p{second_period}"
+                        )
+                        model.Add(sum(first_vars) >= first_present)
+                        model.Add(sum(first_vars) <= len(first_vars) * first_present)
+                        model.Add(sum(second_vars) >= second_present)
+                        model.Add(sum(second_vars) <= len(second_vars) * second_present)
+
+                        follows_in_order = model.NewBoolVar(
+                            f"seq_adjacent_c{classroom_id}_q{sequence_index}_i{pair_index}_d{day}_p{first_period}"
+                        )
+                        model.Add(follows_in_order <= first_present)
+                        model.Add(follows_in_order <= second_present)
+                        model.Add(follows_in_order >= first_present + second_present - 1)
+                        rewards.append(follows_in_order * 1000)
 
     # "Evitar sexta-feira" é uma preferência, não uma proibição de horários.
     if avoid_friday:
